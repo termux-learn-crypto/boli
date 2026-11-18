@@ -13,7 +13,7 @@ All notable changes to BOLI. BOLI follows [Semantic Versioning](https://semver.o
 
 ### Docs
 - README/LANGUAGE_SPEC/SECURITY_REPORT/TESTING: limits tables expanded (11 limits); v0.3.1 notes; test counts corrected (95).
-- COMPLETE_AUDIT.md: v0.3.1 appendix with the 5 fixes and verification.
+- docs/COMPLETE_AUDIT.md: v0.3.1 appendix with the 5 fixes and verification.
 
 ### Internal
 - 95 tests (77 library + 18 CLI), `cargo fmt --check` / `cargo check` / `cargo clippy --all-targets --all-features -- -D warnings` / `cargo build --release` all green.
@@ -73,7 +73,7 @@ All notable changes to BOLI. BOLI follows [Semantic Versioning](https://semver.o
 ### Internal
 - `src/lib.rs` (library) + `src/main.rs` (binary) split so integration tests can use the parser/interpreter.
 - Test suite: 67 automated tests (`cargo test`): lexer, parser, AST, interpreter (functions/scopes/lists/loops/limits), CLI end-to-end (REPL, binary broken-pipe, missing file, pucho input).
-- `AUDIT_REPORT.md`, `LANGUAGE_SPEC.md`, `ARCHITECTURE.md`, `TESTING.md`.
+- `docs/AUDIT_REPORT.md`, `LANGUAGE_SPEC.md`, `ARCHITECTURE.md`, `TESTING.md`.
 
 ## [0.1.0] — 2026-11-18
 

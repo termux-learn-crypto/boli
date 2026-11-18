@@ -384,14 +384,15 @@ boli/
 ├── ARCHITECTURE.md     # code flow aur module design
 ├── CHANGELOG.md        # v0.1.0 → v0.3.0 changes
 ├── TESTING.md          # tests kaise chalayein, kaise likhein
-├── AUDIT_REPORT.md     # audit + "how verified" notes
-├── COMPLETE_AUDIT.md   # v0.3.0: complete source-code audit (lexer/parser/AST/interpreter/CLI)
-├── BUG_FIXES.md        # v0.3.0: har fix ka symptom→root cause→verification
-├── SECURITY_REPORT.md  # v0.3.0: resource-limit matrix + threat model
-├── ARCHITECTURE_REPORT.md  # v0.3.0: module decisions
-├── TEST_RESULTS.md     # v0.3.0: actual command outputs
-├── V0.3.0_CHANGELOG.md # v0.3.0: full changelog
-├── UPGRADE_ROADMAP.md  # v0.4+ plans (dictionary, modules, stdlib, VM)
+├── docs/
+│   ├── AUDIT_REPORT.md     # audit + "how verified" notes
+│   ├── COMPLETE_AUDIT.md   # v0.3.x: complete source-code audit
+│   ├── BUG_FIXES.md        # har fix ka symptom→root cause→verification
+│   ├── SECURITY_REPORT.md  # resource-limit matrix + threat model
+│   ├── ARCHITECTURE_REPORT.md  # module decisions
+│   ├── TEST_RESULTS.md     # actual command outputs
+│   ├── V0.3.0_CHANGELOG.md # v0.3.0 full changelog
+│   └── UPGRADE_ROADMAP.md  # future plans (dictionary, modules, VM)
 ├── examples/
 │   ├── namaste.hl
 │   ├── calculator.hl
@@ -416,7 +417,7 @@ boli/
 cargo test          # 95 tests chalenge
 ```
 
-Details aur test-adding guide: [TESTING.md](TESTING.md). Spec: [LANGUAGE_SPEC.md](LANGUAGE_SPEC.md). Changes: [CHANGELOG.md](CHANGELOG.md). Audit: [COMPLETE_AUDIT.md](COMPLETE_AUDIT.md). Security: [SECURITY_REPORT.md](SECURITY_REPORT.md).
+Details aur test-adding guide: [TESTING.md](TESTING.md). Spec: [LANGUAGE_SPEC.md](LANGUAGE_SPEC.md). Changes: [CHANGELOG.md](CHANGELOG.md). Audit: [docs/COMPLETE_AUDIT.md](docs/COMPLETE_AUDIT.md). Security: [docs/SECURITY_REPORT.md](docs/SECURITY_REPORT.md).
 
 Kaam karne ka flow: `source.hl` → **lexer** (tokens) → **parser** (AST) → **interpreter** (run).
 
