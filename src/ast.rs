@@ -4,10 +4,11 @@
 
 use std::fmt;
 
-// Galti (error) ka type - line number ke saath Hinglish message
+// Galti (error) ka type - line number (aur lexer/parser phase par column) ke saath Hinglish message
 #[derive(Debug, Clone)]
 pub struct BoliError {
     pub line: Option<usize>,
+    pub col: Option<usize>,
     pub message: String,
 }
 
@@ -16,6 +17,16 @@ impl BoliError {
     pub fn line(line: usize, message: impl Into<String>) -> Self {
         BoliError {
             line: Some(line),
+            col: None,
+            message: message.into(),
+        }
+    }
+
+    // Line + column wali galti (lexer/parser phase)
+    pub fn line_col(line: usize, col: usize, message: impl Into<String>) -> Self {
+        BoliError {
+            line: Some(line),
+            col: Some(col),
             message: message.into(),
         }
     }
@@ -23,9 +34,12 @@ impl BoliError {
 
 impl fmt::Display for BoliError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.line {
-            Some(line) => write!(f, "Galti: line {} me {}", line, self.message),
-            None => write!(f, "Galti: {}", self.message),
+        match (self.line, self.col) {
+            (Some(line), Some(col)) => {
+                write!(f, "Galti: line {}, col {} me {}", line, col, self.message)
+            }
+            (Some(line), None) => write!(f, "Galti: line {} me {}", line, self.message),
+            (None, _) => write!(f, "Galti: {}", self.message),
         }
     }
 }

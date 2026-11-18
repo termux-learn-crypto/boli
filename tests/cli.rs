@@ -342,3 +342,18 @@ fn cli_repl_oversized_line_is_rejected_and_repl_survives() {
     assert!(stdout.contains("42"), "stdout: {}", stdout);
     assert!(stdout.contains("Alvida"), "stdout: {}", stdout);
 }
+
+#[test]
+fn cli_syntax_error_shows_line_and_caret() {
+    let path = write_program("caret_error.hl", "nam;aste\n");
+    let output = Command::new(boli_bin())
+        .arg("run")
+        .arg(&path)
+        .output()
+        .expect("boli binary chala nahi");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!output.status.success());
+    assert!(stderr.contains("col 4"), "stderr: {}", stderr);
+    assert!(stderr.contains("nam;aste"), "stderr: {}", stderr);
+    assert!(stderr.contains('^'), "stderr: {}", stderr);
+}

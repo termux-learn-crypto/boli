@@ -64,8 +64,9 @@ impl Parser {
         if tok.tok == wanted {
             return Ok(self.next());
         }
-        Err(BoliError::line(
+        Err(BoliError::line_col(
             tok.line,
+            tok.col,
             format!(
                 "yahan '{}' chahiye tha, par '{}' mila",
                 what,
@@ -84,8 +85,9 @@ impl Parser {
             Tok::Eof => Ok(()),
             _ => {
                 let tok = self.peek();
-                Err(BoliError::line(
+                Err(BoliError::line_col(
                     tok.line,
+                    tok.col,
                     format!(
                         "'{}' yahan nahi aa sakta, ek line me ek hi kaam hota hai",
                         tok.describe()
@@ -112,8 +114,9 @@ impl Parser {
                 self.pos += 1;
                 Ok(("hissa".to_string(), tok.line))
             }
-            _ => Err(BoliError::line(
+            _ => Err(BoliError::line_col(
                 tok.line,
+                tok.col,
                 format!("yahan naam chahiye tha, par '{}' mila", tok.describe()),
             )),
         }
@@ -125,8 +128,9 @@ impl Parser {
         let line = self.peek().line;
         if !Self::atom_start(&self.peek().tok) {
             let tok = self.peek().clone();
-            return Err(BoliError::line(
+            return Err(BoliError::line_col(
                 line,
+                tok.col,
                 format!(
                     "rakho ke baad value chahiye thi, par '{}' mila",
                     tok.describe()
@@ -190,8 +194,9 @@ impl Parser {
         self.depth += 1;
         if self.depth > self.max_depth {
             self.depth -= 1;
-            return Err(BoliError::line(
+            return Err(BoliError::line_col(
                 self.peek().line,
+                self.peek().col,
                 format!(
                     "code bahut zyada gehra hai (max nesting {})",
                     self.max_depth
@@ -243,8 +248,9 @@ impl Parser {
                         ("hissa".to_string(), tok.line)
                     }
                     _ => {
-                        return Err(BoliError::line(
+                        return Err(BoliError::line_col(
                             tok.line,
+                            tok.col,
                             format!(
                                 "'{}' ke baad variable ka naam do, jaise '{} jawab 5 aur 3'",
                                 op.naam(),
@@ -450,16 +456,19 @@ impl Parser {
                 self.expect_line_end()?;
                 Ok(Stmt::Agla(line))
             }
-            Tok::Khatam => Err(BoliError::line(
+            Tok::Khatam => Err(BoliError::line_col(
                 tok.line,
+                tok.col,
                 "'khatam' bina kuch shuru kiye aaya, pehle agar/jab tak/kaam likho",
             )),
-            Tok::Nahi => Err(BoliError::line(
+            Tok::Nahi => Err(BoliError::line_col(
                 tok.line,
+                tok.col,
                 "'nahi to' sirf agar ke andar use hota hai",
             )),
-            _ => Err(BoliError::line(
+            _ => Err(BoliError::line_col(
                 tok.line,
+                tok.col,
                 format!(
                     "'{}' yahan se statement nahi shuru ho sakta",
                     tok.describe()
@@ -508,8 +517,9 @@ impl Parser {
         self.depth += 1;
         if self.depth > self.max_depth {
             self.depth -= 1;
-            return Err(BoliError::line(
+            return Err(BoliError::line_col(
                 self.peek().line,
+                self.peek().col,
                 format!(
                     "expression bahut zyada gehra hai (max nesting {})",
                     self.max_depth
@@ -571,8 +581,9 @@ impl Parser {
                 let (left, right) = self.parse_arith_tail(op, line)?;
                 Ok(Expr::Arith(op, Box::new(left), Box::new(right), line))
             }
-            _ => Err(BoliError::line(
+            _ => Err(BoliError::line_col(
                 tok.line,
+                tok.col,
                 format!("yahan value chahiye thi, par '{}' mila", tok.describe()),
             )),
         }
@@ -614,8 +625,9 @@ impl Parser {
                 let right = self.parse_aur()?;
                 chain += 1;
                 if chain > self.max_condition_depth {
-                    return Err(BoliError::line(
+                    return Err(BoliError::line_col(
                         line,
+                        tok.col,
                         format!(
                             "condition bahut lambi ho gayi (max {} 'ya')",
                             self.max_condition_depth
@@ -642,8 +654,9 @@ impl Parser {
                 let right = self.parse_comparison()?;
                 chain += 1;
                 if chain > self.max_condition_depth {
-                    return Err(BoliError::line(
+                    return Err(BoliError::line_col(
                         line,
+                        tok.col,
                         format!(
                             "condition bahut lambi ho gayi (max {} 'aur')",
                             self.max_condition_depth
@@ -699,8 +712,9 @@ impl Parser {
             }
             _ => {
                 let tok = self.peek().clone();
-                return Err(BoliError::line(
+                return Err(BoliError::line_col(
                     tok.line,
+                    tok.col,
                     format!(
                         "condition me 'bada', 'chhota' ya 'barabar' chahiye tha, par '{}' mila",
                         tok.describe()

@@ -93,12 +93,12 @@ fn run_file(path: &str) {
         Ok(program) => {
             let mut env = Environment::new();
             if let Err(e) = env.run_program(&program) {
-                eprintln!("{}", e);
+                show_boli_error(&source, &e);
                 process::exit(1);
             }
         }
         Err(e) => {
-            eprintln!("{}", e);
+            show_boli_error(&source, &e);
             process::exit(1);
         }
     }
@@ -122,6 +122,25 @@ fn read_capped(path: &str, max_source: u64) -> Result<String, String> {
         ));
     }
     String::from_utf8(buf).map_err(|_| format!("Galti: file '{}' UTF-8 nahi hai", path))
+}
+
+// Error dikhane ka helper: agar line+col pata hai to source line aur caret bhi print karta hai
+fn show_boli_error(source: &str, e: &boli::ast::BoliError) {
+    eprintln!("{}", e);
+    if let (Some(line), Some(col)) = (e.line, e.col) {
+        // EOF jaise errors line ke baahar point kar sakte hain - last line par clamp karo
+        let (line_str, caret_col) = match source.lines().nth(line - 1) {
+            Some(s) => (s.to_string(), col),
+            None => match source.lines().last() {
+                Some(s) => (s.to_string(), s.chars().count() + 1),
+                None => (String::new(), 1),
+            },
+        };
+        if !line_str.is_empty() {
+            eprintln!("    {}", line_str);
+            eprintln!("    {}^", " ".repeat(caret_col - 1));
+        }
+    }
 }
 
 // REPL - interactive shell
@@ -311,13 +330,14 @@ fn repl() {
         }
 
         // Pura code ab ready hai, chalao
-        match parser::parse_source(&buffer) {
+        let program_source = buffer.clone();
+        match parser::parse_source(&program_source) {
             Ok(program) => {
                 if let Err(e) = env.run_program(&program) {
-                    eprintln!("{}", e);
+                    show_boli_error(&program_source, &e);
                 }
             }
-            Err(e) => eprintln!("{}", e),
+            Err(e) => show_boli_error(&program_source, &e),
         }
         buffer.clear();
         depth = 0;

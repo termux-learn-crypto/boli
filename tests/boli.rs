@@ -833,3 +833,40 @@ fn builtin_unicode_text_ops() {
     assert_eq!(run_out("likho lambayi \"नमस्ते\"").unwrap(), vec!["6"]);
     assert_eq!(run_out("likho upar \"नमस्ते\"").unwrap(), vec!["नमस्ते"]); // caseless script stays
 }
+
+// ---------- column numbers + caret (v0.4.0) ----------
+
+#[test]
+fn lexer_error_has_column() {
+    let err = lex("likho @").unwrap_err();
+    assert_eq!(err.line, Some(1));
+    assert_eq!(err.col, Some(7));
+}
+
+#[test]
+fn parser_error_has_column() {
+    let err = parse_source("likho 1 2").unwrap_err();
+    assert_eq!(err.line, Some(1));
+    assert_eq!(err.col, Some(9));
+    assert!(err.to_string().contains("col 9"));
+}
+
+#[test]
+fn unterminated_text_error_has_position() {
+    let err = parse_source("likho \"unclosed").unwrap_err();
+    assert_eq!(err.line, Some(1));
+    assert!(err.col.is_some());
+}
+
+#[test]
+fn symbol_error_caret_position() {
+    let err = lex("nam;aste").unwrap_err();
+    assert_eq!(err.col, Some(4));
+}
+
+#[test]
+fn khaali_message_format_with_col() {
+    let err = parse_source("ruk 5").unwrap_err(); // '5' yahan nahi aa sakta
+    assert!(err.to_string().starts_with("Galti: line 1"));
+    assert!(err.to_string().contains("col"));
+}

@@ -54,6 +54,7 @@ pub enum Tok {
 pub struct Token {
     pub tok: Tok,
     pub line: usize,
+    pub col: usize, // 1-based char column (Unicode-honest)
 }
 
 impl Token {
@@ -162,6 +163,7 @@ struct Cursor<'a> {
     iter: std::str::CharIndices<'a>,
     cur: Option<char>,
     nxt: Option<char>,
+    col: usize, // current char ka 1-based column; newline par reset
 }
 
 impl<'a> Cursor<'a> {
@@ -169,7 +171,12 @@ impl<'a> Cursor<'a> {
         let mut iter = source.char_indices();
         let cur = iter.next().map(|(_, c)| c);
         let nxt = iter.next().map(|(_, c)| c);
-        Cursor { iter, cur, nxt }
+        Cursor {
+            iter,
+            cur,
+            nxt,
+            col: 1,
+        }
     }
 
     fn peek(&self) -> Option<char> {
@@ -180,22 +187,38 @@ impl<'a> Cursor<'a> {
         self.nxt
     }
 
+    fn peek_col(&self) -> usize {
+        self.col
+    }
+
     fn bump(&mut self) -> Option<char> {
         let old = self.cur;
         self.cur = self.nxt;
         self.nxt = self.iter.next().map(|(_, c)| c);
+        match old {
+            Some('\n') => self.col = 1,
+            Some(_) => self.col += 1,
+            None => {}
+        }
         old
     }
 }
 
-fn push_token(tokens: &mut Vec<Token>, token: Token, max_tokens: u64) -> Result<(), BoliError> {
+fn push_token(
+    tokens: &mut Vec<Token>,
+    tok: Tok,
+    line: usize,
+    col: usize,
+    max_tokens: u64,
+) -> Result<(), BoliError> {
     if tokens.len() as u64 >= max_tokens {
-        return Err(BoliError::line(
-            token.line,
+        return Err(BoliError::line_col(
+            line,
+            col,
             format!("code me bahut zyada tokens hain (max {})", max_tokens),
         ));
     }
-    tokens.push(token);
+    tokens.push(Token { tok, line, col });
     Ok(())
 }
 
@@ -208,7 +231,8 @@ pub fn lex_with_limits(
 ) -> Result<Vec<Token>, BoliError> {
     // Source size limit pehle - badi files ko tokenize karne se pehle hi rok do
     if source.len() as u64 > max_source_bytes {
-        return Err(BoliError::line(
+        return Err(BoliError::line_col(
+            1,
             1,
             format!(
                 "source bahut bada hai ({} bytes, max {})",
@@ -231,14 +255,8 @@ pub fn lex_with_limits(
 
         // Nai line
         if c == '\n' {
-            push_token(
-                &mut tokens,
-                Token {
-                    tok: Tok::Newline,
-                    line,
-                },
-                max_tokens,
-            )?;
+            let tok_col = cursor.peek_col();
+            push_token(&mut tokens, Tok::Newline, line, tok_col, max_tokens)?;
             line += 1;
             cursor.bump();
             continue;
@@ -258,6 +276,7 @@ pub fn lex_with_limits(
         // Text (string) - double quotes ke beech ka hissa
         if c == '"' {
             let start_line = line;
+            let tok_col = cursor.peek_col();
             let mut text = String::new();
             cursor.bump();
             let mut band_hua = false;
@@ -270,8 +289,9 @@ pub fn lex_with_limits(
                         break;
                     }
                     Some('\n') => {
-                        return Err(BoliError::line(
+                        return Err(BoliError::line_col(
                             start_line,
+                            cursor.peek_col(),
                             "text pura nahi hua, band karne ke liye \" lagao",
                         ));
                     }
@@ -300,24 +320,25 @@ pub fn lex_with_limits(
                     }
                 }
                 if text.len() as u64 > max_string_bytes {
-                    return Err(BoliError::line(
+                    return Err(BoliError::line_col(
                         start_line,
+                        cursor.peek_col(),
                         format!("text bahut bada hai (max {} bytes)", max_string_bytes),
                     ));
                 }
             }
             if !band_hua {
-                return Err(BoliError::line(
+                return Err(BoliError::line_col(
                     start_line,
+                    cursor.peek_col(),
                     "text pura nahi hua, band karne ke liye \" lagao",
                 ));
             }
             push_token(
                 &mut tokens,
-                Token {
-                    tok: Tok::Text(text),
-                    line: start_line,
-                },
+                Tok::Text(text),
+                start_line,
+                tok_col,
                 max_tokens,
             )?;
             continue;
@@ -329,6 +350,7 @@ pub fn lex_with_limits(
             || (c == '-' && cursor.peek_next().is_some_and(|n| n.is_ascii_digit()))
         {
             let start_line = line;
+            let tok_col = cursor.peek_col();
             let mut num = String::new();
             if c == '-' {
                 num.push('-');
@@ -357,21 +379,25 @@ pub fn lex_with_limits(
                 }
             }
             let value: f64 = num.parse().map_err(|_| {
-                BoliError::line(start_line, format!("'{}' number sahi nahi hai", num))
+                BoliError::line_col(
+                    start_line,
+                    cursor.peek_col(),
+                    format!("'{}' number sahi nahi hai", num),
+                )
             })?;
             // BOLI me sirf finite numbers chalte hain (inf/nan allowed nahi)
             if !value.is_finite() {
-                return Err(BoliError::line(
+                return Err(BoliError::line_col(
                     start_line,
+                    cursor.peek_col(),
                     format!("'{}' bahut bada hai, finite number nahi hai", num),
                 ));
             }
             push_token(
                 &mut tokens,
-                Token {
-                    tok: Tok::Number(value),
-                    line: start_line,
-                },
+                Tok::Number(value),
+                start_line,
+                tok_col,
                 max_tokens,
             )?;
             continue;
@@ -380,6 +406,7 @@ pub fn lex_with_limits(
         // Shabd - letters (Devanagari bhi chal sakti hai), digits aur underscore
         if c.is_alphabetic() || c == '_' || is_mark(c) {
             let start_line = line;
+            let tok_col = cursor.peek_col();
             let mut word = String::new();
             while let Some(x) = cursor.peek() {
                 if !is_word_char(x) {
@@ -388,28 +415,21 @@ pub fn lex_with_limits(
                 word.push(x);
                 cursor.bump();
                 if word.len() as u64 > max_string_bytes {
-                    return Err(BoliError::line(
+                    return Err(BoliError::line_col(
                         start_line,
+                        cursor.peek_col(),
                         format!("shabd bahut bada hai (max {} bytes)", max_string_bytes),
                     ));
                 }
             }
             let lower = word.to_lowercase();
             match keyword(&lower) {
-                Some(kw) => push_token(
-                    &mut tokens,
-                    Token {
-                        tok: kw,
-                        line: start_line,
-                    },
-                    max_tokens,
-                )?,
+                Some(kw) => push_token(&mut tokens, kw, start_line, tok_col, max_tokens)?,
                 None => push_token(
                     &mut tokens,
-                    Token {
-                        tok: Tok::Ident(word),
-                        line: start_line,
-                    },
+                    Tok::Ident(word),
+                    start_line,
+                    tok_col,
                     max_tokens,
                 )?,
             }
@@ -417,8 +437,9 @@ pub fn lex_with_limits(
         }
 
         // Koi symbol (jaise ; { } ( ) = : .) BOLI me allowed nahi
-        return Err(BoliError::line(
+        return Err(BoliError::line_col(
             line,
+            cursor.peek_col(),
             format!(
                 "'{}' nahi chahiye, BOLI me sirf shabd, number aur \"text\" use hota hai",
                 c
@@ -426,14 +447,7 @@ pub fn lex_with_limits(
         ));
     }
 
-    push_token(
-        &mut tokens,
-        Token {
-            tok: Tok::Eof,
-            line,
-        },
-        max_tokens,
-    )?;
+    push_token(&mut tokens, Tok::Eof, line, cursor.peek_col(), max_tokens)?;
     Ok(tokens)
 }
 
