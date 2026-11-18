@@ -585,11 +585,16 @@ impl Environment {
             .iter()
             .map(|a| self.eval_expr(a))
             .collect::<Result<_, _>>()?;
-        let kaam = self
-            .kaam
-            .get(name)
-            .cloned()
-            .ok_or_else(|| BoliError::line(line, format!("kaam '{}' nahi mila", name)))?;
+        let kaam = match self.kaam.get(name).cloned() {
+            Some(k) => k,
+            None => {
+                // user-defined nahi hai to built-in try karo
+                if crate::builtins::is_builtin(name) {
+                    return crate::builtins::call_builtin(name, arg_values, line);
+                }
+                return Err(BoliError::line(line, format!("kaam '{}' nahi mila", name)));
+            }
+        };
         if kaam.params.len() != arg_values.len() {
             return Err(BoliError::line(
                 line,

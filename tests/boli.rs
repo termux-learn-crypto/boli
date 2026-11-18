@@ -774,3 +774,62 @@ fn total_budget_replacement_is_not_double_counted() {
     env.run_program(&program).unwrap();
     assert_eq!(env.take_output(), vec!["ccccccccccccccccccccccccccccc"]);
 }
+
+// ---------- built-in kaam (v0.4.0) ----------
+
+#[test]
+fn builtin_lambayi_text_and_list() {
+    assert_eq!(run_out("likho lambayi \"namaste\"").unwrap(), vec!["7"]);
+    assert_eq!(
+        run_out("cheezein rakho 1 2 3\nlikho lambayi cheezein").unwrap(),
+        vec!["3"]
+    );
+    assert_eq!(run_out("likho lambayi khaali").unwrap(), vec!["0"]);
+    assert!(run_out("likho lambayi 42").is_err());
+}
+
+#[test]
+fn builtin_upar_neeche() {
+    assert_eq!(run_out("likho upar \"boli\"").unwrap(), vec!["BOLI"]);
+    assert_eq!(run_out("likho neeche \"BOLI\"").unwrap(), vec!["boli"]);
+    assert!(run_out("likho upar 42").is_err());
+}
+
+#[test]
+fn builtin_text_cast() {
+    assert_eq!(run_out("likho text 42").unwrap(), vec!["42"]);
+    assert_eq!(run_out("likho text sahi").unwrap(), vec!["sahi"]);
+    assert_eq!(
+        run_out("cheezein rakho 1 2 3\nlikho text cheezein").unwrap(),
+        vec!["1, 2, 3"]
+    );
+    assert_eq!(run_out("likho text khaali").unwrap(), vec!["khaali"]);
+}
+
+#[test]
+fn builtin_sankhya() {
+    assert_eq!(run_out("likho sankhya \"28.5\"").unwrap(), vec!["28.5"]);
+    assert!(run_out("likho sankhya \"naam\"").is_err());
+    assert!(run_out(&format!("likho sankhya \"{}\"", "9".repeat(400))).is_err()); // inf rejected
+    assert_eq!(run_out("likho sankhya 42").unwrap(), vec!["42"]);
+}
+
+#[test]
+fn builtin_wrong_arity_errors() {
+    assert!(run_out("likho lambayi").is_err());
+    assert!(run_out("likho lambayi \"a\" \"b\"").is_err());
+    assert!(run_out("likho upar").is_err());
+}
+
+#[test]
+fn builtin_user_kaam_shadows_builtin() {
+    let src = "kaam lambayi x\n    wapas do \"user wala\"\nkhatam\nlikho lambayi \"abc\"";
+    assert_eq!(run_out(src).unwrap(), vec!["user wala"]);
+}
+
+#[test]
+fn builtin_unicode_text_ops() {
+    // Devanagari text escape ke saath
+    assert_eq!(run_out("likho lambayi \"नमस्ते\"").unwrap(), vec!["6"]);
+    assert_eq!(run_out("likho upar \"नमस्ते\"").unwrap(), vec!["नमस्ते"]); // caseless script stays
+}

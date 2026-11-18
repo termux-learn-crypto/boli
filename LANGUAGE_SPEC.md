@@ -171,6 +171,20 @@ In both cases a variable of that keyword name may be created, read and assigned 
 
 ## 11. Record of behavior
 
+### Built-in kaams (v0.4.0)
+
+Pure Rust, koi external dependency nahi. User-defined kaam in naam se shadow ho sakta hai (user ki priority):
+
+| Kaam | Signature | Behavior |
+|---|---|---|
+| `lambayi` | `lambayi <text\|list\|khaali>` | text: Unicode characters (bytes nahi); list: items; `khaali` → 0 |
+| `upar` | `upar <text>` | Unicode uppercase |
+| `neeche` | `neeche <text>` | Unicode lowercase |
+| `text` | `text <anything>` | value ko dikhane-laayak text me (`dikhane_laayak()`) |
+| `sankhya` | `sankhya <text\|number>` | strict parse; galat text / overflow → Galti |
+
+Arity mismatch ek Hinglish Galti hai with exact expected count. Arguments eagerly evaluate hote hain (existing call rules).
+
 ### v0.3.1 vs v0.3.0
 
 - `BOLI_MAX_EVAL_DEPTH` ab sach me configurable hai (pehle hardcoded 256 tha, env var ignore hota tha); error message bhi configured value dikhata hai.

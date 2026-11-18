@@ -423,6 +423,18 @@ Kaam karne ka flow: `source.hl` → **lexer** (tokens) → **parser** (AST) → 
 
 ---
 
+## Built-in kaams
+
+| Kaam | Kya karta hai | Example |
+|---|---|---|
+| `lambayi` | text ke characters / list ke items | `likho lambayi "namaste"` → `7` |
+| `upar` | text UPPERCASE | `likho upar "boli"` → `BOLI` |
+| `neeche` | text lowercase | `likho neeche "BOLI"` → `boli` |
+| `text` | kisi bhi value ko text me | `likho text 42` → `42` |
+| `sankhya` | text ko number me (galat text → error) | `likho sankhya "28"` → `28` |
+
+User-defined kaam in naam se shadow kar sakta hai — user kaam ki priority zyada hai.
+
 ## Safety limits (BOLI v0.3.1)
 
 Sab limits env variable se override ho sakti hain — har violation Hinglish Galti error hai, kabhi crash nahi:
@@ -448,6 +460,7 @@ Sab limits env variable se override ho sakti hain — har violation Hinglish Gal
 - `agar ... nahi to ... khatam`, `aur / ya` logic, `bada / chhota / barabar / bada ya barabar / chhota ya barabar`
 - `se ... tak` range loop, `jab tak` while loop
 - `kaam` definitions, calls, `wapas do`
+- Built-in kaams: `lambayi`, `upar`, `neeche`, `text`, `sankhya`
 - types: text, number, sahi/galat, khaali
 
 ## Aage kya aa sakta hai

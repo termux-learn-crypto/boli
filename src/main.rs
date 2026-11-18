@@ -49,6 +49,13 @@ fn print_help() {
     println!("  cargo run -- run x.hl  x.hl file chalao");
     println!("  cargo run -- help      yeh message dikhao");
     println!("  cargo run -- version   version dikhao");
+    println!();
+    println!("Built-in kaams: lambayi, upar, neeche, text, sankhya");
+    println!("  lambayi <text|list>   text ke characters / list ke items");
+    println!("  upar <text>           UPPERCASE");
+    println!("  neeche <text>         lowercase");
+    println!("  text <anything>       kisi bhi value ko text me");
+    println!("  sankhya <text>        text ko number me (galat text par error)");
 }
 
 // File padhkar chalao
