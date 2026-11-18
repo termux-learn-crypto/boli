@@ -194,6 +194,11 @@ pub enum Stmt {
     Ruk(usize),
     // agla  (continue - agli ginti pe jao)
     Agla(usize),
+    // laao "<path>.hl"   (module import - current environment me)
+    Laao {
+        path: String,
+        line: usize,
+    },
     // cheezein hissa 2 rakho 99   (list ke ek hisse ko badlo)
     ListAssign {
         target: String,
@@ -245,6 +250,7 @@ impl Stmt {
             Stmt::Wapas { line, .. } => *line,
             Stmt::Ruk(line) => *line,
             Stmt::Agla(line) => *line,
+            Stmt::Laao { line, .. } => *line,
             Stmt::ListAssign { line, .. } => *line,
             Stmt::MapRakho { line, .. } => *line,
         }

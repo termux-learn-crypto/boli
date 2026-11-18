@@ -478,6 +478,27 @@ impl Parser {
                 self.expect_line_end()?;
                 Ok(Stmt::KaamCall { name, args, line })
             }
+            // laao "<path>.hl" - module import
+            Tok::Laao => {
+                self.next();
+                let line = tok.line;
+                let path = match self.peek().tok.clone() {
+                    Tok::Text(p) => {
+                        self.pos += 1;
+                        p
+                    }
+                    _ => {
+                        let tok = self.peek().clone();
+                        return Err(BoliError::line_col(
+                            tok.line,
+                            tok.col,
+                            "laao ke baad .hl file ka naam text me do, jaise laao \"math.hl\"",
+                        ));
+                    }
+                };
+                self.expect_line_end()?;
+                Ok(Stmt::Laao { path, line })
+            }
             // ruk (break) aur agla (continue) - loop ke andar use hote hain
             Tok::Ruk => {
                 self.next();

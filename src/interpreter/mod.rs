@@ -68,6 +68,9 @@ pub struct Environment {
     cond_depth: usize,
     // kaam call trace (outermost -> innermost order)
     trace: Vec<(String, usize)>,
+    // import/module system
+    loaded_modules: std::collections::HashSet<std::path::PathBuf>,
+    source_dir: Option<std::path::PathBuf>,
     captured: Option<Vec<String>>,
 }
 
@@ -103,6 +106,8 @@ impl Environment {
             eval_depth: 0,
             cond_depth: 0,
             trace: Vec::new(),
+            loaded_modules: std::collections::HashSet::new(),
+            source_dir: None,
             captured: None,
         }
     }
@@ -143,6 +148,53 @@ impl Environment {
     pub fn with_total_budget_bytes(mut self, max_total_bytes: u64) -> Self {
         self.max_total_bytes = max_total_bytes;
         self
+    }
+
+    pub fn set_source_dir(&mut self, dir: std::path::PathBuf) {
+        self.source_dir = Some(dir);
+    }
+
+    // `<dir>/file.hl` ko current environment me ek baar execute karo (cycles safe)
+    fn laao(&mut self, raw_path: &str, line: usize) -> Result<(), BoliError> {
+        let resolve_base = || -> Result<std::path::PathBuf, BoliError> {
+            Ok(self.source_dir.clone().unwrap_or_else(|| {
+                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
+            }))
+        };
+        let base = resolve_base()?;
+        let joined = if std::path::Path::new(raw_path).is_absolute() {
+            std::path::PathBuf::from(raw_path)
+        } else {
+            base.join(raw_path)
+        };
+        let canonical = std::fs::canonicalize(&joined)
+            .map_err(|e| BoliError::line(line, format!("file '{}' nahi mili: {}", raw_path, e)))?;
+        if !self.loaded_modules.insert(canonical.clone()) {
+            // pehle hi import ho chuka hai - ek baar execute karna hai
+            return Ok(());
+        }
+        // bounded read (BOLI_MAX_SOURCE_BYTES)
+        let max_source = crate::limits::env_limit(
+            "BOLI_MAX_SOURCE_BYTES",
+            crate::limits::DEFAULT_MAX_SOURCE_BYTES,
+        );
+        let meta_len = std::fs::metadata(&canonical).map(|m| m.len()).unwrap_or(0);
+        if meta_len > max_source {
+            return Err(BoliError::line(
+                line,
+                format!(
+                    "file '{}' bahut badi hai ({} bytes, max {})",
+                    raw_path, meta_len, max_source
+                ),
+            ));
+        }
+        let source = std::fs::read_to_string(&canonical).map_err(|e| {
+            BoliError::line(line, format!("file '{}' padh nahi paye: {}", raw_path, e))
+        })?;
+        let program = crate::parser::parse_source(&source)
+            .map_err(|e| BoliError::line(line, format!("file '{}' me error: {}", raw_path, e)))?;
+        self.run_program(&program)
+            .map_err(|e| BoliError::line(line, format!("file '{}' me error: {}", raw_path, e)))
     }
 
     pub fn reset_steps(&mut self) {
@@ -491,6 +543,10 @@ impl Environment {
             }
             Stmt::Ruk(line) => Ok(Flow::Ruk(*line)),
             Stmt::Agla(line) => Ok(Flow::Agla(*line)),
+            Stmt::Laao { path, line } => {
+                self.laao(path, *line)?;
+                Ok(Flow::Normal)
+            }
             Stmt::ListAssign {
                 target,
                 index,

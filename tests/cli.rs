@@ -357,3 +357,93 @@ fn cli_syntax_error_shows_line_and_caret() {
     assert!(stderr.contains("nam;aste"), "stderr: {}", stderr);
     assert!(stderr.contains('^'), "stderr: {}", stderr);
 }
+
+// ---------- module system (v0.6.0) ----------
+
+#[test]
+fn cli_laao_imports_and_runs() {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("laao_mod.hl"),
+        "PI rakho 314\nkaam double x\n    guna jawab x ko 2 se\n    wapas do jawab\nkhatam\n",
+    )
+    .unwrap();
+    let main_path = write_program(
+        "laao_main.hl",
+        "laao \"laao_mod.hl\"\nlikho PI\nlikho double 21\n",
+    );
+    let output = Command::new(boli_bin())
+        .arg("run")
+        .arg(&main_path)
+        .current_dir(&dir)
+        .output()
+        .expect("boli binary chala nahi");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("314"), "stdout: {}", stdout);
+    assert!(stdout.contains("42"), "stdout: {}", stdout);
+}
+
+#[test]
+fn cli_laao_missing_file_errors() {
+    let main_path = write_program("laao_missing.hl", "laao \"definitely_not_here.hl\"\n");
+    let output = Command::new(boli_bin())
+        .arg("run")
+        .arg(&main_path)
+        .output()
+        .expect("boli binary chala nahi");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!output.status.success());
+    assert!(stderr.contains("nahi mili"), "stderr: {}", stderr);
+}
+
+#[test]
+fn cli_laao_circular_import_does_not_hang() {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("laao_a.hl"),
+        "laao \"laao_b.hl\"\nA_VALUE rakho 1\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("laao_b.hl"),
+        "laao \"laao_a.hl\"\nB_VALUE rakho 2\n",
+    )
+    .unwrap();
+    let main_path = write_program("laao_circ.hl", "laao \"laao_a.hl\"\nlikho B_VALUE\n");
+    let output = Command::new(boli_bin())
+        .arg("run")
+        .arg(&main_path)
+        .current_dir(&dir)
+        .output()
+        .expect("boli binary chala nahi");
+    assert!(
+        output.status.success(),
+        "circular import should not hang: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(String::from_utf8_lossy(&output.stdout).contains('2'));
+}
+
+#[test]
+fn cli_laao_oversized_import_refused() {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("laao_big.hl"), vec![b'x'; 2048]).unwrap();
+    let main_path = write_program("laao_big_main.hl", "laao \"laao_big.hl\"\n");
+    let output = Command::new(boli_bin())
+        .arg("run")
+        .arg(&main_path)
+        .current_dir(&dir)
+        .env("BOLI_MAX_SOURCE_BYTES", "10")
+        .output()
+        .expect("boli binary chala nahi");
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("bahut badi"));
+}
