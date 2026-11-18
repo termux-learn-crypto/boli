@@ -72,12 +72,17 @@ impl Parser {
     }
 
     // Identifier (kaam/variable ka naam) chahiye
+    // 'kaam' keyword bhi naam ki tarah chal sakta hai (jaise pucho kaam "...")
     fn expect_ident(&mut self) -> Result<(String, usize), BoliError> {
         let tok = self.peek().clone();
         match tok.tok {
             Tok::Ident(name) => {
                 self.pos += 1;
                 Ok((name, tok.line))
+            }
+            Tok::Kaam => {
+                self.pos += 1;
+                Ok(("kaam".to_string(), tok.line))
             }
             _ => Err(BoliError::line(
                 tok.line,
@@ -115,6 +120,7 @@ impl Parser {
         matches!(
             tok,
             Tok::Number(_) | Tok::Text(_) | Tok::Sahi | Tok::Galat | Tok::Khaali | Tok::Ident(_)
+                | Tok::Kaam
                 | Tok::Jodo | Tok::Ghatao | Tok::Guna | Tok::Bhaag
         )
     }
@@ -207,15 +213,41 @@ impl Parser {
                 self.expect_line_end()?;
                 Ok(Stmt::RangeLoop { from, to, body, line })
             }
-            // kaam <naam> <params> ... khatam
+            // kaam keyword teen cheezein ho sakti hai:
+            //   kaam rakho x   =>  "kaam" naam ka variable
+            //   kaam <args>    =>  "kaam" naam ke kaam ka bulana
+            //   kaam <naam>    =>  kaam definition (function banate hain)
             Tok::Kaam => {
-                self.next();
                 let line = tok.line;
+                // "kaam rakho ..." => variable "kaam"
+                if self.peek_at(1).tok == Tok::Rakho {
+                    self.next(); // kaam
+                    self.next(); // rakho
+                    let value = self.parse_expr()?;
+                    self.expect_line_end()?;
+                    return Ok(Stmt::Rakho { name: "kaam".to_string(), value, line });
+                }
+                // "kaam 5" / "kaam \"x\"" => ek kaam ka bulana (definition nahi)
+                let call_path = matches!(
+                    self.peek_at(1).tok,
+                    Tok::Number(_) | Tok::Text(_) | Tok::Sahi | Tok::Galat | Tok::Khaali
+                );
+                if call_path {
+                    self.next(); // kaam
+                    let mut args = Vec::new();
+                    while Self::atom_start(&self.peek().tok) {
+                        args.push(self.parse_atom()?);
+                    }
+                    self.expect_line_end()?;
+                    return Ok(Stmt::KaamCall { name: "kaam".to_string(), args, line });
+                }
+                // Warna yeh kaam definition hai
+                self.next();
                 let (name, _) = self.expect_ident()?;
                 let mut params = Vec::new();
-                while let Tok::Ident(param) = self.peek().tok.clone() {
+                while matches!(self.peek().tok, Tok::Ident(_) | Tok::Kaam) {
+                    let (param, _) = self.expect_ident()?;
                     params.push(param);
-                    self.pos += 1;
                 }
                 let body = self.parse_block()?;
                 self.expect(Tok::Khatam, "khatam")?;
@@ -316,7 +348,12 @@ impl Parser {
                 self.pos += 1;
                 Ok(Expr::Khaali(tok.line))
             }
-            Tok::Ident(name) => {
+            // 'kaam' value ki jagah bhi naam ki tarah chal sakta hai
+            Tok::Ident(_) | Tok::Kaam => {
+                let name = match &tok.tok {
+                    Tok::Ident(n) => n.clone(),
+                    _ => "kaam".to_string(),
+                };
                 self.pos += 1;
                 // Agar baad me atom shuru ho raha hai to yeh kaam ka bulana hai
                 if allow_call && Self::atom_start(&self.peek().tok) {

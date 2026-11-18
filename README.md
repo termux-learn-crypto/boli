@@ -265,6 +265,51 @@ Jod (a + b):
 
 ---
 
+## Ek hisab wala calculator — calculator2.hl
+
+Agar user ko sirf **ek** hisab chahiye, to `examples/calculator2.hl` use "kya karna hai? jodo, ghatao, guna, bhaag" puchta hai aur wahi hisab kar deta hai:
+
+```boli
+# calculator2.hl (short me)
+pucho a "Pehli sankhya: "
+pucho b "Doosri sankhya: "
+pucho kaam "kya karna hai? jodo, ghatao, guna, bhaag "
+
+milgaya rakho galat
+
+agar kaam "jodo" barabar hai to
+    jodo jawab a aur b
+    likho "Jawab hai:"
+    likho jawab
+    milgaya rakho sahi
+khatam
+
+# ... ghatao / guna / bhaag ke liye bhi aise hi ...
+
+agar milgaya galat barabar hai to
+    likho "Galat kaam likha hai"
+khatam
+```
+
+Chaar `agar` check hote hain (string `barabar` tulna se). `milgaya` flag rakha gaya hai taaki galat naam — jaise `jod` — pe `Galat kaam likha hai` print ho aur ho sirf ek baar.
+
+```bash
+cargo run -- run examples/calculator2.hl
+```
+
+```
+=== BOLI Calculator (ek hisab) ===
+Pehli sankhya: 5
+Doosri sankhya: 3
+kya karna hai? jodo, ghatao, guna, bhaag jodo
+Jawab hai:
+8
+```
+
+> Note: `kaam` BOLI me function ka keyword bhi hai aur `kaam` naam ka variable bhi ho sakta hai. Statement ki shuruwat me `kaam rakho 5` likhne pe woh variable banega; `kaam namaste` likhne pe woh function definition hoga.
+
+---
+
 ## Project structure
 
 ```
@@ -274,6 +319,7 @@ boli/
 ├── examples/
 │   ├── namaste.hl
 │   ├── calculator.hl
+│   ├── calculator2.hl
 │   └── loop.hl
 └── src/
     ├── main.rs         # CLI + REPL

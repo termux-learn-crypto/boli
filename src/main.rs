@@ -122,12 +122,40 @@ fn repl() {
             break;
         }
 
-        // Block depth badlo: agar/kaam/tak kholta hai, khatam band karta hai
-        for word in trimmed.split(|c: char| c.is_whitespace()) {
-            match word.to_lowercase().as_str() {
-                "agar" | "kaam" | "tak" => depth += 1,
-                "khatam" => depth -= 1,
+        // Block depth badlo: agar/jab/tak/kaam-definition kholte hain, khatam band karta hai
+        // comment (#) nikaal ke dekho, aur kaam def tabhi count ho jab def jaisa ho
+        let code_part = trimmed.split('#').next().unwrap_or("").trim();
+        let words: Vec<String> = code_part
+            .split_whitespace()
+            .map(|w| w.to_lowercase())
+            .collect();
+        if let Some(first) = words.first() {
+            match first.as_str() {
+                "agar" | "jab" => depth += 1, // agar / jab tak
+                "kaam" => match words.get(1).map(|s| s.as_str()) {
+                    // "kaam rakho x" jaisi variable lines block nahi kholti
+                    Some("rakho") => {}
+                    // kaam 5 / kaam "x" / kaam sahi => call statement, def nahi
+                    Some(w)
+                        if w.starts_with('"')
+                            || w.starts_with(|c: char| c.is_ascii_digit())
+                            || w == "sahi"
+                            || w == "galat"
+                            || w == "khaali" => {}
+                    Some(_) => depth += 1, // kaam <naam> => definition
+                    None => {}
+                },
                 _ => {}
+            }
+            // range loop: last shabd "tak" ho to block khulta hai
+            if words.len() > 1 && words.last().map(|s| s.as_str()) == Some("tak") {
+                depth += 1;
+            }
+            // har "khatam" ek block band karta hai
+            for word in &words {
+                if word == "khatam" {
+                    depth -= 1;
+                }
             }
         }
 
