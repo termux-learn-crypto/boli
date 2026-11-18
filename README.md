@@ -382,9 +382,16 @@ boli/
 ├── README.md
 ├── LANGUAGE_SPEC.md    # poora grammar/semantics reference
 ├── ARCHITECTURE.md     # code flow aur module design
-├── CHANGELOG.md        # v0.1.0 → v0.2.0 changes
+├── CHANGELOG.md        # v0.1.0 → v0.3.0 changes
 ├── TESTING.md          # tests kaise chalayein, kaise likhein
 ├── AUDIT_REPORT.md     # audit + "how verified" notes
+├── COMPLETE_AUDIT.md   # v0.3.0: complete source-code audit (lexer/parser/AST/interpreter/CLI)
+├── BUG_FIXES.md        # v0.3.0: har fix ka symptom→root cause→verification
+├── SECURITY_REPORT.md  # v0.3.0: resource-limit matrix + threat model
+├── ARCHITECTURE_REPORT.md  # v0.3.0: module decisions
+├── TEST_RESULTS.md     # v0.3.0: actual command outputs
+├── V0.3.0_CHANGELOG.md # v0.3.0: full changelog
+├── UPGRADE_ROADMAP.md  # v0.4+ plans (dictionary, modules, stdlib, VM)
 ├── examples/
 │   ├── namaste.hl
 │   ├── calculator.hl
@@ -396,6 +403,7 @@ boli/
 │   ├── lexer.rs        # code ko tokens me todta hai
 │   ├── parser.rs       # tokens se AST banata hai
 │   ├── interpreter.rs  # AST ko chalakar output deta hai
+│   ├── limits.rs       # safety limits (env override + defaults)
 │   └── ast.rs          # AST nodes + Galti (error) type
 └── tests/
     ├── boli.rs         # semantics + regression tests (library-level)
@@ -405,14 +413,29 @@ boli/
 ## Testing
 
 ```bash
-cargo test          # 67 tests chalenge
+cargo test          # 82 tests chalenge
 ```
 
-Details aur test-adding guide: [TESTING.md](TESTING.md). Spec: [LANGUAGE_SPEC.md](LANGUAGE_SPEC.md). Changes: [CHANGELOG.md](CHANGELOG.md).
+Details aur test-adding guide: [TESTING.md](TESTING.md). Spec: [LANGUAGE_SPEC.md](LANGUAGE_SPEC.md). Changes: [CHANGELOG.md](CHANGELOG.md). Audit: [COMPLETE_AUDIT.md](COMPLETE_AUDIT.md). Security: [SECURITY_REPORT.md](SECURITY_REPORT.md).
 
 Kaam karne ka flow: `source.hl` → **lexer** (tokens) → **parser** (AST) → **interpreter** (run).
 
 ---
+
+## Safety limits (BOLI v0.3.0)
+
+Sab limits env variable se override ho sakti hain — har violation Hinglish Galti error hai, kabhi crash nahi:
+
+| Limit | Default | Env var |
+|---|---|---|
+| Program steps | 100,000 | `BOLI_MAX_STEPS` |
+| Kaam call depth | 64 | `BOLI_MAX_CALL_DEPTH` |
+| String bytes | 1 MiB | `BOLI_MAX_STRING_BYTES` |
+| Source file bytes | 10 MiB | `BOLI_MAX_SOURCE_BYTES` |
+| List items | 10,000 | `BOLI_MAX_LIST_ITEMS` |
+| Parse nesting depth | 64 | `BOLI_MAX_PARSE_DEPTH` |
+| Condition chain (`aur`/`ya`) | 128 | `BOLI_MAX_CONDITION_DEPTH` |
+| Expression eval depth | 256 | `BOLI_MAX_EVAL_DEPTH` |
 
 ## Feature list
 

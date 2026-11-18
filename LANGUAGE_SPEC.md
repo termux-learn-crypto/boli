@@ -1,6 +1,6 @@
-# BOLI Language Specification (v0.2.0)
+# BOLI Language Specification (v0.3.0)
 
-**Version:** 0.2.0 · **File extension:** `.hl` · **Implementation:** Rust (`cargo run -- run x.hl`, REPL via `cargo run`)
+**Version:** 0.3.0 · **File extension:** `.hl` · **Implementation:** Rust (`cargo run -- run x.hl`, REPL via `cargo run`)
 
 BOLI is a Hinglish-based programming language: Python-like simplicity, Hindi/English keywords, no symbols like `; { } ( ) = :`. Statements are one per line. Only words, numbers, quoted text and whitespace appear in a program.
 
@@ -18,17 +18,17 @@ BOLI is a Hinglish-based programming language: Python-like simplicity, Hindi/Eng
 | Identifier | Unicode letters/combined marks/digits/`_` (Devanagari and Latin both work), start with letter or `_` |
 | Keywords | `likho pucho rakho jodo ghatao guna bhaag agar nahi to khatam se aur ya ko tak jab bada chhota barabar hai kaam wapas do sahi galat khaali hissa ruk agla break continue` |
 
-Words and literals are case-sensitive except for keyword matching (keywords are matched lowercase — `Likho` ≠ keyword? Actually keywords match exactly lowercase as written; keep them lowercase).
+Keywords are matched **case-insensitively** (the word is lowercased before matching, so `LIKHO`, `Likho` and `likho` are all the keyword `likho`). Identifiers are matched **case-sensitively** as written (`Naam` and `naam` are different names). Text literals are never touched by case handling.
 
 ## 2. Types
 
 | Type | Notation | Notes |
 |------|----------|-------|
 | text | `"Vilas"` | Unicode string, max 1 MiB (`BOLI_MAX_STRING_BYTES`) |
-| number | `28`, `99.50`, `-5` | f64 internally; must be finite; int-like values print without decimal |
+| number | `28`, `99.50`, `-5` | f64 internally; must be finite; int-like values print without decimal; integers above 2^53 are not exact |
 | sahi/galat | `sahi`, `galat` | bool |
 | khaali | `khaali` | null |
-| list | `cheezein rakho 1 2 3` | list of values, mixed types allowed; index with `hissa` (1-based) |
+| list | `cheezein rakho 1 2 3` | list of values, mixed types allowed; index with `hissa` (1-based); max 10,000 items (`BOLI_MAX_LIST_ITEMS`) |
 
 No implicit NaN or ±∞ anywhere: input parsing, literals and arithmetic results are all validated finite.
 
@@ -93,6 +93,8 @@ is parsed as `a ya (b aur c)`.
 
 Form: `<operand> <operand> [se] <op> [ya barabar] hai`
 
+The `aur` / `ya` chain in one condition is capped at 128 (`BOLI_MAX_CONDITION_DEPTH`); longer chains are a Galti error instead of a stack overflow.
+
 (`se` is optional; `hai` keyword marks the end of the condition.)
 
 | Operator | Meaning |
@@ -136,9 +138,16 @@ namaste "Rahul"
 |-------|---------|---------|
 | Steps (whole program) | 100,000 | `BOLI_MAX_STEPS` |
 | Kaam call depth | 64 | `BOLI_MAX_CALL_DEPTH` |
-| String bytes (concat result) | 1 MiB | `BOLI_MAX_STRING_BYTES` |
+| String bytes (literals, `pucho` input, concat result, formatted text) | 1 MiB | `BOLI_MAX_STRING_BYTES` |
+| Source file bytes (`boli run` file read) | 10 MiB | `BOLI_MAX_SOURCE_BYTES` |
+| List items (creation and `jodo` concat result) | 10,000 | `BOLI_MAX_LIST_ITEMS` |
+| Parse nesting depth (statements/expressions) | 64 | `BOLI_MAX_PARSE_DEPTH` |
+| Condition chain length (`aur` / `ya`, parse + eval) | 128 | `BOLI_MAX_CONDITION_DEPTH` |
+| Expression evaluation depth | 256 | `BOLI_MAX_EVAL_DEPTH` |
 
-Violations are Hinglish Galti errors, never panics/SIGSEGV/SIGKILL. Also `std::process::exit(0)` on closed stdout pipe.
+All violations are Hinglish Galti errors, never panics/SIGSEGV/SIGKILL. Violations are deterministic. `std::process::exit(0)` on closed stdout pipe.
+
+Input from `pucho` is read in bounded chunks (at most `BOLI_MAX_STRING_BYTES` + one buffer) — an unbounded-length stdin line cannot be buffered. Invalid UTF-8 from stdin is decoded lossy (U+FFFD) instead of crashing.
 
 ## 9. Errors
 
@@ -157,7 +166,20 @@ Galti: line 1 me ';' nahi chahiye, BOLI me sirf shabd, number aur "text" use hot
 
 In both cases a variable of that keyword name may be created, read and assigned anywhere an identifier is expected. `ruk`/`agla`/`break`/`continue` are the only reserved words that don't double as identifiers.
 
-## 11. Record of behavior (v0.2.0 vs v0.1.0)
+## 11. Record of behavior
+
+### v0.3.0 vs v0.2.0
+
+- Initial string literals are now size-checked against `BOLI_MAX_STRING_BYTES` (concatenation was already checked).
+- Lists are capped at 10,000 items (creation and `jodo` concatenation); overflow is a Galti error.
+- `boli run file.hl` refuses files larger than `BOLI_MAX_SOURCE_BYTES` (10 MiB) before reading.
+- Condition chains (`aur`/`ya`) are capped at 128 terms at both parse time and evaluation time.
+- Expression evaluation is depth-capped at 256 (covers deep `hissa` chains).
+- Statement/expression nesting during parsing is capped at 64 (`BOLI_MAX_PARSE_DEPTH`).
+- `pucho` input is read with a hard cap; invalid UTF-8 input is decoded lossy.
+- Keywords are documented as case-insensitive; identifiers case-sensitive.
+
+### v0.2.0 vs v0.1.0
 
 - `rakho` semantics: local write-only (was nonlocal-update).
 - `f a b` flat argument parsing (was nested call nesting).

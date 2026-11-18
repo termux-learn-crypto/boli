@@ -4,8 +4,18 @@
 
 ```bash
 cargo test          # everything (unit + integration)
-cargo test --test boli      # library-level semantics (54 tests)
-cargo test --test cli       # CLI/binary end-to-end (13 tests)
+cargo test --test boli      # library-level semantics (67 tests)
+cargo test --test cli       # CLI/binary end-to-end (15 tests)
+```
+
+Full verification matrix (run before a release):
+
+```bash
+cargo fmt --check                          # formatting gate
+cargo check                                # compile gate
+cargo test                                 # 82 tests (67 library + 15 CLI)
+cargo clippy --all-targets --all-features -- -D warnings   # lint gate
+cargo build --release                      # release artifact gate
 ```
 
 No extra tooling is required — only `cargo` and the BOLI binary (which `cargo test` builds automatically). The CLI tests use the `CARGO_BIN_EXE_boli` path cargo provides; the library tests use the `Environment`/`parse_source` API directly and capture `likho` output via `Environment::collect_output`.
@@ -26,6 +36,13 @@ No extra tooling is required — only `cargo` and the BOLI binary (which `cargo 
 - `ListAssign` statement syntax
 - flat call arguments (`f a b` → `(a, b)`, not `a(b)`)
 - `aur`/`ya` precedence at AST level (`Ya(a, Aur(b, c))`)
+
+### Safety limits (`tests/boli.rs`)
+- literal string size limit (`with_limits` + small `BOLI_MAX_STRING_BYTES`)
+- list creation limit and list `jodo` concat limit (`with_list_limit`)
+- condition `ya` chain parse-time cap (`Parser::with_limits`) and eval-time cap
+- expression/`hissa` chain depth guard
+- fuzz-ish test: deterministic xorshift generator feeds random byte soup into the lexer and parser; neither may panic (no third-party fuzzer needed)
 
 ### Interpreter semantics (`tests/boli.rs`)
 - inline math (`likho jodo 5 aur 3` → `8`)

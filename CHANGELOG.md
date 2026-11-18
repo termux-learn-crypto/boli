@@ -2,6 +2,34 @@
 
 All notable changes to BOLI. BOLI follows [Semantic Versioning](https://semver.org/): breaking changes bump the minor digit (pre-1.0).
 
+## [0.3.0] — 2026-11-18
+
+### Fixed
+- **Init string literal size hole:** literals such as `likho "a very long literal"` bypassed `BOLI_MAX_STRING_BYTES` (only concatenation was checked). Literals are now validated at evaluation.
+- **Condition chain stack overflow:** a condition with a huge `ya`/`aur` chain (e.g. 200,000 terms) built an unbounded left-nested `Cond` and crashed with SIGSEGV. Both parse-time and eval-time chains are now capped (`BOLI_MAX_CONDITION_DEPTH`, default 128) with a Hinglish Galti error.
+- **Unbounded `pucho` input:** `pucho` read a full stdin line into memory without limit. Now read in bounded chunks capped by `BOLI_MAX_STRING_BYTES`; invalid UTF-8 decodes lossy (U+FFFD) instead of erroring.
+- **Source file size:** `boli run file.hl` reads at most `BOLI_MAX_SOURCE_BYTES` (default 10 MiB); enforced with a metadata check before reading. (AUDIT_REPORT previously claimed a limit existed; it did not.)
+- **List size:** lists are now capped (`BOLI_MAX_LIST_ITEMS`, default 10,000) at creation and for `jodo` list concatenation results; overflow is a Galti error.
+
+### Added
+- `src/limits.rs`: single source of truth for all safety limits (defaults + `BOLI_MAX_*` env override).
+- `BOLI_MAX_PARSE_DEPTH` (64) — statement/expression nesting cap, env-tunable.
+- `BOLI_MAX_CONDITION_DEPTH` (128) — `aur`/`ya` chain cap, parse and eval.
+- `BOLI_MAX_EVAL_DEPTH` (256) — expression evaluation depth cap (deep `hissa` chains).
+- Fuzz-ish regression test (deterministic xorshift; lexer/parser must not panic).
+- CLI tests: bogus subcommand and extra `run` args exit non-zero with a Galti error.
+
+### Changed
+- `Expr::Text` evaluation now returns the literal via `checked_text` (same policy as concatenation).
+- Cargo package metadata: `description`, `license`, `repository`.
+
+### Docs
+- LANGUAGE_SPEC keyword rule corrected: keywords match case-insensitively, identifiers case-sensitively. Limits table expanded (8 limits). Test counts corrected. AUDIT_REPORT false claim annotated.
+
+### Internal
+- `cargo fmt --check` is now a clean gate (one-time reformat commit `df5c012`).
+- Clippy `-D warnings` clean; test suite 82 automated tests.
+
 ## [0.2.0] — 2026-11-18
 
 ### Fixed

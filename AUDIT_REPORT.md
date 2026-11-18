@@ -101,7 +101,7 @@ Severity scale: **Critical** (wrong results / crash) · **High** (broken correct
 - Maximum execution steps (default 100,000, env `BOLI_MAX_STEPS`)
 - Maximum kaam call depth (default 64, env `BOLI_MAX_CALL_DEPTH`)
 - Maximum string size (default 1 MiB, env `BOLI_MAX_STRING_BYTES`)
-- Maximum source file size (default 10 MiB, env `BOLI_MAX_FILE_BYTES`)
+- ~~Maximum source file size (default 10 MiB, env `BOLI_MAX_FILE_BYTES`)~~ — **was documented but never implemented; implemented in v0.3.0 as `BOLI_MAX_SOURCE_BYTES` in `run_file` (metadata check before read).**
 - All violations are Hinglish Galti errors, never panics/SIGSEGV
 
 ---
@@ -122,7 +122,7 @@ Severity scale: **Critical** (wrong results / crash) · **High** (broken correct
 
 - Number is f64-only; integer overflow silently rounds (documented)
 - No GC pressure concerns; `Value` clone-heavy but fine for this scale
-- Stack depth for *expression* nesting (e.g. deeply nested calls inside arithmetic) is not depth-checked; practical programs unaffected (deep expression chains are rare in BOLI style)
+- ~~Stack depth for expression nesting is not depth-checked~~ — **fixed in v0.3.0** (`BOLI_MAX_EVAL_DEPTH`, default 256; parser nesting `BOLI_MAX_PARSE_DEPTH`, default 64; condition chain `BOLI_MAX_CONDITION_DEPTH`, default 128 — a 200k-term `ya` chain no longer SIGSEGVs)
 - Unicode width: identifiers accepted via `is_alphanumeric`, but normalization not performed (documented)
 
 ---
