@@ -643,3 +643,134 @@ fn fuzz_lex_parse_never_panics() {
         }
     }
 }
+
+// ---------- v0.3.1 safety fixes ----------
+
+fn nested_jodo_source(depth: usize) -> String {
+    format!(
+        "likho {}{}1{}",
+        "jodo ".repeat(depth),
+        "",
+        " aur 1".repeat(depth)
+    )
+}
+
+#[test]
+fn eval_depth_limit_is_configurable_and_enforced() {
+    let src = nested_jodo_source(15);
+    let program = parse_source(&src).unwrap();
+
+    // limit 10 -> Galti
+    let mut env = Environment::new().with_eval_depth_limit(10);
+    env.collect_output();
+    let err = env.run_program(&program).unwrap_err();
+    assert!(err.to_string().contains("expression bahut zyada gehra hai"));
+    assert!(err.to_string().contains("(max 10)"));
+
+    // limit 500 -> same program chalta hai
+    let program = parse_source(&src).unwrap();
+    let mut env = Environment::new().with_eval_depth_limit(500);
+    env.collect_output();
+    env.run_program(&program).unwrap();
+    assert_eq!(env.take_output().len(), 1);
+}
+
+#[test]
+fn lexer_string_literal_byte_limit() {
+    use boli::lexer::lex_with_limits;
+    // literal limit se bada -> Galti (word "aa" chhota hai, text 8 bytes)
+    assert!(lex_with_limits("aa \"abcd1234\"", 1_000_000, 4, 1_000_000).is_err());
+    // limit ke andar -> ok
+    assert!(lex_with_limits("aa \"abcd\"", 1_000_000, 4, 1_000_000).is_ok());
+    // Devanagari literal bhi limit me hi
+    assert!(lex_with_limits("aa \"नमस्ते\"", 1_000_000, 100, 1_000_000).is_ok());
+    assert!(lex_with_limits("aa \"नमस्ते\"", 1_000_000, 3, 1_000_000).is_err());
+}
+
+#[test]
+fn lexer_identifier_byte_limit() {
+    use boli::lexer::lex_with_limits;
+    let long_name = "a".repeat(5000);
+    let src = format!("{} rakho 1", long_name);
+    assert!(lex_with_limits(&src, 1_000_000, 100, 1_000_000).is_err());
+}
+
+#[test]
+fn lexer_token_limit() {
+    use boli::lexer::lex_with_limits;
+    let src = "likho jodo 1 aur 2"; // 6 tokens (Likho, Jodo, Number, Aur, Number, Eof)
+    assert!(lex_with_limits(src, 1_000_000, 1_000_000, 5).is_err());
+    assert!(lex_with_limits(src, 1_000_000, 1_000_000, 100).is_ok());
+}
+
+#[test]
+fn lexer_source_byte_limit() {
+    use boli::lexer::lex_with_limits;
+    assert!(lex_with_limits("likho 1", 4, 1_000_000, 1_000_000).is_err());
+    assert!(lex_with_limits("likho 1", 100, 1_000_000, 1_000_000).is_ok());
+}
+
+#[test]
+fn lexer_degrammar_still_works_after_cursor_rewrite() {
+    // cursor-based rewrite ne Devanagari aur escapes sahi chhod diye
+    let tokens = lex("likho \"नमस्ते \\\\n دنیا\"").unwrap();
+    let texts: Vec<&Tok> = tokens.iter().map(|t| &t.tok).collect();
+    assert!(
+        texts
+            .iter()
+            .any(|t| matches!(t, Tok::Text(s) if s.contains("नमस्ते")))
+    );
+}
+
+#[test]
+fn total_budget_caps_string_storage() {
+    let big_value = "x".repeat(2000);
+    let src = format!("naam rakho \"{}\"\nlikho naam", big_value);
+    let program = parse_source(&src).unwrap();
+    let mut env = Environment::new().with_total_budget_bytes(512);
+    env.collect_output();
+    let err = env.run_program(&program).unwrap_err();
+    assert!(err.to_string().contains("memory budget"));
+}
+
+#[test]
+fn total_budget_caps_list_storage() {
+    let items: Vec<String> = (0..50).map(|i| i.to_string()).collect();
+    let src = format!("cheezein rakho {}\nlikho cheezein", items.join(" "));
+    let program = parse_source(&src).unwrap();
+    let mut env = Environment::new()
+        .with_list_limit(100)
+        .with_total_budget_bytes(512);
+    env.collect_output();
+    let err = env.run_program(&program).unwrap_err();
+    assert!(err.to_string().contains("memory budget"));
+}
+
+#[test]
+fn total_budget_freed_by_scope_pop() {
+    // kaam ka local scope exit par budget wapas milta hai
+    let src = r#"kaam bada_wala x
+    lamba rakho "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    wapas do lamba
+khatam
+a rakho bada_wala 1
+b rakho bada_wala 2
+likho "ok"
+"#;
+    let program = parse_source(src).unwrap();
+    let mut env = Environment::new().with_total_budget_bytes(4096);
+    env.collect_output();
+    env.run_program(&program).unwrap();
+    assert_eq!(env.take_output(), vec!["ok"]);
+}
+
+#[test]
+fn total_budget_replacement_is_not_double_counted() {
+    // same naam ko baar-baar replace karna - purani value ka budget jama nahi hota
+    let src = "naam rakho \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\nnaam rakho \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"\nnaam rakho \"ccccccccccccccccccccccccccccc\"\nlikho naam";
+    let program = parse_source(src).unwrap();
+    let mut env = Environment::new().with_total_budget_bytes(512);
+    env.collect_output();
+    env.run_program(&program).unwrap();
+    assert_eq!(env.take_output(), vec!["ccccccccccccccccccccccccccccc"]);
+}

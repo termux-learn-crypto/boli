@@ -6,7 +6,7 @@ use boli::parser;
 
 use std::env;
 use std::fs;
-use std::io::{self, Write};
+use std::io::{self, BufRead, Read, Write};
 use std::process;
 
 fn main() {
@@ -54,6 +54,8 @@ fn print_help() {
 // File padhkar chalao
 fn run_file(path: &str) {
     // source file size limit (env BOLI_MAX_SOURCE_BYTES, default 10 MiB)
+    // metadata check pe sirf bharosa nahi - read bhi max+1 tak hi hota hai
+    // (file read ke beech grow ho sakti hai; TOCTOU se bachne ke liye)
     let max_source = env_limit("BOLI_MAX_SOURCE_BYTES", DEFAULT_MAX_SOURCE_BYTES);
     match fs::metadata(path) {
         Ok(meta) => {
@@ -72,10 +74,10 @@ fn run_file(path: &str) {
             process::exit(1);
         }
     }
-    let source = match fs::read_to_string(path) {
+    let source = match read_capped(path, max_source) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("Galti: file '{}' nahi khuli: {}", path, e);
+            eprintln!("{}", e);
             process::exit(1);
         }
     };
@@ -95,8 +97,90 @@ fn run_file(path: &str) {
     }
 }
 
+// max_source bytes tak hi file padho; exceed ho to Galti error
+// read ke dauraan file grow ho to bhi cap lagu rehta hai
+fn read_capped(path: &str, max_source: u64) -> Result<String, String> {
+    let file =
+        fs::File::open(path).map_err(|e| format!("Galti: file '{}' nahi khuli: {}", path, e))?;
+    let mut buf: Vec<u8> = Vec::new();
+    file.take(max_source + 1)
+        .read_to_end(&mut buf)
+        .map_err(|e| format!("Galti: file '{}' padh nahi paye: {}", path, e))?;
+    if buf.len() as u64 > max_source {
+        return Err(format!(
+            "Galti: file '{}' bahut badi hai ({} bytes se zyada, max {})",
+            path,
+            buf.len() - 1,
+            max_source
+        ));
+    }
+    String::from_utf8(buf).map_err(|_| format!("Galti: file '{}' UTF-8 nahi hai", path))
+}
+
 // REPL - interactive shell
 // Multi-line blocks (agar ... khatam) ko estimate karke jodta hai
+// REPL input line ko max_bytes tak padhna - bahut badi line ko drain karke reject karta hai
+enum LineRead {
+    Eof,          // EOF (Ctrl-D)
+    Line(String), // normal line (newline tak)
+    TooLong,      // bahut badi line - poori consume + discard kar di
+}
+
+fn read_repl_line(stdin: &mut io::StdinLock, max_bytes: u64) -> io::Result<LineRead> {
+    let mut buf: Vec<u8> = Vec::new();
+    loop {
+        let chunk = match stdin.fill_buf() {
+            Ok(c) => c,
+            Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+            Err(e) => return Err(e),
+        };
+        if chunk.is_empty() {
+            return Ok(if buf.is_empty() {
+                LineRead::Eof
+            } else {
+                LineRead::Line(String::from_utf8_lossy(&buf).into_owned())
+            });
+        }
+        match chunk.iter().position(|&b| b == b'\n') {
+            Some(pos) => {
+                if buf.len() as u64 + (pos + 1) as u64 > max_bytes {
+                    stdin.consume(pos + 1); // poori line drain, reject karo
+                    return Ok(LineRead::TooLong);
+                }
+                buf.extend_from_slice(&chunk[..=pos]); // trailing \n bhi rakhlo (read_line jaisa)
+                stdin.consume(pos + 1);
+                return Ok(LineRead::Line(String::from_utf8_lossy(&buf).into_owned()));
+            }
+            None => {
+                if buf.len() as u64 + chunk.len() as u64 > max_bytes {
+                    // poori line drain kar do taaki agli line clean ho
+                    let consumed = chunk.len();
+                    stdin.consume(consumed);
+                    loop {
+                        let c = stdin.fill_buf()?;
+                        if c.is_empty() {
+                            return Ok(LineRead::TooLong);
+                        }
+                        match c.iter().position(|&b| b == b'\n') {
+                            Some(p) => {
+                                stdin.consume(p + 1);
+                                return Ok(LineRead::TooLong);
+                            }
+                            None => {
+                                let len = c.len();
+                                stdin.consume(len);
+                            }
+                        }
+                    }
+                }
+                buf.extend_from_slice(chunk);
+                let len = chunk.len();
+                stdin.consume(len);
+            }
+        }
+    }
+}
+
 fn repl() {
     println!("BOLI REPL - likhne ke liye tayyar!");
     println!("REPL se nikalne ke liye 'nikalo' likho.");
@@ -115,15 +199,27 @@ fn repl() {
         }
         io::stdout().flush().unwrap();
 
-        let mut line = String::new();
-        match stdin.read_line(&mut line) {
-            Ok(0) => break, // EOF (Ctrl-D)
-            Ok(_) => {}
+        let max_repl_line = env_limit(
+            "BOLI_MAX_REPL_LINE_BYTES",
+            boli::limits::DEFAULT_MAX_REPL_LINE_BYTES,
+        );
+        let mut stdin_lock = stdin.lock();
+        let line = match read_repl_line(&mut stdin_lock, max_repl_line) {
+            Ok(LineRead::Eof) => break, // EOF (Ctrl-D)
+            Ok(LineRead::Line(l)) => l,
+            Ok(LineRead::TooLong) => {
+                eprintln!(
+                    "Galti: line bahut badi hai (max {} bytes) - yeh line chhod di, agli try karo",
+                    max_repl_line
+                );
+                continue;
+            }
             Err(_) => {
                 eprintln!("Galti: input nahi padh paye");
                 break;
             }
-        }
+        };
+        drop(stdin_lock);
 
         let trimmed = line.trim();
 

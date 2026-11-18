@@ -71,8 +71,43 @@ enum Flow {
     Agla(usize),
 }
 
+struct Scope {
+    map: HashMap<String, Value>,
+    bytes: u64,
+}
+
+impl Scope {
+    fn new() -> Self {
+        Scope {
+            map: HashMap::new(),
+            bytes: 0,
+        }
+    }
+
+    fn total_bytes_add(&mut self, delta: i128) {
+        if delta >= 0 {
+            self.bytes += delta as u64;
+        } else {
+            self.bytes = self.bytes.saturating_sub((-delta) as u64);
+        }
+    }
+}
+
+// value ka approximate heap size (live bytes budget ke liye)
+fn value_size(value: &Value) -> u64 {
+    match value {
+        Value::Text(t) => t.len() as u64 + 24,
+        Value::Number(_) => 16,
+        Value::Bool(_) => 8,
+        Value::Khaali => 1,
+        Value::List(items) => {
+            24 + items.len() as u64 * 40 + items.iter().map(value_size).sum::<u64>()
+        }
+    }
+}
+
 pub struct Environment {
-    scopes: Vec<HashMap<String, Value>>,
+    scopes: Vec<Scope>,
     kaam: HashMap<String, Kaam>,
     steps: u64,
     max_steps: u64,
@@ -81,6 +116,8 @@ pub struct Environment {
     max_list_items: usize,
     max_eval_depth: usize,
     max_condition_depth: usize,
+    max_total_bytes: u64,
+    total_bytes: u64,
     call_depth: usize,
     eval_depth: usize,
     cond_depth: usize,
@@ -99,8 +136,14 @@ impl Environment {
             "BOLI_MAX_CONDITION_DEPTH",
             crate::limits::DEFAULT_MAX_CONDITION_DEPTH,
         ) as usize;
+        let max_total_bytes = env_limit(
+            "BOLI_MAX_TOTAL_BYTES",
+            crate::limits::DEFAULT_MAX_TOTAL_BYTES,
+        );
         Environment {
-            scopes: vec![HashMap::new()],
+            scopes: vec![Scope::new()],
+            total_bytes: 0,
+            max_total_bytes,
             kaam: HashMap::new(),
             steps: 0,
             max_steps,
@@ -149,34 +192,54 @@ impl Environment {
         self
     }
 
+    pub fn with_total_budget_bytes(mut self, max_total_bytes: u64) -> Self {
+        self.max_total_bytes = max_total_bytes;
+        self
+    }
+
     pub fn reset_steps(&mut self) {
         self.steps = 0;
     }
 
     fn push_scope(&mut self) {
-        self.scopes.push(HashMap::new());
+        self.scopes.push(Scope::new());
     }
 
     fn pop_scope(&mut self) {
         if self.scopes.len() > 1 {
-            self.scopes.pop();
+            let popped = self.scopes.pop().expect("global scope hamesha rahega");
+            self.total_bytes = self.total_bytes.saturating_sub(popped.bytes);
         }
     }
 
     fn get(&self, name: &str) -> Option<Value> {
         for scope in self.scopes.iter().rev() {
-            if let Some(value) = scope.get(name) {
+            if let Some(value) = scope.map.get(name) {
                 return Some(value.clone());
             }
         }
         None
     }
 
-    fn set(&mut self, name: &str, value: Value) {
-        self.scopes
-            .last_mut()
-            .unwrap()
-            .insert(name.to_string(), value);
+    // Live scope bytes ka hisaab: insert/replace par budget check
+    fn set(&mut self, name: &str, value: Value, line: usize) -> Result<(), BoliError> {
+        let size = value_size(&value);
+        let scope = self.scopes.last_mut().expect("global scope hamesha rahega");
+        let old_size = scope.map.get(name).map(value_size).unwrap_or(0);
+        let new_total = self.total_bytes + size - old_size;
+        if new_total > self.max_total_bytes {
+            return Err(BoliError::line(
+                line,
+                format!(
+                    "program ki memory budget khatam ho gayi (max {} bytes, BOLI_MAX_TOTAL_BYTES)",
+                    self.max_total_bytes
+                ),
+            ));
+        }
+        scope.total_bytes_add(size as i128 - old_size as i128);
+        scope.map.insert(name.to_string(), value);
+        self.total_bytes = new_total;
+        Ok(())
     }
 
     pub fn run_program(&mut self, stmts: &[Stmt]) -> Result<(), BoliError> {
@@ -233,14 +296,14 @@ impl Environment {
                 }
                 Ok(Flow::Normal)
             }
-            Stmt::Rakho { name, value, .. } => {
+            Stmt::Rakho { name, value, line } => {
                 let value = self.eval_expr(value)?;
-                self.set(name, value);
+                self.set(name, value, *line)?;
                 Ok(Flow::Normal)
             }
             Stmt::Pucho { name, prompt, line } => {
                 if self.captured.is_some() {
-                    self.set(name, Value::Khaali);
+                    self.set(name, Value::Khaali, *line)?;
                     return Ok(Flow::Normal);
                 }
                 let prompt_ok =
@@ -311,7 +374,7 @@ impl Environment {
                 } else {
                     Value::Text(trimmed.to_string())
                 };
-                self.set(name, value);
+                self.set(name, value, *line)?;
                 Ok(Flow::Normal)
             }
             Stmt::ArithAssign {
@@ -331,7 +394,7 @@ impl Environment {
                     self.max_string_bytes,
                     self.max_list_items,
                 )?;
-                self.set(target, value);
+                self.set(target, value, *line)?;
                 Ok(Flow::Normal)
             }
             Stmt::Agar {
@@ -387,10 +450,7 @@ impl Environment {
                                 ),
                             ));
                         }
-                        self.scopes
-                            .last_mut()
-                            .unwrap()
-                            .insert("ginti".to_string(), Value::Number(from_n + i as f64));
+                        self.set("ginti", Value::Number(from_n + i as f64), *line)?;
                         match self.run_block(body)? {
                             Flow::Normal => {}
                             Flow::Wapas(value, wline) => return Ok(Flow::Wapas(value, wline)),
@@ -516,7 +576,7 @@ impl Environment {
             }
             _ => return Err(BoliError::line(line, format!("'{}' list nahi hai", target))),
         }
-        self.set(target, current);
+        self.set(target, current, line)?;
         Ok(())
     }
 
@@ -553,7 +613,7 @@ impl Environment {
         self.call_depth += 1;
         self.push_scope();
         for (param, value) in kaam.params.iter().zip(arg_values) {
-            self.scopes.last_mut().unwrap().insert(param.clone(), value);
+            self.set(param, value, line)?;
         }
         let result = self.run_block(&kaam.body);
         self.pop_scope();
@@ -575,11 +635,14 @@ impl Environment {
     fn eval_expr(&mut self, expr: &Expr) -> Result<Value, BoliError> {
         // Bahut gehra nested expression/AST se stack overflow nahi hona chahiye
         self.eval_depth += 1;
-        if self.eval_depth > 256 {
+        if self.eval_depth > self.max_eval_depth {
             self.eval_depth -= 1;
             return Err(BoliError::line(
                 expr.line_for_error(),
-                "expression bahut zyada gehra hai (max 256)",
+                format!(
+                    "expression bahut zyada gehra hai (max {})",
+                    self.max_eval_depth
+                ),
             ));
         }
         let result = self.eval_expr_inner(expr);

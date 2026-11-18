@@ -258,3 +258,87 @@ fn cli_run_with_too_many_args_errors() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("Galti"));
 }
+
+#[test]
+fn cli_source_bytes_boundary() {
+    // exactly at limit (8 bytes, valid program) -> runs
+    let ok_program = "likho 1\n"; // 8 bytes
+    let path_ok = write_program("source_bytes_ok.hl", ok_program);
+    let output = Command::new(boli_bin())
+        .arg("run")
+        .arg(&path_ok)
+        .env("BOLI_MAX_SOURCE_BYTES", "8")
+        .output()
+        .expect("boli binary chala nahi");
+    assert!(
+        output.status.success(),
+        "8-byte program with limit 8 should run"
+    );
+
+    // one byte under -> Galti
+    let output = Command::new(boli_bin())
+        .arg("run")
+        .arg(&path_ok)
+        .env("BOLI_MAX_SOURCE_BYTES", "7")
+        .output()
+        .expect("boli binary chala nahi");
+    assert!(
+        !output.status.success(),
+        "8-byte program with limit 7 must fail"
+    );
+}
+
+#[test]
+fn cli_env_eval_depth_is_respected() {
+    // deep nesting jodo - limit 10 par fail, 500 par pass
+    let depth = 20;
+    let program = format!(
+        "likho {}{}1{}",
+        "jodo ".repeat(depth),
+        "",
+        " aur 1".repeat(depth)
+    );
+    let path = write_program("eval_depth_env.hl", &program);
+
+    let output = Command::new(boli_bin())
+        .arg("run")
+        .arg(&path)
+        .env("BOLI_MAX_EVAL_DEPTH", "10")
+        .output()
+        .expect("boli binary chala nahi");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!output.status.success());
+    assert!(stderr.contains("expression bahut zyada gehra hai"));
+
+    let output = Command::new(boli_bin())
+        .arg("run")
+        .arg(&path)
+        .env("BOLI_MAX_EVAL_DEPTH", "500")
+        .output()
+        .expect("boli binary chala nahi");
+    assert!(output.status.success());
+}
+
+#[test]
+fn cli_repl_oversized_line_is_rejected_and_repl_survives() {
+    let long_line = "x".repeat(200);
+    let input = format!("{}\nlikho 42\nnikalo\n", long_line);
+    let output = Command::new(boli_bin())
+        .env("BOLI_MAX_REPL_LINE_BYTES", "50")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .and_then(|mut child| {
+            use std::io::Write as _;
+            child.stdin.as_mut().unwrap().write_all(input.as_bytes())?;
+            child.wait_with_output()
+        })
+        .expect("REPL spawn/write nahi hua");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    // oversized line reject + REPL zinda raha + agli command chal gayi
+    assert!(stderr.contains("line bahut badi hai"), "stderr: {}", stderr);
+    assert!(stdout.contains("42"), "stdout: {}", stdout);
+    assert!(stdout.contains("Alvida"), "stdout: {}", stdout);
+}

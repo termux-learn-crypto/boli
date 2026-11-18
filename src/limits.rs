@@ -9,6 +9,9 @@ pub const DEFAULT_MAX_LIST_ITEMS: u64 = 10_000; // ek list me items
 pub const DEFAULT_MAX_PARSE_DEPTH: u64 = 64; // nested statements/expressions
 pub const DEFAULT_MAX_CONDITION_DEPTH: u64 = 128; // aur/ya chain length
 pub const DEFAULT_MAX_EVAL_DEPTH: u64 = 256; // nested expression evaluation
+pub const DEFAULT_MAX_TOKENS: u64 = 1_000_000; // max tokens ek program me
+pub const DEFAULT_MAX_REPL_LINE_BYTES: u64 = 64 * 1024; // REPL input line
+pub const DEFAULT_MAX_TOTAL_BYTES: u64 = 64 * 1024 * 1024; // live scope value bytes budget
 
 // env var ko u64 me padho; 0 ya galat value par default
 pub fn env_limit(name: &str, default: u64) -> u64 {

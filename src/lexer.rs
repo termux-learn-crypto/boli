@@ -158,37 +158,99 @@ fn keyword(word: &str) -> Option<Tok> {
     }
 }
 
-// Pura source code tokens me convert karo
-pub fn lex(source: &str) -> Result<Vec<Token>, BoliError> {
-    let chars: Vec<char> = source.chars().collect();
+struct Cursor<'a> {
+    iter: std::str::CharIndices<'a>,
+    cur: Option<char>,
+    nxt: Option<char>,
+}
+
+impl<'a> Cursor<'a> {
+    fn new(source: &'a str) -> Self {
+        let mut iter = source.char_indices();
+        let cur = iter.next().map(|(_, c)| c);
+        let nxt = iter.next().map(|(_, c)| c);
+        Cursor { iter, cur, nxt }
+    }
+
+    fn peek(&self) -> Option<char> {
+        self.cur
+    }
+
+    fn peek_next(&self) -> Option<char> {
+        self.nxt
+    }
+
+    fn bump(&mut self) -> Option<char> {
+        let old = self.cur;
+        self.cur = self.nxt;
+        self.nxt = self.iter.next().map(|(_, c)| c);
+        old
+    }
+}
+
+fn push_token(tokens: &mut Vec<Token>, token: Token, max_tokens: u64) -> Result<(), BoliError> {
+    if tokens.len() as u64 >= max_tokens {
+        return Err(BoliError::line(
+            token.line,
+            format!("code me bahut zyada tokens hain (max {})", max_tokens),
+        ));
+    }
+    tokens.push(token);
+    Ok(())
+}
+
+/// Lex with explicit limits (used by tests and by `lex` which reads env).
+pub fn lex_with_limits(
+    source: &str,
+    max_source_bytes: u64,
+    max_string_bytes: u64,
+    max_tokens: u64,
+) -> Result<Vec<Token>, BoliError> {
+    // Source size limit pehle - badi files ko tokenize karne se pehle hi rok do
+    if source.len() as u64 > max_source_bytes {
+        return Err(BoliError::line(
+            1,
+            format!(
+                "source bahut bada hai ({} bytes, max {})",
+                source.len(),
+                max_source_bytes
+            ),
+        ));
+    }
+
+    let mut cursor = Cursor::new(source);
     let mut tokens: Vec<Token> = Vec::new();
-    let mut i = 0usize;
     let mut line = 1usize;
 
-    while i < chars.len() {
-        let c = chars[i];
-
+    while let Some(c) = cursor.peek() {
         // Spaces aur tabs - inhe chhod do
         if c == ' ' || c == '\t' || c == '\r' {
-            i += 1;
+            cursor.bump();
             continue;
         }
 
         // Nai line
         if c == '\n' {
-            tokens.push(Token {
-                tok: Tok::Newline,
-                line,
-            });
+            push_token(
+                &mut tokens,
+                Token {
+                    tok: Tok::Newline,
+                    line,
+                },
+                max_tokens,
+            )?;
             line += 1;
-            i += 1;
+            cursor.bump();
             continue;
         }
 
         // # se lekar line ke ant tak comment hai, usse chhod do
         if c == '#' {
-            while i < chars.len() && chars[i] != '\n' {
-                i += 1;
+            while let Some(x) = cursor.peek() {
+                if x == '\n' {
+                    break;
+                }
+                cursor.bump();
             }
             continue;
         }
@@ -197,37 +259,52 @@ pub fn lex(source: &str) -> Result<Vec<Token>, BoliError> {
         if c == '"' {
             let start_line = line;
             let mut text = String::new();
-            i += 1;
+            cursor.bump();
             let mut band_hua = false;
-            while i < chars.len() {
-                let ch = chars[i];
-                if ch == '"' {
-                    band_hua = true;
-                    i += 1;
-                    break;
+            loop {
+                match cursor.peek() {
+                    None => break,
+                    Some('"') => {
+                        band_hua = true;
+                        cursor.bump();
+                        break;
+                    }
+                    Some('\n') => {
+                        return Err(BoliError::line(
+                            start_line,
+                            "text pura nahi hua, band karne ke liye \" lagao",
+                        ));
+                    }
+                    Some('\\') => {
+                        // Simple escape: backslash ke baad quote/backslash/n aya to asli character dalo
+                        match cursor.peek_next() {
+                            Some(n @ ('"' | '\\')) => {
+                                text.push(n);
+                                cursor.bump();
+                                cursor.bump();
+                            }
+                            Some('n') => {
+                                text.push('\n');
+                                cursor.bump();
+                                cursor.bump();
+                            }
+                            _ => {
+                                text.push('\\');
+                                cursor.bump();
+                            }
+                        }
+                    }
+                    Some(ch) => {
+                        text.push(ch);
+                        cursor.bump();
+                    }
                 }
-                if ch == '\n' {
+                if text.len() as u64 > max_string_bytes {
                     return Err(BoliError::line(
                         start_line,
-                        "text pura nahi hua, band karne ke liye \" lagao",
+                        format!("text bahut bada hai (max {} bytes)", max_string_bytes),
                     ));
                 }
-                // Simple escape: backslash ke baad quote/backslash/n aya to asli character dalo
-                if ch == '\\' && i + 1 < chars.len() {
-                    let next = chars[i + 1];
-                    if next == '"' || next == '\\' {
-                        text.push(next);
-                        i += 2;
-                        continue;
-                    }
-                    if next == 'n' {
-                        text.push('\n');
-                        i += 2;
-                        continue;
-                    }
-                }
-                text.push(ch);
-                i += 1;
             }
             if !band_hua {
                 return Err(BoliError::line(
@@ -235,38 +312,48 @@ pub fn lex(source: &str) -> Result<Vec<Token>, BoliError> {
                     "text pura nahi hua, band karne ke liye \" lagao",
                 ));
             }
-            tokens.push(Token {
-                tok: Tok::Text(text),
-                line: start_line,
-            });
+            push_token(
+                &mut tokens,
+                Token {
+                    tok: Tok::Text(text),
+                    line: start_line,
+                },
+                max_tokens,
+            )?;
             continue;
         }
 
         // Number - ankh laage hue, ek dot ho sakti hai (jaise 99.50 ya -7)
         // '-' sirf tab number ka hissa jab uske baad digit ho (BOLI me minus symbol allowed nahi)
-        if c.is_ascii_digit() || (c == '-' && i + 1 < chars.len() && chars[i + 1].is_ascii_digit())
+        if c.is_ascii_digit()
+            || (c == '-' && cursor.peek_next().is_some_and(|n| n.is_ascii_digit()))
         {
             let start_line = line;
             let mut num = String::new();
             if c == '-' {
                 num.push('-');
-                i += 1;
+                cursor.bump();
             }
-            while i < chars.len() && chars[i].is_ascii_digit() {
-                num.push(chars[i]);
-                i += 1;
+            while let Some(x) = cursor.peek() {
+                if x.is_ascii_digit() {
+                    num.push(x);
+                    cursor.bump();
+                } else {
+                    break;
+                }
             }
             // Dot sirf tab lo jab uske baad digit ho (warna oh alag galti hai)
-            if i < chars.len()
-                && chars[i] == '.'
-                && i + 1 < chars.len()
-                && chars[i + 1].is_ascii_digit()
+            if cursor.peek() == Some('.') && cursor.peek_next().is_some_and(|n| n.is_ascii_digit())
             {
                 num.push('.');
-                i += 1;
-                while i < chars.len() && chars[i].is_ascii_digit() {
-                    num.push(chars[i]);
-                    i += 1;
+                cursor.bump();
+                while let Some(x) = cursor.peek() {
+                    if x.is_ascii_digit() {
+                        num.push(x);
+                        cursor.bump();
+                    } else {
+                        break;
+                    }
                 }
             }
             let value: f64 = num.parse().map_err(|_| {
@@ -279,10 +366,14 @@ pub fn lex(source: &str) -> Result<Vec<Token>, BoliError> {
                     format!("'{}' bahut bada hai, finite number nahi hai", num),
                 ));
             }
-            tokens.push(Token {
-                tok: Tok::Number(value),
-                line: start_line,
-            });
+            push_token(
+                &mut tokens,
+                Token {
+                    tok: Tok::Number(value),
+                    line: start_line,
+                },
+                max_tokens,
+            )?;
             continue;
         }
 
@@ -290,20 +381,37 @@ pub fn lex(source: &str) -> Result<Vec<Token>, BoliError> {
         if c.is_alphabetic() || c == '_' || is_mark(c) {
             let start_line = line;
             let mut word = String::new();
-            while i < chars.len() && is_word_char(chars[i]) {
-                word.push(chars[i]);
-                i += 1;
+            while let Some(x) = cursor.peek() {
+                if !is_word_char(x) {
+                    break;
+                }
+                word.push(x);
+                cursor.bump();
+                if word.len() as u64 > max_string_bytes {
+                    return Err(BoliError::line(
+                        start_line,
+                        format!("shabd bahut bada hai (max {} bytes)", max_string_bytes),
+                    ));
+                }
             }
             let lower = word.to_lowercase();
             match keyword(&lower) {
-                Some(kw) => tokens.push(Token {
-                    tok: kw,
-                    line: start_line,
-                }),
-                None => tokens.push(Token {
-                    tok: Tok::Ident(word),
-                    line: start_line,
-                }),
+                Some(kw) => push_token(
+                    &mut tokens,
+                    Token {
+                        tok: kw,
+                        line: start_line,
+                    },
+                    max_tokens,
+                )?,
+                None => push_token(
+                    &mut tokens,
+                    Token {
+                        tok: Tok::Ident(word),
+                        line: start_line,
+                    },
+                    max_tokens,
+                )?,
             }
             continue;
         }
@@ -318,9 +426,27 @@ pub fn lex(source: &str) -> Result<Vec<Token>, BoliError> {
         ));
     }
 
-    tokens.push(Token {
-        tok: Tok::Eof,
-        line,
-    });
+    push_token(
+        &mut tokens,
+        Token {
+            tok: Tok::Eof,
+            line,
+        },
+        max_tokens,
+    )?;
     Ok(tokens)
+}
+
+// Pura source code tokens me convert karo (env limits: BOLI_MAX_SOURCE_BYTES, BOLI_MAX_STRING_BYTES, BOLI_MAX_TOKENS)
+pub fn lex(source: &str) -> Result<Vec<Token>, BoliError> {
+    let max_source = crate::limits::env_limit(
+        "BOLI_MAX_SOURCE_BYTES",
+        crate::limits::DEFAULT_MAX_SOURCE_BYTES,
+    );
+    let max_string = crate::limits::env_limit(
+        "BOLI_MAX_STRING_BYTES",
+        crate::limits::DEFAULT_MAX_STRING_BYTES,
+    );
+    let max_tokens = crate::limits::env_limit("BOLI_MAX_TOKENS", crate::limits::DEFAULT_MAX_TOKENS);
+    lex_with_limits(source, max_source, max_string, max_tokens)
 }
