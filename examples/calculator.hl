@@ -1,0 +1,27 @@
+# calculator.hl - chhota calculator jo numbers puchta hai
+
+likho "=== BOLI Calculator ==="
+
+pucho a "Pehli sankhya: "
+pucho b "Doosri sankhya: "
+
+jodo jod a aur b
+ghatao ghata a se b
+guna gun a ko b se
+bhaag bhag a ko b se
+
+likho "Jod (a + b):"
+likho jod
+
+likho "Ghatao (a - b):"
+likho ghata
+
+likho "Guna (a * b):"
+likho gun
+
+likho "Bhaag (a / b):"
+likho bhag
+
+# Inline hisaab bhi kar sakte hain, likho ke saath
+likho jodo 100 aur 50
+likho ghatao 100 se 50

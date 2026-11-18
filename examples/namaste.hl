@@ -1,0 +1,11 @@
+# namaste.hl - BOLI ka pehla program
+
+likho "Namaste Duniya"
+
+naam rakho "Vilas"
+likho naam
+
+# pucho se input lo
+pucho tumhara_naam "Tumhara naam kya hai? "
+likho "Aapka swagat hai,"
+likho tumhara_naam

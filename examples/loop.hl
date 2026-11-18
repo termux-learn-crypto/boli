@@ -1,0 +1,27 @@
+# loop.hl - BOLI me loop ke tarike
+
+likho "--- 1 se 5 tak ---"
+1 se 5 tak
+    likho "Namaste"
+    likho ginti
+khatam
+
+likho "--- ginti variable ---"
+3 se 7 tak
+    likho ginti
+khatam
+
+likho "--- jab tak loop ---"
+ginti2 rakho 1
+jab tak ginti2 5 se chhota ya barabar hai to
+    likho ginti2
+    jodo ginti2 ginti2 aur 1
+khatam
+
+likho "--- agar / nahi to ---"
+umar rakho 28
+agar umar 18 se bada ya barabar hai to
+    likho "Adult ho"
+nahi to
+    likho "Bacche ho"
+khatam
