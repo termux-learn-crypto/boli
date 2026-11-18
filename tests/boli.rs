@@ -534,3 +534,112 @@ fn moderately_nested_code_still_works() {
     let src = "agar 1 1 barabar hai to\n".repeat(20) + "likho 42\n" + &"khatam\n".repeat(20);
     assert_eq!(run_out(&src).unwrap(), vec!["42"]);
 }
+
+// ---------- safety limits (v0.3.0) ----------
+
+#[test]
+fn literal_string_size_limit() {
+    // initial string literal bhi checked_text se guzarta hai
+    let program = parse_source("likho \"abcdefghij\"").unwrap();
+    let mut env = Environment::with_limits(100, 64, 5);
+    env.collect_output();
+    let err = env.run_program(&program).unwrap_err();
+    assert!(err.to_string().contains("bahut bada"));
+}
+
+#[test]
+fn list_creation_limit() {
+    let program = parse_source("cheezein rakho 1 2 3 4").unwrap();
+    let mut env = Environment::with_limits(100, 64, 1024).with_list_limit(3);
+    env.collect_output();
+    let err = env.run_program(&program).unwrap_err();
+    assert!(err.to_string().contains("list bahut badi"));
+}
+
+#[test]
+fn list_concat_limit() {
+    let src = "a rakho 1 2 3\nb rakho 4 5 6\njodo c a aur b\nlikho c";
+    let program = parse_source(src).unwrap();
+    let mut env = Environment::with_limits(100, 64, 1024).with_list_limit(5);
+    env.collect_output();
+    let err = env.run_program(&program).unwrap_err();
+    assert!(err.to_string().contains("list bahut badi"));
+}
+
+#[test]
+fn list_under_limit_works() {
+    let src = "cheezein rakho 1 2 3\nlikho cheezein";
+    let program = parse_source(src).unwrap();
+    let mut env = Environment::with_limits(100, 64, 1024).with_list_limit(3);
+    env.collect_output();
+    env.run_program(&program).unwrap();
+    assert_eq!(env.take_output(), vec!["1, 2, 3"]);
+}
+
+#[test]
+fn condition_ya_chain_parse_limit() {
+    // parser 'ya' chain ko cap karta hai
+    let ya_src = format!(
+        "a rakho 1\nagar {} to\nlikho 1\nkhatam",
+        std::iter::repeat_n("a a barabar hai", 20)
+            .collect::<Vec<_>>()
+            .join(" ya ")
+    );
+    let tokens = lex(&ya_src).unwrap();
+    let mut parser = boli::parser::Parser::with_limits(tokens, 64, 8);
+    assert!(parser.parse_program().is_err());
+}
+
+#[test]
+fn condition_ya_chain_eval_limit() {
+    let ya_src = format!(
+        "a rakho 1\nagar {} to\nlikho 1\nkhatam",
+        std::iter::repeat_n("a a barabar hai", 10)
+            .collect::<Vec<_>>()
+            .join(" ya ")
+    );
+    let tokens = lex(&ya_src).unwrap();
+    let program = boli::parser::Parser::with_limits(tokens, 64, 100)
+        .parse_program()
+        .unwrap();
+    let mut env = Environment::with_limits(1000, 64, 1024).with_condition_depth_limit(4);
+    env.collect_output();
+    let err = env.run_program(&program).unwrap_err();
+    assert!(err.to_string().contains("condition bahut"));
+}
+
+#[test]
+fn lexer_rejects_control_characters() {
+    assert!(lex("likho \"a\" \u{0007}").is_err());
+    assert!(lex("likho @").is_err());
+}
+
+#[test]
+fn malformed_programs_error_not_crash() {
+    assert!(parse_source("agar 1 1 barabar hai").is_err());
+    assert!(parse_source("kaam f a\n").is_err());
+    assert!(parse_source("ruk").is_ok()); // parse oK, runtime err
+    assert!(parse_source("").is_ok());
+}
+
+#[test]
+fn fuzz_lex_parse_never_panics() {
+    // deterministic xorshift - koi dependency nahi
+    let mut state: u64 = 0x9E3779B97F4A7C15;
+    let mut rand = move || {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        state
+    };
+    let alphabet: Vec<char> = "likho 1\"#\nasdf \n_.aि".chars().collect();
+    for _ in 0..2000 {
+        let len = (rand() % 200) as usize;
+        let src: String = (0..len)
+            .map(|_| alphabet[(rand() as usize) % alphabet.len()])
+            .collect();
+        if let Ok(tokens) = lex(&src) {
+            let _ = boli::parser::Parser::new(tokens).parse_program();
+        }
+    }
+}

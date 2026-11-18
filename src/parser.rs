@@ -3,21 +3,31 @@
 
 use crate::ast::{ArithOp, BoliError, CmpOp, Cond, Expr, Program, Stmt};
 use crate::lexer::{Tok, Token, lex};
-
-const MAX_PARSE_DEPTH: usize = 64;
+use crate::limits::{DEFAULT_MAX_CONDITION_DEPTH, DEFAULT_MAX_PARSE_DEPTH, env_limit};
 
 pub struct Parser {
     tokens: Vec<Token>,
     pos: usize,
     depth: usize,
+    max_depth: usize,
+    max_condition_depth: usize,
 }
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
+        let max_depth = env_limit("BOLI_MAX_PARSE_DEPTH", DEFAULT_MAX_PARSE_DEPTH) as usize;
+        let max_condition_depth =
+            env_limit("BOLI_MAX_CONDITION_DEPTH", DEFAULT_MAX_CONDITION_DEPTH) as usize;
+        Self::with_limits(tokens, max_depth, max_condition_depth)
+    }
+
+    pub fn with_limits(tokens: Vec<Token>, max_depth: usize, max_condition_depth: usize) -> Self {
         Parser {
             tokens,
             pos: 0,
             depth: 0,
+            max_depth,
+            max_condition_depth,
         }
     }
 
@@ -178,13 +188,13 @@ impl Parser {
 
     fn parse_stmt(&mut self) -> Result<Stmt, BoliError> {
         self.depth += 1;
-        if self.depth > MAX_PARSE_DEPTH {
+        if self.depth > self.max_depth {
             self.depth -= 1;
             return Err(BoliError::line(
                 self.peek().line,
                 format!(
                     "code bahut zyada gehra hai (max nesting {})",
-                    MAX_PARSE_DEPTH
+                    self.max_depth
                 ),
             ));
         }
@@ -496,13 +506,13 @@ impl Parser {
     // Ek base operand (index se pehle wala hissa)
     fn atom_base(&mut self, allow_call: bool) -> Result<Expr, BoliError> {
         self.depth += 1;
-        if self.depth > MAX_PARSE_DEPTH {
+        if self.depth > self.max_depth {
             self.depth -= 1;
             return Err(BoliError::line(
                 self.peek().line,
                 format!(
                     "expression bahut zyada gehra hai (max nesting {})",
-                    MAX_PARSE_DEPTH
+                    self.max_depth
                 ),
             ));
         }
@@ -595,12 +605,23 @@ impl Parser {
     // "a ya b aur c" ka matlab hai: a ya (b aur c)
     fn parse_cond(&mut self) -> Result<Cond, BoliError> {
         let mut cond = self.parse_aur()?;
+        let mut chain = 1usize;
         loop {
             let tok = self.peek().clone();
             if tok.tok == Tok::Ya {
                 self.next();
                 let line = tok.line;
                 let right = self.parse_aur()?;
+                chain += 1;
+                if chain > self.max_condition_depth {
+                    return Err(BoliError::line(
+                        line,
+                        format!(
+                            "condition bahut lambi ho gayi (max {} 'ya')",
+                            self.max_condition_depth
+                        ),
+                    ));
+                }
                 cond = Cond::Ya(Box::new(cond), Box::new(right), line);
             } else {
                 break;
@@ -612,12 +633,23 @@ impl Parser {
     // aur (AND) bind karta hai: comparison (aur comparison)*
     fn parse_aur(&mut self) -> Result<Cond, BoliError> {
         let mut cond = self.parse_comparison()?;
+        let mut chain = 1usize;
         loop {
             let tok = self.peek().clone();
             if tok.tok == Tok::Aur {
                 self.next();
                 let line = tok.line;
                 let right = self.parse_comparison()?;
+                chain += 1;
+                if chain > self.max_condition_depth {
+                    return Err(BoliError::line(
+                        line,
+                        format!(
+                            "condition bahut lambi ho gayi (max {} 'aur')",
+                            self.max_condition_depth
+                        ),
+                    ));
+                }
                 cond = Cond::Aur(Box::new(cond), Box::new(right), line);
             } else {
                 break;

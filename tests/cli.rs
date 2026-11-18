@@ -236,3 +236,25 @@ fn cli_broken_pipe_exits_cleanly() {
     let output = stdout_pipe.wait_with_output().unwrap();
     assert_eq!(output.status.code(), Some(0));
 }
+
+#[test]
+fn cli_bogus_subcommand_errors() {
+    let output = Command::new(boli_bin())
+        .arg("boguscommand")
+        .output()
+        .expect("boli binary chala nahi");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("Galti"));
+}
+
+#[test]
+fn cli_run_with_too_many_args_errors() {
+    let output = Command::new(boli_bin())
+        .args(["run", "a.hl", "extra"])
+        .output()
+        .expect("boli binary chala nahi");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("Galti"));
+}

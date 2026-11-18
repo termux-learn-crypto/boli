@@ -5,6 +5,10 @@ use std::collections::HashMap;
 use std::io::{self, Write};
 
 use crate::ast::{ArithOp, BoliError, CmpOp, Cond, Expr, Stmt};
+use crate::limits::{
+    DEFAULT_MAX_CALL_DEPTH, DEFAULT_MAX_EVAL_DEPTH, DEFAULT_MAX_LIST_ITEMS, DEFAULT_MAX_STEPS,
+    DEFAULT_MAX_STRING_BYTES, env_limit,
+};
 
 // BOLI ke values
 #[derive(Debug, Clone, PartialEq)]
@@ -74,16 +78,27 @@ pub struct Environment {
     max_steps: u64,
     max_call_depth: usize,
     max_string_bytes: usize,
+    max_list_items: usize,
+    max_eval_depth: usize,
+    max_condition_depth: usize,
     call_depth: usize,
     eval_depth: usize,
+    cond_depth: usize,
     captured: Option<Vec<String>>,
 }
 
 impl Environment {
     pub fn new() -> Self {
-        let max_steps = env_limit("BOLI_MAX_STEPS", 100_000);
-        let max_call_depth = env_limit("BOLI_MAX_CALL_DEPTH", 64) as usize;
-        let max_string_bytes = env_limit("BOLI_MAX_STRING_BYTES", 1024 * 1024) as usize;
+        let max_steps = env_limit("BOLI_MAX_STEPS", DEFAULT_MAX_STEPS);
+        let max_call_depth = env_limit("BOLI_MAX_CALL_DEPTH", DEFAULT_MAX_CALL_DEPTH) as usize;
+        let max_string_bytes =
+            env_limit("BOLI_MAX_STRING_BYTES", DEFAULT_MAX_STRING_BYTES) as usize;
+        let max_list_items = env_limit("BOLI_MAX_LIST_ITEMS", DEFAULT_MAX_LIST_ITEMS) as usize;
+        let max_eval_depth = env_limit("BOLI_MAX_EVAL_DEPTH", DEFAULT_MAX_EVAL_DEPTH) as usize;
+        let max_condition_depth = env_limit(
+            "BOLI_MAX_CONDITION_DEPTH",
+            crate::limits::DEFAULT_MAX_CONDITION_DEPTH,
+        ) as usize;
         Environment {
             scopes: vec![HashMap::new()],
             kaam: HashMap::new(),
@@ -91,8 +106,12 @@ impl Environment {
             max_steps,
             max_call_depth,
             max_string_bytes,
+            max_list_items,
+            max_eval_depth,
+            max_condition_depth,
             call_depth: 0,
             eval_depth: 0,
+            cond_depth: 0,
             captured: None,
         }
     }
@@ -113,6 +132,21 @@ impl Environment {
         env.max_call_depth = max_call_depth;
         env.max_string_bytes = max_string_bytes;
         env
+    }
+
+    pub fn with_list_limit(mut self, max_list_items: usize) -> Self {
+        self.max_list_items = max_list_items;
+        self
+    }
+
+    pub fn with_eval_depth_limit(mut self, max_eval_depth: usize) -> Self {
+        self.max_eval_depth = max_eval_depth;
+        self
+    }
+
+    pub fn with_condition_depth_limit(mut self, max_condition_depth: usize) -> Self {
+        self.max_condition_depth = max_condition_depth;
+        self
     }
 
     pub fn reset_steps(&mut self) {
@@ -214,10 +248,51 @@ impl Environment {
                 if !prompt_ok {
                     std::process::exit(0);
                 }
-                let mut line_in = String::new();
-                io::stdin()
-                    .read_line(&mut line_in)
-                    .map_err(|_| BoliError::line(*line, "input nahi mil raha"))?;
+                // input ko chunked-read karke max_string_bytes pe kaato (unbounded alloc nahi)
+                let mut input_buf: Vec<u8> = Vec::new();
+                {
+                    use std::io::BufRead;
+                    let mut stdin = io::stdin().lock();
+                    loop {
+                        let chunk = stdin
+                            .fill_buf()
+                            .map_err(|_| BoliError::line(*line, "input nahi mil raha"))?;
+                        if chunk.is_empty() {
+                            break; // EOF
+                        }
+                        match chunk.iter().position(|&b| b == b'\n') {
+                            Some(pos) => {
+                                input_buf.extend_from_slice(&chunk[..pos]);
+                                stdin.consume(pos + 1);
+                                break;
+                            }
+                            None => {
+                                if input_buf.len() + chunk.len() > self.max_string_bytes {
+                                    return Err(BoliError::line(
+                                        *line,
+                                        format!(
+                                            "input text bahut bada hai (max {} bytes)",
+                                            self.max_string_bytes
+                                        ),
+                                    ));
+                                }
+                                input_buf.extend_from_slice(chunk);
+                                let len = chunk.len();
+                                stdin.consume(len);
+                            }
+                        }
+                    }
+                }
+                if input_buf.len() > self.max_string_bytes {
+                    return Err(BoliError::line(
+                        *line,
+                        format!(
+                            "input text bahut bada hai (max {} bytes)",
+                            self.max_string_bytes
+                        ),
+                    ));
+                }
+                let line_in = String::from_utf8_lossy(&input_buf).into_owned();
                 let trimmed = line_in.trim();
                 let value = if trimmed.is_empty() {
                     Value::Khaali
@@ -248,7 +323,14 @@ impl Environment {
             } => {
                 let left_v = self.eval_expr(left)?;
                 let right_v = self.eval_expr(right)?;
-                let value = eval_arith(*op, &left_v, &right_v, *line, self.max_string_bytes)?;
+                let value = eval_arith(
+                    *op,
+                    &left_v,
+                    &right_v,
+                    *line,
+                    self.max_string_bytes,
+                    self.max_list_items,
+                )?;
                 self.set(target, value);
                 Ok(Flow::Normal)
             }
@@ -508,7 +590,7 @@ impl Environment {
     fn eval_expr_inner(&mut self, expr: &Expr) -> Result<Value, BoliError> {
         match expr {
             Expr::Number(n, _) => Ok(Value::Number(*n)),
-            Expr::Text(s, _) => Ok(Value::Text(s.clone())),
+            Expr::Text(s, line) => checked_text(s.clone(), *line, self.max_string_bytes),
             Expr::Bool(b, _) => Ok(Value::Bool(*b)),
             Expr::Khaali(_) => Ok(Value::Khaali),
             Expr::Var(name, line) => {
@@ -536,10 +618,26 @@ impl Environment {
             Expr::Arith(op, left, right, line) => {
                 let left_v = self.eval_expr(left)?;
                 let right_v = self.eval_expr(right)?;
-                eval_arith(*op, &left_v, &right_v, *line, self.max_string_bytes)
+                eval_arith(
+                    *op,
+                    &left_v,
+                    &right_v,
+                    *line,
+                    self.max_string_bytes,
+                    self.max_list_items,
+                )
             }
             Expr::Call(name, args, line) => self.call_kaam(name, args.clone(), *line),
-            Expr::List(items, _) => {
+            Expr::List(items, line) => {
+                if items.len() > self.max_list_items {
+                    return Err(BoliError::line(
+                        *line,
+                        format!(
+                            "list bahut badi ho gayi (max {} items)",
+                            self.max_list_items
+                        ),
+                    ));
+                }
                 let values = items
                     .iter()
                     .map(|e| self.eval_expr(e))
@@ -591,6 +689,23 @@ impl Environment {
     }
 
     fn eval_cond(&mut self, cond: &Cond) -> Result<bool, BoliError> {
+        self.cond_depth += 1;
+        if self.cond_depth > self.max_condition_depth {
+            self.cond_depth -= 1;
+            return Err(BoliError::line(
+                cond_line(cond),
+                format!(
+                    "condition bahut zyada gehra hai (max {})",
+                    self.max_condition_depth
+                ),
+            ));
+        }
+        let result = self.eval_cond_inner(cond);
+        self.cond_depth -= 1;
+        result
+    }
+
+    fn eval_cond_inner(&mut self, cond: &Cond) -> Result<bool, BoliError> {
         match cond {
             Cond::Cmp {
                 left,
@@ -628,12 +743,12 @@ impl F64ToI64Checked for f64 {
     }
 }
 
-fn env_limit(name: &str, default: u64) -> u64 {
-    std::env::var(name)
-        .ok()
-        .and_then(|v| v.parse::<u64>().ok())
-        .filter(|&v| v > 0)
-        .unwrap_or(default)
+fn cond_line(cond: &Cond) -> usize {
+    match cond {
+        Cond::Cmp { line, .. } => *line,
+        Cond::Aur(_, _, line) => *line,
+        Cond::Ya(_, _, line) => *line,
+    }
 }
 
 fn checked_text(s: String, line: usize, max_string_bytes: usize) -> Result<Value, BoliError> {
@@ -662,12 +777,19 @@ fn eval_arith(
     right: &Value,
     line: usize,
     max_string_bytes: usize,
+    max_list_items: usize,
 ) -> Result<Value, BoliError> {
     if op == ArithOp::Jodo
         && let (Value::List(a), Value::List(b)) = (left, right)
     {
         let mut items = a.clone();
         items.extend(b.iter().cloned());
+        if items.len() > max_list_items {
+            return Err(BoliError::line(
+                line,
+                format!("list bahut badi ho gayi (max {} items)", max_list_items),
+            ));
+        }
         return Ok(Value::List(items));
     }
     if op == ArithOp::Jodo {

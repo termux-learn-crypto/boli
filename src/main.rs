@@ -1,6 +1,7 @@
 // BOLI - ek Hinglish programming language jo Rust me bani hai
 // cargo run se REPL, `cargo run -- run x.hl` se file chale
 use boli::interpreter::Environment;
+use boli::limits::{DEFAULT_MAX_SOURCE_BYTES, env_limit};
 use boli::parser;
 
 use std::env;
@@ -52,6 +53,25 @@ fn print_help() {
 
 // File padhkar chalao
 fn run_file(path: &str) {
+    // source file size limit (env BOLI_MAX_SOURCE_BYTES, default 10 MiB)
+    let max_source = env_limit("BOLI_MAX_SOURCE_BYTES", DEFAULT_MAX_SOURCE_BYTES);
+    match fs::metadata(path) {
+        Ok(meta) => {
+            if meta.len() > max_source {
+                eprintln!(
+                    "Galti: file '{}' bahut badi hai ({} bytes, max {})",
+                    path,
+                    meta.len(),
+                    max_source
+                );
+                process::exit(1);
+            }
+        }
+        Err(e) => {
+            eprintln!("Galti: file '{}' nahi khuli: {}", path, e);
+            process::exit(1);
+        }
+    }
     let source = match fs::read_to_string(path) {
         Ok(s) => s,
         Err(e) => {
