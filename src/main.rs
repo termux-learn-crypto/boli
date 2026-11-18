@@ -1,6 +1,15 @@
 // BOLI - ek Hinglish programming language jo Rust me bani hai
 // cargo run se REPL, `cargo run -- run x.hl` se file chale
 use boli::interpreter::Environment;
+
+// stdout crash nahi hona chahiye (broken pipe -> clean exit), print!/println! se EPIPE panic hotas
+fn out_line(text: &str) -> bool {
+    writeln!(io::stdout(), "{}", text).is_ok()
+}
+
+fn out(text: &str) -> bool {
+    write!(io::stdout(), "{}", text).is_ok() && io::stdout().flush().is_ok()
+}
 use boli::limits::{DEFAULT_MAX_SOURCE_BYTES, env_limit};
 use boli::parser;
 
@@ -20,7 +29,7 @@ fn main() {
             match cmd {
                 "help" | "--help" | "-h" => print_help(),
                 "version" | "--version" | "-v" => {
-                    println!("BOLI version {}", env!("CARGO_PKG_VERSION"))
+                    let _ = out_line(&format!("BOLI version {}", env!("CARGO_PKG_VERSION")));
                 }
                 // convenience: `cargo run -- file.hl` bhi chalega
                 _ if cmd.ends_with(".hl") => run_file(cmd),
@@ -42,20 +51,20 @@ fn main() {
 
 // Kya kaam hai: help text
 fn print_help() {
-    println!("BOLI - Hinglish me programming language");
-    println!();
-    println!("Use:");
-    println!("  cargo run              REPL kholo");
-    println!("  cargo run -- run x.hl  x.hl file chalao");
-    println!("  cargo run -- help      yeh message dikhao");
-    println!("  cargo run -- version   version dikhao");
-    println!();
-    println!("Built-in kaams: lambayi, upar, neeche, text, sankhya");
-    println!("  lambayi <text|list>   text ke characters / list ke items");
-    println!("  upar <text>           UPPERCASE");
-    println!("  neeche <text>         lowercase");
-    println!("  text <anything>       kisi bhi value ko text me");
-    println!("  sankhya <text>        text ko number me (galat text par error)");
+    let _ = out_line("BOLI - Hinglish me programming language");
+    let _ = out_line("");
+    let _ = out_line("Use:");
+    let _ = out_line("  cargo run              REPL kholo");
+    let _ = out_line("  cargo run -- run x.hl  x.hl file chalao");
+    let _ = out_line("  cargo run -- help      yeh message dikhao");
+    let _ = out_line("  cargo run -- version   version dikhao");
+    let _ = out_line("");
+    let _ = out_line("Built-in kaams: lambayi, upar, neeche, text, sankhya");
+    let _ = out_line("  lambayi <text|list>   text ke characters / list ke items");
+    let _ = out_line("  upar <text>           UPPERCASE");
+    let _ = out_line("  neeche <text>         lowercase");
+    let _ = out_line("  text <anything>       kisi bhi value ko text me");
+    let _ = out_line("  sankhya <text>        text ko number me (galat text par error)");
 }
 
 // File padhkar chalao
@@ -208,8 +217,10 @@ fn read_repl_line(stdin: &mut io::StdinLock, max_bytes: u64) -> io::Result<LineR
 }
 
 fn repl() {
-    println!("BOLI REPL - likhne ke liye tayyar!");
-    println!("REPL se nikalne ke liye 'nikalo' likho.");
+    if !out_line("BOLI REPL - likhne ke liye tayyar!") {
+        return; // stdout band hai - kuch print karne ka point nahi
+    }
+    let _ = out_line("REPL se nikalne ke liye 'nikalo' likho.");
 
     let mut env = Environment::new();
     let mut buffer = String::new();
@@ -218,12 +229,14 @@ fn repl() {
 
     loop {
         // Prompt: normal ya continuation
-        if depth > 0 {
-            print!("...> ");
+        let prompt_ok = if depth > 0 {
+            out("...> ")
         } else {
-            print!("boli> ");
+            out("boli> ")
+        };
+        if !prompt_ok {
+            return; // stdout band hai
         }
-        io::stdout().flush().unwrap();
 
         let max_repl_line = env_limit(
             "BOLI_MAX_REPL_LINE_BYTES",
@@ -255,7 +268,7 @@ fn repl() {
         }
         // REPL se nikalna
         if depth == 0 && (trimmed == "nikalo" || trimmed == "exit" || trimmed == "quit") {
-            println!("BOLI band ho raha hai. Alvida!");
+            let _ = out_line("BOLI band ho raha hai. Alvida!");
             break;
         }
 
