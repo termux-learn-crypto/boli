@@ -1,14 +1,17 @@
 // BOLI ke values (tree-walking interpreter)
 // Live bytes budget ke liye value_size bhi yahin hai
 
+use std::collections::BTreeMap;
+
 // BOLI ke values
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Text(String),
     Number(f64),
-    Bool(bool),       // sahi / galat
-    Khaali,           // khaali (null)
-    List(Vec<Value>), // cheezein rakho 1 2 3
+    Bool(bool),                   // sahi / galat
+    Khaali,                       // khaali (null)
+    List(Vec<Value>),             // cheezein rakho 1 2 3
+    Map(BTreeMap<String, Value>), // mapa rakho "a" 1 "b" 2
 }
 
 impl Value {
@@ -35,6 +38,11 @@ impl Value {
                 .map(|v| v.dikhane_laayak())
                 .collect::<Vec<_>>()
                 .join(", "),
+            Value::Map(m) => m
+                .iter()
+                .map(|(k, v)| format!("{}: {}", k, v.dikhane_laayak()))
+                .collect::<Vec<_>>()
+                .join(", "),
         }
     }
 
@@ -45,6 +53,7 @@ impl Value {
             Value::Bool(_) => "sahi/galat",
             Value::Khaali => "khaali",
             Value::List(_) => "list",
+            Value::Map(_) => "map",
         }
     }
 }
@@ -58,6 +67,12 @@ pub(crate) fn value_size(value: &Value) -> u64 {
         Value::Khaali => 1,
         Value::List(items) => {
             24 + items.len() as u64 * 40 + items.iter().map(value_size).sum::<u64>()
+        }
+        Value::Map(m) => {
+            24 + m.len() as u64 * 40
+                + m.iter()
+                    .map(|(k, v)| k.len() as u64 + 16 + value_size(v))
+                    .sum::<u64>()
         }
     }
 }

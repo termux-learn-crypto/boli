@@ -249,6 +249,28 @@ impl Environment {
                 self.set(name, value, *line)?;
                 Ok(Flow::Normal)
             }
+            Stmt::MapRakho { name, pairs, line } => {
+                let mut map = std::collections::BTreeMap::new();
+                for (k_expr, v_expr) in pairs {
+                    let key_v = self.eval_expr(k_expr)?;
+                    let key = match key_v {
+                        Value::Text(t) => t,
+                        other => {
+                            return Err(BoliError::line(
+                                *line,
+                                format!(
+                                    "map ki chaabi text honi chahiye, {} nahi",
+                                    other.type_naam()
+                                ),
+                            ));
+                        }
+                    };
+                    let value = self.eval_expr(v_expr)?;
+                    map.insert(key, value);
+                }
+                self.set(name, Value::Map(map), *line)?;
+                Ok(Flow::Normal)
+            }
             Stmt::Pucho { name, prompt, line } => {
                 if self.captured.is_some() {
                     self.set(name, Value::Khaali, *line)?;
@@ -488,6 +510,32 @@ impl Environment {
         value: &Expr,
         line: usize,
     ) -> Result<(), BoliError> {
+        // Map assignment: mapa hissa "chaabi" rakho value
+        {
+            let target_v = self.get(target);
+            if let Some(Value::Map(_)) = target_v {
+                let key_v = self.eval_expr(index)?;
+                let key = match key_v {
+                    Value::Text(t) => t,
+                    other => {
+                        return Err(BoliError::line(
+                            line,
+                            format!(
+                                "map ki chaabi text honi chahiye, {} nahi",
+                                other.type_naam()
+                            ),
+                        ));
+                    }
+                };
+                let new_value = self.eval_expr(value)?;
+                let mut current = self.get(target).expect("abhi pata hai map hai");
+                if let Value::Map(ref mut m) = current {
+                    m.insert(key, new_value);
+                }
+                self.set(target, current, line)?;
+                return Ok(());
+            }
+        }
         let idx_v = self.eval_expr(index)?;
         let idx = as_number(&idx_v, line, "hissa ke liye")?;
         if idx.fract() != 0.0 || idx < 1.0 {
@@ -601,8 +649,6 @@ impl Environment {
         }
     }
 }
-
-
 
 // "Did you mean...?" - simple Damerau-Levenshtein over known names
 fn edit_distance(a: &str, b: &str) -> usize {

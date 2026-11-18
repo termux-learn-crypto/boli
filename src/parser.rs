@@ -414,6 +414,41 @@ impl Parser {
                 if self.peek_at(1).tok == Tok::Rakho {
                     self.next(); // naam
                     self.next(); // rakho
+                    // <naam> rakho map "k" v "k2" v2
+                    if self.peek().tok == Tok::Map {
+                        self.next(); // map
+                        let mut pairs = Vec::new();
+                        while Self::atom_start(&self.peek().tok) || self.peek().tok == Tok::Map {
+                            if self.peek().tok == Tok::Map {
+                                return Err(BoliError::line(
+                                    self.peek().line,
+                                    "map literal ke andar 'map' dubara nahi aa sakta",
+                                ));
+                            }
+                            let key = self.atom(false)?;
+                            if !Self::atom_start(&self.peek().tok) {
+                                let tok = self.peek().clone();
+                                return Err(BoliError::line(
+                                    tok.line,
+                                    format!(
+                                        "map ki har chaabi ke saath value deni hogi, '{}' mila",
+                                        tok.describe()
+                                    ),
+                                ));
+                            }
+                            let value = self.atom(false)?;
+                            pairs.push((key, value));
+                        }
+                        if pairs.is_empty() {
+                            let tok = self.peek().clone();
+                            return Err(BoliError::line(
+                                tok.line,
+                                "map me kam se kam ek chaabi-value pair chahiye",
+                            ));
+                        }
+                        self.expect_line_end()?;
+                        return Ok(Stmt::MapRakho { name, pairs, line });
+                    }
                     let value = self.parse_rakho_value()?;
                     self.expect_line_end()?;
                     return Ok(Stmt::Rakho { name, value, line });
@@ -506,7 +541,8 @@ impl Parser {
         // hissa (index) postfix: cheezein hissa 1  =>  cheezein ka pehla hissa
         while self.peek().tok == Tok::Hissa {
             let hissa_tok = self.next();
-            let index = self.parse_operand()?;
+            // index sirf atom_base - postfix chains left-associate (a hissa 1 hissa 2 = (a[1])[2])
+            let index = self.atom_base(false)?;
             expr = Expr::Index(Box::new(expr), Box::new(index), hissa_tok.line);
         }
         Ok(expr)

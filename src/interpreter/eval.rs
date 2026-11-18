@@ -91,6 +91,24 @@ impl Environment {
             Expr::Index(target, index, line) => {
                 let target_v = self.eval_expr(target)?;
                 let idx_v = self.eval_expr(index)?;
+                // Map access: mapa hissa "chaabi"
+                if let Value::Map(m) = &target_v {
+                    let key = match idx_v {
+                        Value::Text(t) => t,
+                        other => {
+                            return Err(BoliError::line(
+                                *line,
+                                format!(
+                                    "map ki chaabi text honi chahiye, {} nahi",
+                                    other.type_naam()
+                                ),
+                            ));
+                        }
+                    };
+                    return m.get(&key).cloned().ok_or_else(|| {
+                        BoliError::line(*line, format!("map me chaabi '{}' nahi mili", key))
+                    });
+                }
                 let idx = as_number(&idx_v, *line, "hissa ke liye")?;
                 if idx.fract() != 0.0 || idx < 1.0 {
                     return Err(BoliError::line(
@@ -313,6 +331,11 @@ pub(crate) fn values_equal(left: &Value, right: &Value) -> bool {
         (Value::Text(a), Value::Text(b)) => a == b,
         (Value::Bool(a), Value::Bool(b)) => a == b,
         (Value::Khaali, Value::Khaali) => true,
+        (Value::Map(a), Value::Map(b)) => {
+            a.len() == b.len()
+                && a.iter()
+                    .all(|(k, v)| b.get(k).is_some_and(|bv| values_equal(v, bv)))
+        }
         (Value::List(a), Value::List(b)) => {
             a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| values_equal(x, y))
         }

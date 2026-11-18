@@ -34,7 +34,8 @@ pub enum Tok {
     Sahi,
     Galat,
     Khaali,
-    Hissa, // list ka index (1 se shuru)
+    Hissa, // list ka index ya map ki chaabi
+    Map,   // map literal banane ka shabd
     Ruk,   // break
     Agla,  // continue
     // Numbers (jaise 28 ya 99.50)
@@ -89,6 +90,7 @@ impl Token {
             Tok::Galat => "galat".to_string(),
             Tok::Khaali => "khaali".to_string(),
             Tok::Hissa => "hissa".to_string(),
+            Tok::Map => "map".to_string(),
             Tok::Ruk => "ruk".to_string(),
             Tok::Agla => "agla".to_string(),
             Tok::Number(n) => format!("{}", n),
@@ -151,6 +153,7 @@ fn keyword(word: &str) -> Option<Tok> {
         "galat" => Some(Tok::Galat),
         "khaali" => Some(Tok::Khaali),
         "hissa" => Some(Tok::Hissa),
+        "map" => Some(Tok::Map),
         "ruk" => Some(Tok::Ruk),
         "agla" => Some(Tok::Agla),
         "break" => Some(Tok::Ruk), // English alias

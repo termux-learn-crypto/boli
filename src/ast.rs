@@ -201,6 +201,12 @@ pub enum Stmt {
         value: Expr,
         line: usize,
     },
+    // mapa rakho "naam" "Vilas" "umar" 28   (map literal)
+    MapRakho {
+        name: String,
+        pairs: Vec<(Expr, Expr)>,
+        line: usize,
+    },
 }
 
 // Pura program statements ki list hai
@@ -240,6 +246,7 @@ impl Stmt {
             Stmt::Ruk(line) => *line,
             Stmt::Agla(line) => *line,
             Stmt::ListAssign { line, .. } => *line,
+            Stmt::MapRakho { line, .. } => *line,
         }
     }
 }

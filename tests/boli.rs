@@ -508,25 +508,46 @@ fn unknown_variable_line_number() {
 #[test]
 fn deeply_nested_agar_errors_not_crashes() {
     let src = "agar 1 1 barabar hai to\n".repeat(200) + "likho 1\n" + &"khatam\n".repeat(200);
-    assert!(parse_source(&src).is_err());
+    // 64MB stack - default test thread 2MB me borderline ho sakta hai
+    std::thread::Builder::new()
+        .stack_size(64 * 1024 * 1024)
+        .spawn(move || assert!(parse_source(&src).is_err()))
+        .unwrap()
+        .join()
+        .unwrap();
 }
 
 #[test]
 fn deeply_nested_expression_errors_not_crashes() {
     let src = format!("likho {}1", "jodo 1 aur ".repeat(150));
-    assert!(parse_source(&src).is_err());
+    std::thread::Builder::new()
+        .stack_size(64 * 1024 * 1024)
+        .spawn(move || assert!(parse_source(&src).is_err()))
+        .unwrap()
+        .join()
+        .unwrap();
 }
 
 #[test]
 fn deeply_nested_hissa_chain_errors_not_crashes() {
-    let mut src = String::from("naam rakho \"Vilas\"\nlikho naam");
-    for _ in 0..300 {
-        src.push_str(" hissa 1");
-    }
-    let program = parse_source(&src).unwrap();
-    let mut env = Environment::new();
-    env.collect_output();
-    assert!(env.run_program(&program).is_err());
+    let src = {
+        let mut s = String::from("naam rakho \"Vilas\"\nlikho naam");
+        for _ in 0..300 {
+            s.push_str(" hissa 1");
+        }
+        s
+    };
+    std::thread::Builder::new()
+        .stack_size(64 * 1024 * 1024)
+        .spawn(move || {
+            let program = parse_source(&src).unwrap();
+            let mut env = Environment::new();
+            env.collect_output();
+            assert!(env.run_program(&program).is_err());
+        })
+        .unwrap()
+        .join()
+        .unwrap();
 }
 
 #[test]
@@ -928,4 +949,76 @@ fn traceback_preserved_through_nested_propagation() {
     for name in ["deep1", "deep2", "deep3", "deep4"] {
         assert!(msg.contains(name), "msg: {}", msg);
     }
+}
+
+// ---------- maps (v0.6.0) ----------
+
+#[test]
+fn map_literal_and_print() {
+    assert_eq!(
+        run_out("mapa rakho map \"naam\" \"Vilas\" \"umar\" 28\nlikho mapa").unwrap(),
+        vec!["naam: Vilas, umar: 28"]
+    );
+}
+
+#[test]
+fn map_index_get() {
+    let src = "mapa rakho map \"naam\" \"Vilas\" \"umar\" 28\nlikho mapa hissa \"naam\"\nlikho mapa hissa \"umar\"";
+    assert_eq!(run_out(src).unwrap(), vec!["Vilas", "28"]);
+}
+
+#[test]
+fn map_index_assignment() {
+    let src = "mapa rakho map \"naam\" \"Vilas\"\nmapa hissa \"umar\" rakho 28\nlikho mapa hissa \"umar\"";
+    assert_eq!(run_out(src).unwrap(), vec!["28"]);
+    let src2 = "mapa rakho map \"naam\" \"Vilas\"\nmapa hissa \"naam\" rakho \"Rahul\"\nlikho mapa hissa \"naam\"";
+    assert_eq!(run_out(src2).unwrap(), vec!["Rahul"]);
+}
+
+#[test]
+fn map_missing_key_is_error() {
+    let src = "mapa rakho map \"naam\" \"Vilas\"\nlikho mapa hissa \"nonexistent\"";
+    let err = run_out(src).unwrap_err();
+    assert!(err.to_string().contains("chaabi 'nonexistent' nahi mili"));
+}
+
+#[test]
+fn map_requires_even_pairs() {
+    let src = "mapa rakho map \"naam\"";
+    assert!(parse_source(src).is_err());
+}
+
+#[test]
+fn map_key_must_be_text_at_runtime() {
+    // number key -> Galti (keys must evaluate to text)
+    let src = "mapa rakho map 1 2\nlikho mapa";
+    let err = run_out(src).unwrap_err();
+    assert!(err.to_string().contains("chaabi text honi chahiye"));
+}
+
+#[test]
+fn map_lambayi_and_chaabiyan() {
+    let src = "mapa rakho map \"a\" 1 \"b\" 2 \"c\" 3\nlikho lambayi mapa\nlikho chaabiyan mapa";
+    assert_eq!(run_out(src).unwrap(), vec!["3", "a, b, c"]);
+}
+
+#[test]
+fn map_numeric_index_is_error() {
+    let src = "mapa rakho map \"a\" 1\nlikho mapa hissa 1";
+    let err = run_out(src).unwrap_err();
+    assert!(err.to_string().contains("chaabi text honi chahiye"));
+}
+
+#[test]
+fn map_equality() {
+    let src =
+        "a rakho map \"x\" 1\nb rakho map \"x\" 1\nagar a b barabar hai to\nlikho \"same\"\nkhatam";
+    assert_eq!(run_out(src).unwrap(), vec!["same"]);
+}
+
+#[test]
+fn map_nested() {
+    let src =
+        "inner rakho map \"x\" 1\nouter rakho map \"k\" inner\nlikho outer hissa \"k\" hissa \"x\"";
+    assert_eq!(run_out(src).unwrap(), vec!["1"]);
 }
