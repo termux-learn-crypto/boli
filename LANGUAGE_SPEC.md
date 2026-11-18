@@ -1,6 +1,6 @@
-# BOLI Language Specification (v0.3.0)
+# BOLI Language Specification (v0.3.1)
 
-**Version:** 0.3.0 · **File extension:** `.hl` · **Implementation:** Rust (`cargo run -- run x.hl`, REPL via `cargo run`)
+**Version:** 0.3.1 · **File extension:** `.hl` · **Implementation:** Rust (`cargo run -- run x.hl`, REPL via `cargo run`)
 
 BOLI is a Hinglish-based programming language: Python-like simplicity, Hindi/English keywords, no symbols like `; { } ( ) = :`. Statements are one per line. Only words, numbers, quoted text and whitespace appear in a program.
 
@@ -144,6 +144,9 @@ namaste "Rahul"
 | Parse nesting depth (statements/expressions) | 64 | `BOLI_MAX_PARSE_DEPTH` |
 | Condition chain length (`aur` / `ya`, parse + eval) | 128 | `BOLI_MAX_CONDITION_DEPTH` |
 | Expression evaluation depth | 256 | `BOLI_MAX_EVAL_DEPTH` |
+| Program tokens | 1,000,000 | `BOLI_MAX_TOKENS` |
+| REPL input line bytes | 64 KiB | `BOLI_MAX_REPL_LINE_BYTES` |
+| Live scope bytes (memory budget) | 64 MiB | `BOLI_MAX_TOTAL_BYTES` |
 
 All violations are Hinglish Galti errors, never panics/SIGSEGV/SIGKILL. Violations are deterministic. `std::process::exit(0)` on closed stdout pipe.
 
@@ -167,6 +170,15 @@ Galti: line 1 me ';' nahi chahiye, BOLI me sirf shabd, number aur "text" use hot
 In both cases a variable of that keyword name may be created, read and assigned anywhere an identifier is expected. `ruk`/`agla`/`break`/`continue` are the only reserved words that don't double as identifiers.
 
 ## 11. Record of behavior
+
+### v0.3.1 vs v0.3.0
+
+- `BOLI_MAX_EVAL_DEPTH` ab sach me configurable hai (pehle hardcoded 256 tha, env var ignore hota tha); error message bhi configured value dikhata hai.
+- Lexer `Vec<char>` nahi banata (sliding cursor); source/literal/identifier/token byte caps (`BOLI_MAX_SOURCE_BYTES` / `BOLI_MAX_STRING_BYTES` / `BOLI_MAX_TOKENS`) — badi lines/files bhi safe tokenize hoti hain; Devanagari unchanged.
+- `boli run` ab bounded read karta hai: `BOLI_MAX_SOURCE_BYTES` se ek byte zyada padhne pe Galti (file read ke dauraan grow ho to bhi safe).
+- REPL line input `BOLI_MAX_REPL_LINE_BYTES` (64 KiB) se bounded; oversized line reject hoti hai, REPL zinda rehta hai; multiline blocks, quoted text, comments aur `nikalo` unchanged.
+- Live scope memory budget `BOLI_MAX_TOTAL_BYTES` (64 MiB default): variables/list/kaam-scope bytes counted; replace-safe accounting; budget error Galti hai.
+- Crash ya nahi: sab caps deterministic Galti error dete hain.
 
 ### v0.3.0 vs v0.2.0
 

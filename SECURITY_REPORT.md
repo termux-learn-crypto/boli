@@ -1,4 +1,4 @@
-# BOLI — Security Report (v0.3.0)
+# BOLI — Security Report (v0.3.1)
 
 **Scope:** the interpreter and CLI as shipped in `boli` v0.3.0. **Threat model:** BOLI programs may come from untrusted authors (a user running someone else's `.hl`). The host process must not crash, hang forever, exhaust memory without bound, or misreport safety guarantees. **Not in scope:** confidentiality (a run program can legitimately print anything it is given), sandboxing of the target machine (BOLI cannot execute shell, files, or network — by design there is no such capability).
 
@@ -13,7 +13,10 @@
 | Condition chain | 128 | `BOLI_MAX_CONDITION_DEPTH` | `aur`/`ya` chains, parse + eval | `parse_cond`, `parse_aur`, `eval_cond` |
 | String bytes | 1 MiB | `BOLI_MAX_STRING_BYTES` | literals, pucho input, concat results, input lines | eval, lexer/parse, `pucho` |
 | List items | 10,000 | `BOLI_MAX_LIST_ITEMS` | creation & `jodo` concat | `Expr::List`, `eval_arith` |
-| Source file bytes | 10 MiB | `BOLI_MAX_SOURCE_BYTES` | `boli run x.hl` | `main.rs` metadata check |
+| Source file bytes | 10 MiB | `BOLI_MAX_SOURCE_BYTES` | `boli run x.hl` | `main.rs` metadata check + bounded `take(max+1)` read (growth-safe) |
+| Program tokens | 1,000,000 | `BOLI_MAX_TOKENS` | lex time | lexer (`push_token`) |
+| REPL input line bytes | 64 KiB | `BOLI_MAX_REPL_LINE_BYTES` | chunked read | `read_repl_line` (line drained + rejected) |
+| Live scope bytes (memory budget) | 64 MiB | `BOLI_MAX_TOTAL_BYTES` | set/pop scope accounting (replace-safe) | interpreter |
 
 Every violation is a deterministic Hinglish `Galti: line N me …` error. **No violation is a panic, SIGSEGV, SIGABRT, or (in tests) an unwind.**
 
@@ -27,9 +30,11 @@ Before v0.3.0, three independent axes overflowed the native stack:
 Fuzz test (deterministic, no dependencies) confirms lexer+parser do not panic on random inputs.
 
 ### 2. Memory exhaustion
-- String literals: now checked at eval (`BOLI_MAX_STRING_BYTES`); concat was already checked; `pucho` now capped with bounded chunked reads.
+- Whole-program token count capped (`BOLI_MAX_TOKENS`); each literal capped (`BOLI_MAX_STRING_BYTES`) at lex time; identifiers capped the same way; the lexer no longer materializes a `Vec<char>` (sliding two-char cursor) — large inputs tokenize with ~2 chars of lookahead.
+- String literals: checked at lex AND at eval (`checked_text`); concat checked; `pucho` capped with bounded chunked reads.
 - Lists: capped at 10,000 items (creation + concat).
-- Source file: refused above 10 MiB before `read_to_string` allocates.
+- Source file: metadata check AND bounded `take(max+1)` read — a file that grows during read is still stopped at the cap (no metadata TOCTOU).
+- Live scope bytes budget (`BOLI_MAX_TOTAL_BYTES`, default 64 MiB): every value entering a scope is weighed (text bytes, list cells×40B, scalars); replacing a name releases the old weight; scope pops decrement. Exceeding the budget is a deterministic Galti error — no partial-run corruption, no OOM.
 - Steps: 100k global budget terminates loop-bombs (range `1 se 999999999 tak`, `jab tak sahi to …`).
 - Numbers: f64, NaN/±∞ rejected at every entry point; arithmetic overflow → error, not silent inf.
 
@@ -63,7 +68,7 @@ Remaining `unwrap`s are internal invariants (scope stack never empty; last token
 
 ## Verification performed (not claims — actual commands)
 
-- `cargo test` — 82/82 pass (67 library + 15 CLI)
+- `cargo test` — 95/95 pass (77 library + 18 CLI)
 - `cargo clippy --all-targets --all-features -- -D warnings` — clean
 - Reproduced & confirmed fixed: 200k-term condition SIGSEGV → Galti; 3,000-deep expression nesting SIGSEGV → Galti (0.2.0); 20,000-item list → Galti; literal bypass → Galti; 11 MiB file → Galti; `LIKHO` keyword equivalence; REPL multiblock.
 

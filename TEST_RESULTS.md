@@ -16,19 +16,27 @@ Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.92s
 ```
 
 ### 3. `cargo test`
+
+```
+running 77 tests
+test result: ok. 77 passed; 0 failed
+running 18 tests
+test result: ok. 18 passed; 0 failed
+```
+
 ```
 running 0 tests
 test result: ok. 0 passed; 0 failed
 running 0 tests
 test result: ok. 0 passed; 0 failed
-running 67 tests
-test result: ok. 67 passed; 0 failed; finished in 0.08s
-running 15 tests
-test result: ok. 15 passed; 0 failed; finished in 0.12s
+running 77 tests
+test result: ok. 77 passed; 0 failed; finished in 0.09s
+running 18 tests
+test result: ok. 18 passed; 0 failed; finished in 0.23s
 running 0 tests
 test result: ok. 0 passed; 0 failed
 ```
-**82 passed / 0 failed** (67 `tests/boli.rs` library-level + 15 `tests/cli.rs` end-to-end).
+**95 passed / 0 failed** (77 `tests/boli.rs` library-level + 18 `tests/cli.rs` end-to-end).
 
 New tests added in v0.3.0 (all in `tests/boli.rs` unless noted):
 - `literal_string_size_limit` — literal bypasses the string-bytes limit → error
@@ -39,6 +47,10 @@ New tests added in v0.3.0 (all in `tests/boli.rs` unless noted):
 - `fuzz_lex_parse_never_panics` — deterministic xorshift, 2,000 random-ish inputs through lexer+parser; neither may panic; no dependencies
 - `malformed_programs_error_not_crash`
 - CLI (`tests/cli.rs`): `cli_bogus_subcommand_errors`, `cli_run_with_too_many_args_errors`
+
+### v0.3.1 tests added
+- Unit: `eval_depth_limit_is_configurable_and_enforced` (10 → error "(max 10)", 500 → ok), `lexer_string_literal_byte_limit`, `lexer_identifier_byte_limit`, `lexer_token_limit`, `lexer_source_byte_limit`, `lexer_degrammar_still_works_after_cursor_rewrite`, `total_budget_caps_string_storage`, `total_budget_caps_list_storage`, `total_budget_freed_by_scope_pop`, `total_budget_replacement_is_not_double_counted`
+- CLI (subprocess with real env): `cli_source_bytes_boundary`, `cli_env_eval_depth_is_respected`, `cli_repl_oversized_line_is_rejected_and_repl_survives`
 
 ### 4. `cargo clippy --all-targets --all-features -- -D warnings`
 ```

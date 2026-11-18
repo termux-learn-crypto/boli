@@ -4,8 +4,8 @@
 
 ```bash
 cargo test          # everything (unit + integration)
-cargo test --test boli      # library-level semantics (67 tests)
-cargo test --test cli       # CLI/binary end-to-end (15 tests)
+cargo test --test boli      # library-level semantics (77 tests)
+cargo test --test cli       # CLI/binary end-to-end (18 tests)
 ```
 
 Full verification matrix (run before a release):
@@ -13,7 +13,7 @@ Full verification matrix (run before a release):
 ```bash
 cargo fmt --check                          # formatting gate
 cargo check                                # compile gate
-cargo test                                 # 82 tests (67 library + 15 CLI)
+cargo test                                 # 95 tests (77 library + 18 CLI)
 cargo clippy --all-targets --all-features -- -D warnings   # lint gate
 cargo build --release                      # release artifact gate
 ```
@@ -43,6 +43,12 @@ No extra tooling is required — only `cargo` and the BOLI binary (which `cargo 
 - condition `ya` chain parse-time cap (`Parser::with_limits`) and eval-time cap
 - expression/`hissa` chain depth guard
 - fuzz-ish test: deterministic xorshift generator feeds random byte soup into the lexer and parser; neither may panic (no third-party fuzzer needed)
+
+### v0.3.1 regression tests
+- `eval_depth_limit_is_configurable_and_enforced` — `with_eval_depth_limit(10)` errors, `with_eval_depth_limit(500)` passes (and the env var itself is covered by `cli_env_eval_depth_is_respected`)
+- `lexer_string_literal_byte_limit`, `lexer_identifier_byte_limit`, `lexer_token_limit`, `lexer_source_byte_limit`, `lexer_degrammar_still_works_after_cursor_rewrite`
+- `total_budget_caps_string_storage`, `total_budget_caps_list_storage`, `total_budget_freed_by_scope_pop`, `total_budget_replacement_is_not_double_counted`
+- CLI (subprocess, real env): `cli_source_bytes_boundary` (exactly-at vs one-under), `cli_env_eval_depth_is_respected`, `cli_repl_oversized_line_is_rejected_and_repl_survives`
 
 ### Interpreter semantics (`tests/boli.rs`)
 - inline math (`likho jodo 5 aur 3` → `8`)

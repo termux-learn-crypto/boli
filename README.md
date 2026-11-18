@@ -413,7 +413,7 @@ boli/
 ## Testing
 
 ```bash
-cargo test          # 82 tests chalenge
+cargo test          # 95 tests chalenge
 ```
 
 Details aur test-adding guide: [TESTING.md](TESTING.md). Spec: [LANGUAGE_SPEC.md](LANGUAGE_SPEC.md). Changes: [CHANGELOG.md](CHANGELOG.md). Audit: [COMPLETE_AUDIT.md](COMPLETE_AUDIT.md). Security: [SECURITY_REPORT.md](SECURITY_REPORT.md).
@@ -422,7 +422,7 @@ Kaam karne ka flow: `source.hl` → **lexer** (tokens) → **parser** (AST) → 
 
 ---
 
-## Safety limits (BOLI v0.3.0)
+## Safety limits (BOLI v0.3.1)
 
 Sab limits env variable se override ho sakti hain — har violation Hinglish Galti error hai, kabhi crash nahi:
 
@@ -436,6 +436,9 @@ Sab limits env variable se override ho sakti hain — har violation Hinglish Gal
 | Parse nesting depth | 64 | `BOLI_MAX_PARSE_DEPTH` |
 | Condition chain (`aur`/`ya`) | 128 | `BOLI_MAX_CONDITION_DEPTH` |
 | Expression eval depth | 256 | `BOLI_MAX_EVAL_DEPTH` |
+| Program tokens (lexer) | 1,000,000 | `BOLI_MAX_TOKENS` |
+| REPL input line bytes | 64 KiB | `BOLI_MAX_REPL_LINE_BYTES` |
+| Live scope bytes (memory budget) | 64 MiB | `BOLI_MAX_TOTAL_BYTES` |
 
 ## Feature list
 

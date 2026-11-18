@@ -33,7 +33,7 @@ Data flow:
 Key invariants:
 
 - Scopes are a stack of `HashMap<String, Value>`; every `push_scope` has an unconditional `pop_scope` (success or error).
-- Every recursion axis is bounded by an env-tunable limit: parser nesting (64), condition `aur`/`ya` chain (128 parse + 128 eval), expression evaluation depth (256), kaam call depth (64), program steps (100,000), list items (10,000), string bytes (1 MiB). See `src/limits.rs`.
+- Every recursion axis is bounded by an env-tunable limit: parser nesting (64), condition `aur`/`ya` chain (128 parse + 128 eval), expression evaluation depth (256), kaam call depth (64), program steps (100,000), list items (10,000), string bytes (1 MiB), program tokens (1,000,000), REPL line bytes (64 KiB), live scope memory budget (64 MiB). See `src/limits.rs`. The lexer walks a two-char `Cursor` (no `Vec<char>`), and source reads are bounded via `take(max+1)`.
 - Functions are hoisted into a separate `kaam` table at call time (not closure capture); name collisions are rejected.
 - Numbers are validated finite at three boundaries: literals, `pucho` parsing, and arithmetic results.
 - No panic paths in user code: all runtime errors are `BoliError`s; the only `exit`s are `std::process::exit(0)` on closed stdout.

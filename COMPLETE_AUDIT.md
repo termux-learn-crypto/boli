@@ -93,3 +93,21 @@ Critical (crash/memory) · High (correctness) · Medium (robustness/limits) · L
 - REPL depth heuristic is textual (quote/comment-aware but not full parsing) — malformed multiline input can confuse it; `nikalo`/`khatam` recovery exists.
 - stdin line cap (`pucho`) drops/limits at 1 MiB by erroring the program; the remainder of an oversized line stays in stdin (harmless: error exits the program).
 - No Unicode normalization.
+
+
+---
+
+# Appendix — v0.3.1 addendum (2026-11-18)
+
+Five verified fixes, each reproduced before the change and re-verified after:
+
+| # | Issue | Severity | Root cause | Fix |
+|---|---|---|---|---|
+| F1 | `BOLI_MAX_EVAL_DEPTH` ignored | High | hardcoded `256` in `eval_expr` guard; error message also hardcoded | `self.max_eval_depth` everywhere; tests `eval_depth_limit_is_configurable_and_enforced` (unit, limits 10/500) + `cli_env_eval_depth_is_respected` (env, 10/500) |
+| F2 | Lexer allocates `Vec<char>` of whole source; literals unvalidated at lex time | High | convenience collection; no lex-time byte caps | sliding `Cursor` over `CharIndices`; caps: source/literal/identifier bytes + `BOLI_MAX_TOKENS`; Devanagari + escapes re-verified (`lexer_degrammar_still_works_after_cursor_rewrite`) |
+| F3 | Source read relies on metadata length then unbounded `read_to_string` | High | metadata TOCTOU; large/growing files | `read_capped()`: metadata fast-path + `take(max+1).read_to_end()`; >max → Galti; invalid UTF-8 → Galti (`cli_source_bytes_boundary` + manual 11 MiB test) |
+| F4 | REPL `read_line` unbounded | Medium | stdin line length unconstrained | `read_repl_line` chunked reader; `BOLI_MAX_REPL_LINE_BYTES` (64 KiB); oversized line drained+rejected, REPL survives (`cli_repl_oversized_line_is_rejected_and_repl_survives`) |
+| F5 | No total memory budget: N variables × M MiB strings unbounded (steps-limited only) | High | missing accounting | live scope bytes budget `BOLI_MAX_TOTAL_BYTES` (64 MiB) with replace-safe set/pop accounting; `with_total_budget_bytes` for tests; 4 unit tests (string cap, list cap, scope-pop release, replacement not double-counted) |
+
+**Verified:** 95/95 tests green; fmt/check/clippy(-D warnings)/release build green; manually re-ran all examples + REPL.
+**Remaining limitations:** see SECURITY_REPORT.md / UPGRADE_ROADMAP.md.

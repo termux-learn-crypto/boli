@@ -2,6 +2,23 @@
 
 All notable changes to BOLI. BOLI follows [Semantic Versioning](https://semver.org/): breaking changes bump the minor digit (pre-1.0).
 
+## [0.3.1] — 2026-11-18
+
+### Fixed (critical)
+- **`BOLI_MAX_EVAL_DEPTH` was ignored** — the hardcoded `256` in `eval_expr` made the env var a no-op; error messages lied too. Now the configured limit (default 256) controls execution; `with_eval_depth_limit` and the env var both work (tests + CLI env test).
+- **Lexer memory:** `source.chars().collect()` duplicated the source as a char vector and literals were allocated before validation. Lexer now walks a two-char sliding cursor; source/literal/identifier bytes are capped at lex time (`BOLI_MAX_SOURCE_BYTES` / `BOLI_MAX_STRING_BYTES`); total tokens capped (`BOLI_MAX_TOKENS`, 1,000,000); violations are Hinglish Galti errors; Devanagari/Unicode identifiers unchanged.
+- **Source file reading:** metadata check alone was TOCTOU-unsafe and `read_to_string` allocated unboundedly. Now `read_capped()` honors `BOLI_MAX_SOURCE_BYTES` with a hard `take(max+1)` read; growth during read stops at the cap; oversized/invalid-UTF-8 files refuse with Galti (exit 1).
+- **REPL input:** unbounded `read_line` replaced by chunked `read_repl_line` capped at `BOLI_MAX_REPL_LINE_BYTES` (64 KiB); oversized lines are drained and rejected without killing the REPL; multiline blocks, quoted text, `#` comments and `nikalo` all preserved.
+- **Runtime memory budget:** new `BOLI_MAX_TOTAL_BYTES` (default 64 MiB) — live scope value bytes are counted on every set/pop (text bytes, list cells, scalars); replacement is not double-counted; scope exit frees its bytes; exceeding the budget is a deterministic Galti error (verified: string + list storage, scope-pop release, replacement semantics).
+
+### Docs
+- README/LANGUAGE_SPEC/SECURITY_REPORT/TESTING: limits tables expanded (11 limits); v0.3.1 notes; test counts corrected (95).
+- COMPLETE_AUDIT.md: v0.3.1 appendix with the 5 fixes and verification.
+
+### Internal
+- 95 tests (77 library + 18 CLI), `cargo fmt --check` / `cargo check` / `cargo clippy --all-targets --all-features -- -D warnings` / `cargo build --release` all green.
+- Backward compatible: existing programs unchanged; only crash/unbounded paths became Galti errors.
+
 ## [0.3.0] — 2026-11-18
 
 ### Fixed
