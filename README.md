@@ -1,8 +1,8 @@
-# BOLI
+BOLI - Bina + - * / ke, sirf shabdon se programming
 
 **BOLI** ek Hinglish programming language hai — Python jaisi easy, lekin poori tarah Hinglish me.
-Koi symbol `; { } ( ) = : .` use nahi hota. Sirf shabd, number aur text se poore program ban sakte hain.
-Implementation language: **Rust**. File extension: **`.hl`**.
+Yahan `+ - * / { } ( ) = :` jaise symbols ki jagah shabd use hote hain. Poor poora program sirf shabdon, number aur text se likha jata hai.
+Interpreter **Rust** me bana hai. File extension: **`.hl`**.
 
 ```boli
 likho "Namaste Duniya"
@@ -15,27 +15,160 @@ Namaste Duniya
 
 ---
 
-## Install aur chalana
+## BOLI chalane ke liye kya chahiye?
 
-Rust aur Cargo hone chahiye. Fir:
+**Chalane ke liye sirf `boli` binary kaafi hai. Rust, Python, ya koi aur cheez install karne ki zaroorat NAHI.**
+Rust sirf BOLI ko source se **build** karne ke liye chahiye. Ek baar ban gaya, to `boli` akela chalta hai — zero dependencies.
+
+---
+
+## Install karna
+
+### Step 1: Source clone karke build karo (ek dafa)
 
 ```bash
+git clone https://github.com/termux-learn-crypto/boli
+cd boli
 cargo build --release
 ```
 
-### File chalana
+### Step 2: Install script chalao
 
 ```bash
-cargo run -- run examples/namaste.hl
+./install.sh
 ```
 
-### REPL (interactive shell)
+Yeh `boli` binary ko copy karke PATH me daal deta hai:
 
-Bina kuch likhe `cargo run` likhao, REPL khulega:
+- **Termux**: `$PREFIX/bin` (automatic)
+- **Linux**: `/usr/local/bin` (writable ho to), warna `~/.local/bin`
+
+Custom directory me install karna ho to:
 
 ```bash
-cargo run
+BOLI_INSTALL_DIR=/path/to/bin ./install.sh
 ```
+
+### Step 3: Ab bina cargo ke chalao
+
+```bash
+boli run examples/namaste.hl
+boli                     # REPL
+boli help                # help
+boli version             # version
+```
+
+Install nahi karna? Seedha binary bhi chal sakta hai:
+
+```bash
+./target/release/boli run examples/namaste.hl
+```
+
+> Windows par: `install.sh` Linux/Termux ke liye hai. Windows par `BOLI_INSTALL_DIR` style manually karo ya WSL use karo.
+
+---
+
+## 3 examples — seedha chalake dekho
+
+```bash
+boli run examples/namaste.hl     # input lena + print
+boli run examples/calculator.hl  # 4 hisab dono forms me
+boli run examples/loop.hl        # se tak loop, jab tak, agar
+```
+
+### 1. namaste.hl — shuruaat, variable, input
+
+```boli
+# namaste.hl
+likho "Namaste Duniya"
+naam rakho "Vilas"
+likho naam
+pucho tumhara_naam "Tumhara naam kya hai? "
+likho tumhara_naam
+```
+
+### 2. calculator.hl — hisab jodo/ghatao/guna/bhaag
+
+```boli
+# calculator.hl (short me)
+pucho a "Pehli sankhya: "
+pucho b "Doosri sankhya: "
+jodo jod a aur b
+ghatao ghata a se b
+guna gun a ko b se
+bhaag bhag a ko b se
+likho jod
+likho ghata
+likho gun
+likho bhag
+```
+
+### 3. loop.hl — `se tak` range loop aur `jab tak` while loop
+
+```boli
+1 se 5 tak
+    likho ginti
+khatam
+
+ginti2 rakho 1
+jab tak ginti2 5 se chhota ya barabar hai to
+    likho ginti2
+    jodo ginti2 ginti2 aur 1
+khatam
+```
+
+---
+
+## Calculator ka demo — calculator2.hl
+
+`examples/calculator2.hl` ek hisab wala calculator hai: user ek hi hisab chunta hai (jodo / ghatao / guna / bhaag) aur wahi hota hai. Bina ek bhi `+ - * /` symbol ke, sirf shabdon me:
+
+```boli
+# calculator2.hl (short me)
+pucho a "Pehli sankhya: "
+pucho b "Doosri sankhya: "
+pucho kaam "kya karna hai? jodo, ghatao, guna, bhaag "
+
+milgaya rakho galat
+
+agar kaam "jodo" barabar hai to
+    jodo jawab a aur b
+    likho "Jawab hai:"
+    likho jawab
+    milgaya rakho sahi
+khatam
+
+# ghatao / guna / bhaag bhi aise hi ...
+
+agar milgaya galat barabar hai to
+    likho "Galat kaam likha hai"
+khatam
+```
+
+Chalane ka demo:
+
+```bash
+boli run examples/calculator2.hl
+```
+
+```
+=== BOLI Calculator (ek hisab) ===
+Pehli sankhya: 5
+Doosri sankhya: 3
+kya karna hai? jodo, ghatao, guna, bhaag jodo
+Jawab hai:
+8
+```
+
+Agar user `jod` jaisa galat hisab likhe, to `Galat kaam likha hai` print hota hai. Chaar `agar` check hote hain (string `barabar` tulna se), aur `milgaya` flag rakha gaya hai taaki error message ho sirf ek baar.
+
+> Note: `kaam` BOLI me function keyword bhi hai aur `kaam` naam ka variable bhi ho sakta hai. Statement ki shuruwat me `kaam rakho 5` likhne pe woh variable banega; `kaam namaste` likhne pe woh function definition hoga.
+
+---
+
+## REPL (interactive shell)
+
+Bina argument ke `boli` chalao, REPL khulega:
 
 ```
 BOLI REPL - likhne ke liye tayyar!
@@ -52,22 +185,13 @@ boli> nikalo
 BOLI band ho raha hai. Alvida!
 ```
 
-REPL me multi-line block (jaise `agar` ... `khatam`) likhne pe `...>` prompt aata hai, aur variable/kaam environment me bache rehte hain.
-
-### Help
-
-```bash
-cargo run -- help      # kya command hain
-cargo run -- version   # version
-```
+Multi-line block (jaise `agar` ... `khatam`) likhne pe `...>` prompt aata hai. Variable aur kaam environment REPL me bache rehte hain.
 
 ---
 
 ## BOLI ke niyam (rules)
 
 ### 1. Likhna — `likho`
-
-Text print karo, ya kisi variable ki value:
 
 ```boli
 likho "Namaste Duniya"
@@ -92,11 +216,11 @@ pucho naam "Tumhara naam kya hai"
 likho naam
 ```
 
-Input ka type apne aap pehchana jata hai: `99.50` jaise input number ban jata hai, `sahi`/`galat`/`khaali` bhi pehchane jate hain, aur baaki sab text. Blank input `khaali` banta hai.
+Input ka type apne aap pehchana jata hai: `99.50` number ban jata hai, `sahi`/`galat`/`khaali` bhi pehchane jate hain, baaki sab text. Blank input `khaali` banta hai.
 
 ### 4. Hisab — `jodo`, `ghatao`, `guna`, `bhaag`
 
-Variable me hisaab rakho. **`rakho` yahan use NAHI hota**, bas jodo/ghatao/guna/bhaag:
+Variable me hisaab. **`rakho` yahan use NAHI hota**:
 
 ```boli
 jodo jawab 5 aur 3        # jawab = 5 + 3
@@ -106,7 +230,7 @@ bhaag hissa 10 ko 2 se    # hissa = 10 / 2
 likho jawab
 ```
 
-Direct hisaab seedha `likho` ke saath:
+Seedha `likho` ke saath:
 
 ```boli
 likho jodo 5 aur 3        # 8
@@ -115,8 +239,7 @@ likho guna 5 ko 2 se      # 10
 likho bhaag 10 ko 4 se    # 2.5
 ```
 
-Nesting bhi chalta hai: `likho jodo guna 5 ko 2 se aur 3` → `13`.
-Zero se bhaag karne pe galti aati hai. Text bhi `jodo` se jud jata hai (`likho jodo "Naam: " aur Vilas`).
+Nesting chalta hai: `likho jodo guna 5 ko 2 se aur 3` → `13`. Zero se bhaag karne pe galti. Text bhi `jodo` se jud jata hai.
 
 ### 5. Shart (Condition) — `agar ... nahi to ... khatam`
 
@@ -129,25 +252,17 @@ nahi to
 khatam
 ```
 
-Tulna ke operator:
-
 | BOLI | matlab |
 |------|--------|
-| `bada se` | > |
-| `chhota se` | < |
+| `bada` | > |
+| `chhota` | < |
 | `barabar` | == |
 | `bada ya barabar` | >= |
 | `chhota ya barabar` | <= |
 
-`se` optional hai — `agar umar 18 se bada hai to` aur `agar umar 18 bada hai to` dono chalte hain.
-
-Logic operator:
+`se` optional hai — `agar umar 18 se bada hai to` aur `agar umar 18 bada hai to` dono chalte hain. `nahi to` optional hai.
 
 ```boli
-agar umar 18 se bada ya barabar hai to        # >=
-    likho "18 ya usse zyada"
-khatam
-
 # aur / ya
 agar umar 25 se bada hai aur umar 60 se chhota hai to
     likho "Kam karne ki umar"
@@ -156,20 +271,15 @@ nahi to
 khatam
 ```
 
-`nahi to` optional hai.
-
 ### 6. Loops
 
 **Range loop** — `1 se 5 tak` (dono ends shamil, `ginti` variable apne aap milta hai):
 
 ```boli
 1 se 5 tak
-    likho "Namaste"
-    likho ginti     # 1 se 5 tak print hoga
+    likho ginti
 khatam
 ```
-
-Range me variable bhi use kar sakte hain: `1 se n tak ...`.
 
 **Jab tak (while) loop** — `jab tak <condition> to ... khatam`:
 
@@ -192,8 +302,6 @@ khatam
 namaste "Rahul"
 ```
 
-Function call ke saath arguments space se alag hote hain.
-
 ### 8. Value wapas karna — `wapas do`
 
 ```boli
@@ -203,22 +311,22 @@ kaam jodo_kaam a b
 khatam
 
 x rakho jodo_kaam 20 8
-likho x              # 28
-likho jodo_kaam 100 1  # seedha likho me bhi (101)
+likho x               # 28
+likho jodo_kaam 100 1 # seedha likho me bhi (101)
 ```
 
 Bina value ke `wapas do` likhne pe `khaali` wapas milta hai. `wapas do` kaam ke andar hi allowed hai.
 
 ### 9. Types
 
-| BOLI type | Rust equivalent | example |
-|-----------|-----------------|---------|
-| text | String | `"Vilas"` |
-| number (int/float ek hi type hai) | f64 | `28`, `99.50` |
-| sahi / galat | bool | `sahi`, `galat` |
-| khaali | null | `khaali` |
+| BOLI type | example |
+|-----------|---------|
+| text | `"Vilas"` |
+| number (int/float, ek hi type) | `28`, `99.50` |
+| sahi / galat | `sahi`, `galat` |
+| khaali | `khaali` |
 
-Number `28.0` ko print me `28` dikhaya jata hai, `99.5` waise ka-waisa dikhata hai. `likho` sab type dikha sakta hai.
+Number `28.0` ko print me `28` dikhaya jata hai, `99.5` waise ka-waisa dikhata hai.
 
 ---
 
@@ -241,72 +349,16 @@ Galti ki line number ke saath Hinglish message aata hai:
 Galti: line 2 me naam 'xyz' nahi mila
 Galti: line 4 me zero se bhaag nahi kar sakte
 Galti: line 1 me ';' nahi chahiye, BOLI me sirf shabd, number aur "text" use hota hai
-Galti: line 6 me 'khatam' chahiye tha, par 'file ka ant' mila
 ```
 
 ---
 
-## Calculator chalakar dekho
+## Help
 
 ```bash
-cargo run -- run examples/calculator.hl
+boli help       # commands dikhao
+boli version    # version dikhao
 ```
-
-Input me `10` aur `4` dijiye:
-
-```
-=== BOLI Calculator ===
-Pehli sankhya: 10
-Doosri sankhya: 4
-Jod (a + b):
-14
-...
-```
-
----
-
-## Ek hisab wala calculator — calculator2.hl
-
-Agar user ko sirf **ek** hisab chahiye, to `examples/calculator2.hl` use "kya karna hai? jodo, ghatao, guna, bhaag" puchta hai aur wahi hisab kar deta hai:
-
-```boli
-# calculator2.hl (short me)
-pucho a "Pehli sankhya: "
-pucho b "Doosri sankhya: "
-pucho kaam "kya karna hai? jodo, ghatao, guna, bhaag "
-
-milgaya rakho galat
-
-agar kaam "jodo" barabar hai to
-    jodo jawab a aur b
-    likho "Jawab hai:"
-    likho jawab
-    milgaya rakho sahi
-khatam
-
-# ... ghatao / guna / bhaag ke liye bhi aise hi ...
-
-agar milgaya galat barabar hai to
-    likho "Galat kaam likha hai"
-khatam
-```
-
-Chaar `agar` check hote hain (string `barabar` tulna se). `milgaya` flag rakha gaya hai taaki galat naam — jaise `jod` — pe `Galat kaam likha hai` print ho aur ho sirf ek baar.
-
-```bash
-cargo run -- run examples/calculator2.hl
-```
-
-```
-=== BOLI Calculator (ek hisab) ===
-Pehli sankhya: 5
-Doosri sankhya: 3
-kya karna hai? jodo, ghatao, guna, bhaag jodo
-Jawab hai:
-8
-```
-
-> Note: `kaam` BOLI me function ka keyword bhi hai aur `kaam` naam ka variable bhi ho sakta hai. Statement ki shuruwat me `kaam rakho 5` likhne pe woh variable banega; `kaam namaste` likhne pe woh function definition hoga.
 
 ---
 
@@ -315,6 +367,8 @@ Jawab hai:
 ```
 boli/
 ├── Cargo.toml
+├── LICENSE             # MIT
+├── install.sh          # Termux/Linux installer (binary ko PATH me dalta hai)
 ├── README.md
 ├── examples/
 │   ├── namaste.hl
@@ -333,20 +387,19 @@ Kaam karne ka flow: `source.hl` → **lexer** (tokens) → **parser** (AST) → 
 
 ---
 
-## Pehle version me kya-kya hai
+## Feature list
 
 - `likho`, `rakho`, `pucho`
 - `jodo`, `ghatao`, `guna`, `bhaag` (inline aur variable-assign dono forms)
-- `agar ... nahi to ... khatam` with `bada / chhota / barabar / bada ya barabar / chhota ya barabar`
-- `aur / ya` logic
-- `se ... tak` range loop aur `jab tak` while loop
-- `kaam` definitions, calls aur `wapas do`
+- `agar ... nahi to ... khatam`, `aur / ya` logic, `bada / chhota / barabar / bada ya barabar / chhota ya barabar`
+- `se ... tak` range loop, `jab tak` while loop
+- `kaam` definitions, calls, `wapas do`
 - types: text, number, sahi/galat, khaali
 
 ## Aage kya aa sakta hai
 
-- list/array type (jaise `cheezein rakho 1 aur 2 aur 3`)
-- string formatting aur join kaam (`jodao`)
+- list/array type
+- string formatting kaam
 - kaam ke saath default arguments
 - modules (`laao`)
 
@@ -354,4 +407,4 @@ Kaam karne ka flow: `source.hl` → **lexer** (tokens) → **parser** (AST) → 
 
 ## License
 
-MIT
+MIT — dekho [LICENSE](LICENSE).
