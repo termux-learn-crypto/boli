@@ -130,7 +130,10 @@ impl Environment {
             // likho <expr>
             Stmt::Likho(expr, _line) => {
                 let value = self.eval_expr(expr)?;
-                println!("{}", value.dikhane_laayak());
+                // pipe band ho jaaye (jaise | head) to silent exit karo, panic nahi
+                if writeln!(io::stdout(), "{}", value.dikhane_laayak()).is_err() {
+                    std::process::exit(0);
+                }
                 Ok(Flow::Normal)
             }
             // <naam> rakho <expr>
@@ -141,8 +144,11 @@ impl Environment {
             }
             // pucho <naam> "sawal"
             Stmt::Pucho { name, prompt, line } => {
-                print!("{}", prompt);
-                io::stdout().flush().map_err(|_| BoliError::line(*line, "output nahi jaa rahi"))?;
+                // prompt line ke andar hi print hota hai + pipe band ho jaaye to silent exit
+                let prompt_ok = write!(io::stdout(), "{}", prompt).is_ok() && io::stdout().flush().is_ok();
+                if !prompt_ok {
+                    std::process::exit(0);
+                }
                 let mut line_in = String::new();
                 io::stdin().read_line(&mut line_in).map_err(|_| {
                     BoliError::line(*line, "input nahi mil raha")

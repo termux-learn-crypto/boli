@@ -1,39 +1,35 @@
 # calculator2.hl: BOLI Calculator, ek hisab pooch kar
-# User se sankhya aur kaam puchta hai, phir wahi hisab karta hai
+# User se a, b aur kya karna hai puchta hai, phir wahi hisab karta hai
 
 likho "=== BOLI Calculator (ek hisab) ==="
 
 pucho a "Pehli sankhya: "
 pucho b "Doosri sankhya: "
-pucho kaam "kya karna hai? jodo, ghatao, guna, bhaag "
+pucho kaam "kya karna hai? jodo, ghatao, guna, bhaag"
 
-# Kaunsa hisab mila, yeh flag rakho, warna galat naam pehle se pata nahi chalta
+# Kaunsa hisab mila, yeh flag rakho, warna galat naam pata nahi chalta
 milgaya rakho galat
 
 agar kaam "jodo" barabar hai to
     jodo jawab a aur b
-    likho "Jawab hai:"
     likho jawab
     milgaya rakho sahi
 khatam
 
 agar kaam "ghatao" barabar hai to
     ghatao jawab a se b
-    likho "Jawab hai:"
     likho jawab
     milgaya rakho sahi
 khatam
 
 agar kaam "guna" barabar hai to
     guna jawab a ko b se
-    likho "Jawab hai:"
     likho jawab
     milgaya rakho sahi
 khatam
 
 agar kaam "bhaag" barabar hai to
     bhaag jawab a ko b se
-    likho "Jawab hai:"
     likho jawab
     milgaya rakho sahi
 khatam

@@ -127,13 +127,12 @@ khatam
 # calculator2.hl (short me)
 pucho a "Pehli sankhya: "
 pucho b "Doosri sankhya: "
-pucho kaam "kya karna hai? jodo, ghatao, guna, bhaag "
+pucho kaam "kya karna hai? jodo, ghatao, guna, bhaag"
 
 milgaya rakho galat
 
 agar kaam "jodo" barabar hai to
     jodo jawab a aur b
-    likho "Jawab hai:"
     likho jawab
     milgaya rakho sahi
 khatam
@@ -156,7 +155,6 @@ boli run examples/calculator2.hl
 Pehli sankhya: 5
 Doosri sankhya: 3
 kya karna hai? jodo, ghatao, guna, bhaag jodo
-Jawab hai:
 8
 ```
 
