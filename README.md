@@ -269,6 +269,18 @@ nahi to
 khatam
 ```
 
+**Precedence (BOLI me):** expression nesting → `hissa` → comparison → `aur` → `ya`
+
+BOLI me symbol parentheses nahi hain — group karna ho to nested expression likho:
+
+```boli
+agar jodo 1 aur 2 barabar jodo 2 aur 1 hai to   # 3 == 3
+    likho "sahi"
+khatam
+```
+
+`aur` (AND) hamesha `ya` (OR) se pehle bind hota hai: `A ya B aur C` = `A ya (B aur C)`.
+
 ### 6. Loops
 
 **Range loop** — `1 se 5 tak` (dono ends shamil, `ginti` variable apne aap milta hai):
@@ -368,18 +380,35 @@ boli/
 ├── LICENSE             # MIT
 ├── install.sh          # Termux/Linux installer (binary ko PATH me dalta hai)
 ├── README.md
+├── LANGUAGE_SPEC.md    # poora grammar/semantics reference
+├── ARCHITECTURE.md     # code flow aur module design
+├── CHANGELOG.md        # v0.1.0 → v0.2.0 changes
+├── TESTING.md          # tests kaise chalayein, kaise likhein
+├── AUDIT_REPORT.md     # audit + "how verified" notes
 ├── examples/
 │   ├── namaste.hl
 │   ├── calculator.hl
 │   ├── calculator2.hl
 │   └── loop.hl
-└── src/
-    ├── main.rs         # CLI + REPL
-    ├── lexer.rs        # code ko tokens me todta hai
-    ├── parser.rs       # tokens se AST banata hai
-    ├── interpreter.rs  # AST ko chalakar output deta hai
-    └── ast.rs          # AST nodes + Galti (error) type
+├── src/
+│   ├── main.rs         # CLI + REPL
+│   ├── lib.rs          # library crate (tests isi pe based)
+│   ├── lexer.rs        # code ko tokens me todta hai
+│   ├── parser.rs       # tokens se AST banata hai
+│   ├── interpreter.rs  # AST ko chalakar output deta hai
+│   └── ast.rs          # AST nodes + Galti (error) type
+└── tests/
+    ├── boli.rs         # semantics + regression tests (library-level)
+    └── cli.rs          # binary-level end-to-end tests (spawns boli)
 ```
+
+## Testing
+
+```bash
+cargo test          # 67 tests chalenge
+```
+
+Details aur test-adding guide: [TESTING.md](TESTING.md). Spec: [LANGUAGE_SPEC.md](LANGUAGE_SPEC.md). Changes: [CHANGELOG.md](CHANGELOG.md).
 
 Kaam karne ka flow: `source.hl` → **lexer** (tokens) → **parser** (AST) → **interpreter** (run).
 

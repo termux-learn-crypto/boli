@@ -1,0 +1,166 @@
+# BOLI Language Specification (v0.2.0)
+
+**Version:** 0.2.0 · **File extension:** `.hl` · **Implementation:** Rust (`cargo run -- run x.hl`, REPL via `cargo run`)
+
+BOLI is a Hinglish-based programming language: Python-like simplicity, Hindi/English keywords, no symbols like `; { } ( ) = :`. Statements are one per line. Only words, numbers, quoted text and whitespace appear in a program.
+
+---
+
+## 1. Lexical rules
+
+| Item | Rule |
+|------|------|
+| File encoding | UTF-8 |
+| Statement terminator | newline (empty lines are ignored) |
+| Comments | `#` to end of line |
+| Text literal | `"..."` — escapes `\"`, `\\`, `\n`; embedded newline not allowed |
+| Number literal | digits with optional single `.` and decimal part, optional leading `-` (only directly before a digit); must be **finite** — a literal exceeding f64 range is a Galti error |
+| Identifier | Unicode letters/combined marks/digits/`_` (Devanagari and Latin both work), start with letter or `_` |
+| Keywords | `likho pucho rakho jodo ghatao guna bhaag agar nahi to khatam se aur ya ko tak jab bada chhota barabar hai kaam wapas do sahi galat khaali hissa ruk agla break continue` |
+
+Words and literals are case-sensitive except for keyword matching (keywords are matched lowercase — `Likho` ≠ keyword? Actually keywords match exactly lowercase as written; keep them lowercase).
+
+## 2. Types
+
+| Type | Notation | Notes |
+|------|----------|-------|
+| text | `"Vilas"` | Unicode string, max 1 MiB (`BOLI_MAX_STRING_BYTES`) |
+| number | `28`, `99.50`, `-5` | f64 internally; must be finite; int-like values print without decimal |
+| sahi/galat | `sahi`, `galat` | bool |
+| khaali | `khaali` | null |
+| list | `cheezein rakho 1 2 3` | list of values, mixed types allowed; index with `hissa` (1-based) |
+
+No implicit NaN or ±∞ anywhere: input parsing, literals and arithmetic results are all validated finite.
+
+## 3. Statements
+
+```boli
+# likho <expr>                  print
+likho "text"
+likho ginti
+likho jodo 5 aur 3              # inline hisaab
+
+# <naam> rakho <values...>     variable (multi-value = list)
+naam rakho "Vilas"
+cheezein rakho 1 2 3            # list [1, 2, 3]
+
+# <naam> rakho jodo ...        hisaab rakho (rakho NAHI kaam karte hue)
+jodo jawab 5 aur 3               # jawab = 8
+ghatao bacha 10 se 4             # bacha = 6
+guna total 5 ko 2 se             # total = 10
+bhaag hissa 10 ko 2 se           # hissa = 5
+
+# list index assignment (1 se ginti)
+cheezein hissa 2 rakho 99
+
+# pucho <naam> "sawal"          stdin line read (type auto-detect)
+pucho naam "Tumhara naam"
+
+# agar ... nahi to ... khatam    condition
+# jab tak <cond> to ... khatam   while loop
+# <from> se <to> tak ... khatam  range loop (inclusive, ginti naam ka variable)
+# kaam <naam> <params> ... khatam  function
+# wapas do <expr>                 return value
+# ruk / agla                        break / continue (alias: break / continue)
+```
+
+## 4. Operators & precedence
+
+Highest → lowest:
+
+1. **Expression nesting** — nested `jodo/ghatao/guna/bhaag` groups inner-first (like parentheses in other languages)
+2. **List indexing** — `hissa` postfix
+3. **Comparisons** — `bada`, `chhota`, `barabar`, `bada ya barabar`, `chhota ya barabar`
+4. **`aur`** (AND)
+5. **`ya`** (OR)
+
+There are **no symbol parentheses**; nesting works by writing nested expressions inside each other:
+
+```boli
+agar jodo 1 aur 2 barabar jodo 2 aur 1 hai to   # 3 == 3
+    likho "same"
+khatam
+```
+
+Logic reads left-to-right; `aur` binds tighter:
+
+```boli
+agar a sahi barabar hai ya b sahi barabar hai aur c sahi barabar hai to
+```
+is parsed as `a ya (b aur c)`.
+
+## 5. Conditions & comparisons
+
+Form: `<operand> <operand> [se] <op> [ya barabar] hai`
+
+(`se` is optional; `hai` keyword marks the end of the condition.)
+
+| Operator | Meaning |
+|----------|---------|
+| `bada` | > |
+| `chhota` | < |
+| `barabar` | == |
+| `bada ya barabar` | >= |
+| `chhota ya barabar` | <= |
+
+Operands can be number, text (`bada`/`chhota` compare unicode) or list only with `barabar`. Mixed text/number comparison is a Galti error (except `barabar` → `galat`).
+
+## 6. Functions (kaam)
+
+```boli
+kaam namaste naam
+    likho "Namaste"
+    likho naam
+khatam
+
+namaste "Rahul"
+```
+
+- Calls: `kaam_name` or `kaam_name arg1 arg2 ...` — arguments are evaluated in the caller's scope.
+- Arguments are **flat atoms**: `f a b` means `f(a, b)` — never a nested call. For nested calls bind to a zero-argument kaam or to a variable: `t rakho g 1 2` then `f t`.
+- Zero-argument kaam can be named in expressions: `likho jawab_do` → calls `jawab_do()`. A variable of that name shadows the kaam.
+- `wapas do expr` returns a value; `wapas do` alone returns `khaali`.
+- Recursion depth limited (`BOLI_MAX_CALL_DEPTH`, default 64).
+- `ruk`/`agla` inside kaam without an enclosing loop are errors.
+
+## 7. Scoping
+
+- `rakho` always writes to the **current (innermost) scope**; it never mutates an outer/global variable silently (v0.2.0).
+- Reading a name searches innermost → outermost → global.
+- Loops push a temporary scope (`ginti` for range loops); popped at loop end.
+- Kaam calls push a scope with the parameters; popped at kaam exit (even on errors).
+
+## 8. Safety limits (configurable via environment)
+
+| Limit | Default | Env var |
+|-------|---------|---------|
+| Steps (whole program) | 100,000 | `BOLI_MAX_STEPS` |
+| Kaam call depth | 64 | `BOLI_MAX_CALL_DEPTH` |
+| String bytes (concat result) | 1 MiB | `BOLI_MAX_STRING_BYTES` |
+
+Violations are Hinglish Galti errors, never panics/SIGSEGV/SIGKILL. Also `std::process::exit(0)` on closed stdout pipe.
+
+## 9. Errors
+
+All runtime and syntax errors are Hinglish with line numbers:
+
+```
+Galti: line 4 me naam 'xyz' nahi mila
+Galti: line 7 me zero se bhaag nahi kar sakte
+Galti: line 1 me ';' nahi chahiye, BOLI me sirf shabd, number aur "text" use hota hai
+```
+
+## 10. Contextual keywords
+
+- `kaam` — function keyword; also a valid variable name (`pucho kaam`, `kaam rakho` …).
+- `hissa` — list-index keyword; also a valid variable name (`bhaag hissa 10 ko 2 se`).
+
+In both cases a variable of that keyword name may be created, read and assigned anywhere an identifier is expected. `ruk`/`agla`/`break`/`continue` are the only reserved words that don't double as identifiers.
+
+## 11. Record of behavior (v0.2.0 vs v0.1.0)
+
+- `rakho` semantics: local write-only (was nonlocal-update).
+- `f a b` flat argument parsing (was nested call nesting).
+- `aur`/`ya` precedence: `aur` binds tighter (was equal/left-assoc).
+- `pucho`/literals/arithmetic validate finite numbers (was inf/nan allowed).
+- See CHANGELOG.md.

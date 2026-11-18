@@ -1,17 +1,13 @@
 // BOLI - ek Hinglish programming language jo Rust me bani hai
-// CLI: `cargo run -- run file.hl` se file chalao, `cargo run` se REPL khulega
-
-mod ast;
-mod interpreter;
-mod lexer;
-mod parser;
+// cargo run se REPL, `cargo run -- run x.hl` se file chale
+use boli::interpreter::Environment;
+use boli::parser;
 
 use std::env;
 use std::fs;
 use std::io::{self, Write};
 use std::process;
 
-use interpreter::Environment;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -123,12 +119,24 @@ fn repl() {
         }
 
         // Block depth badlo: agar/jab/tak/kaam-definition kholte hain, khatam band karta hai
-        // comment (#) nikaal ke dekho, aur kaam def tabhi count ho jab def jaisa ho
-        let code_part = trimmed.split('#').next().unwrap_or("").trim();
+        // comment (#) aur quoted text nikaal ke dekho
+        let code_part = trimmed.split('#').next().unwrap_or("");
+        let mut stripped = String::with_capacity(code_part.len());
+        let mut in_text = false;
+        for c in code_part.chars() {
+            if c == '"' {
+                in_text = !in_text;
+                stripped.push(' ');
+            } else if !in_text {
+                stripped.push(c);
+            }
+        }
+        let code_part = stripped.trim();
         let words: Vec<String> = code_part
             .split_whitespace()
             .map(|w| w.to_lowercase())
             .collect();
+        let mut stray = false;
         if let Some(first) = words.first() {
             match first.as_str() {
                 "agar" | "jab" => depth += 1, // agar / jab tak
@@ -151,12 +159,22 @@ fn repl() {
             if words.len() > 1 && words.last().map(|s| s.as_str()) == Some("tak") {
                 depth += 1;
             }
-            // har "khatam" ek block band karta hai
+            // har "khatam" ek block band karta hai; bina block ke khatam = Galti, line ignore karo
             for word in &words {
                 if word == "khatam" {
                     depth -= 1;
+                    if depth < 0 {
+                        depth = 0;
+                        eprintln!("Galti: 'khatam' bina kuch shuru kiye aaya");
+                        buffer.clear();
+                        stray = true;
+                        break;
+                    }
                 }
             }
+        }
+        if stray {
+            continue;
         }
 
         buffer.push_str(&line);

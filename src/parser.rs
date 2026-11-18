@@ -72,7 +72,7 @@ impl Parser {
     }
 
     // Identifier (kaam/variable ka naam) chahiye
-    // 'kaam' keyword bhi naam ki tarah chal sakta hai (jaise pucho kaam "...")
+    // 'kaam' aur 'hissa' keywords bhi naam ki tarah chal sakte hain
     fn expect_ident(&mut self) -> Result<(String, usize), BoliError> {
         let tok = self.peek().clone();
         match tok.tok {
@@ -84,10 +84,36 @@ impl Parser {
                 self.pos += 1;
                 Ok(("kaam".to_string(), tok.line))
             }
+            Tok::Hissa => {
+                self.pos += 1;
+                Ok(("hissa".to_string(), tok.line))
+            }
             _ => Err(BoliError::line(
                 tok.line,
                 format!("yahan naam chahiye tha, par '{}' mila", tok.describe()),
             )),
+        }
+    }
+
+    // `rakho` ke baad jo likha hai usse value banao.
+    // Ek atom => wahi value; ek se zyada atoms => list (cheezein rakho 1 2 3)
+    fn parse_rakho_value(&mut self) -> Result<Expr, BoliError> {
+        let line = self.peek().line;
+        if !Self::atom_start(&self.peek().tok) {
+            let tok = self.peek().clone();
+            return Err(BoliError::line(
+                line,
+                format!("rakho ke baad value chahiye thi, par '{}' mila", tok.describe()),
+            ));
+        }
+        let mut atoms = vec![self.parse_atom()?];
+        while Self::atom_start(&self.peek().tok) {
+            atoms.push(self.parse_atom()?);
+        }
+        if atoms.len() == 1 {
+            Ok(atoms.pop().unwrap())
+        } else {
+            Ok(Expr::List(atoms, line))
         }
     }
 
@@ -160,6 +186,10 @@ impl Parser {
                         self.pos += 1;
                         (name, tok.line)
                     }
+                    Tok::Hissa => {
+                        self.pos += 1;
+                        ("hissa".to_string(), tok.line)
+                    }
                     _ => {
                         return Err(BoliError::line(
                             tok.line,
@@ -219,11 +249,21 @@ impl Parser {
             //   kaam <naam>    =>  kaam definition (function banate hain)
             Tok::Kaam => {
                 let line = tok.line;
+                // "kaam hissa 1 rakho x" => variable "kaam" ka list hissa badlo
+                if self.peek_at(1).tok == Tok::Hissa {
+                    self.next(); // kaam
+                    self.next(); // hissa
+                    let index = self.parse_operand()?;
+                    self.expect(Tok::Rakho, "rakho")?;
+                    let value = self.parse_atom()?;
+                    self.expect_line_end()?;
+                    return Ok(Stmt::ListAssign { target: "kaam".to_string(), index, value, line });
+                }
                 // "kaam rakho ..." => variable "kaam"
                 if self.peek_at(1).tok == Tok::Rakho {
                     self.next(); // kaam
                     self.next(); // rakho
-                    let value = self.parse_expr()?;
+                    let value = self.parse_rakho_value()?;
                     self.expect_line_end()?;
                     return Ok(Stmt::Rakho { name: "kaam".to_string(), value, line });
                 }
@@ -236,7 +276,7 @@ impl Parser {
                     self.next(); // kaam
                     let mut args = Vec::new();
                     while Self::atom_start(&self.peek().tok) {
-                        args.push(self.parse_atom()?);
+                        args.push(self.atom(false)?);
                     }
                     self.expect_line_end()?;
                     return Ok(Stmt::KaamCall { name: "kaam".to_string(), args, line });
@@ -245,7 +285,7 @@ impl Parser {
                 self.next();
                 let (name, _) = self.expect_ident()?;
                 let mut params = Vec::new();
-                while matches!(self.peek().tok, Tok::Ident(_) | Tok::Kaam) {
+                while matches!(self.peek().tok, Tok::Ident(_) | Tok::Kaam | Tok::Hissa) {
                     let (param, _) = self.expect_ident()?;
                     params.push(param);
                 }
@@ -266,25 +306,54 @@ impl Parser {
                 self.expect_line_end()?;
                 Ok(Stmt::Wapas { value, line })
             }
-            // <naam> rakho <expr>  ya  kaam_call <args>
-            Tok::Ident(name) => {
+            // <naam> rakho <expr>  ya  <naam> hissa <n> rakho <expr>  ya  kaam_call <args>
+            // 'hissa' bhi naam ki tarah chal sakta hai (jaise bhaag hissa 10 ko 2 se)
+            Tok::Ident(_) | Tok::Hissa => {
+                let name = match &tok.tok {
+                    Tok::Ident(n) => n.clone(),
+                    _ => "hissa".to_string(),
+                };
                 let line = tok.line;
                 // Do dekhne pe pata chalta hai ki yeh assignment hai ya call
                 if self.peek_at(1).tok == Tok::Rakho {
                     self.next(); // naam
                     self.next(); // rakho
-                    let value = self.parse_expr()?;
+                    let value = self.parse_rakho_value()?;
                     self.expect_line_end()?;
                     return Ok(Stmt::Rakho { name, value, line });
+                }
+                // <naam> hissa <index> rakho <expr>  =>  list ka ek hissa badlo
+                if self.peek_at(1).tok == Tok::Hissa {
+                    self.next(); // naam
+                    self.next(); // hissa
+                    let index = self.parse_operand()?;
+                    self.expect(Tok::Rakho, "rakho")?;
+                    // value me list nahi, seedha single atom hi expect karte hain
+                    let value = self.parse_atom()?;
+                    self.expect_line_end()?;
+                    return Ok(Stmt::ListAssign { target: name, index, value, line });
                 }
                 // Warna yeh kaam ka bulana (function call) hai
                 self.next(); // kaam ka naam
                 let mut args = Vec::new();
                 while Self::atom_start(&self.peek().tok) {
-                    args.push(self.parse_atom()?);
+                    args.push(self.atom(false)?);
                 }
                 self.expect_line_end()?;
                 Ok(Stmt::KaamCall { name, args, line })
+            }
+            // ruk (break) aur agla (continue) - loop ke andar use hote hain
+            Tok::Ruk => {
+                self.next();
+                let line = tok.line;
+                self.expect_line_end()?;
+                Ok(Stmt::Ruk(line))
+            }
+            Tok::Agla => {
+                self.next();
+                let line = tok.line;
+                self.expect_line_end()?;
+                Ok(Stmt::Agla(line))
             }
             Tok::Khatam => Err(BoliError::line(
                 tok.line,
@@ -326,6 +395,18 @@ impl Parser {
     }
 
     fn atom(&mut self, allow_call: bool) -> Result<Expr, BoliError> {
+        let mut expr = self.atom_base(allow_call)?;
+        // hissa (index) postfix: cheezein hissa 1  =>  cheezein ka pehla hissa
+        while self.peek().tok == Tok::Hissa {
+            let hissa_tok = self.next();
+            let index = self.parse_operand()?;
+            expr = Expr::Index(Box::new(expr), Box::new(index), hissa_tok.line);
+        }
+        Ok(expr)
+    }
+
+    // Ek base operand (index se pehle wala hissa)
+    fn atom_base(&mut self, allow_call: bool) -> Result<Expr, BoliError> {
         let tok = self.peek().clone();
         match tok.tok {
             Tok::Number(n) => {
@@ -348,18 +429,20 @@ impl Parser {
                 self.pos += 1;
                 Ok(Expr::Khaali(tok.line))
             }
-            // 'kaam' value ki jagah bhi naam ki tarah chal sakta hai
-            Tok::Ident(_) | Tok::Kaam => {
+            // 'kaam' aur 'hissa' value ki jagah bhi naam ki tarah chal sakte hain
+            Tok::Ident(_) | Tok::Kaam | Tok::Hissa => {
                 let name = match &tok.tok {
                     Tok::Ident(n) => n.clone(),
-                    _ => "kaam".to_string(),
+                    _ if tok.tok == Tok::Kaam => "kaam".to_string(),
+                    _ => "hissa".to_string(),
                 };
                 self.pos += 1;
                 // Agar baad me atom shuru ho raha hai to yeh kaam ka bulana hai
+                // (arguments FLAT hote hain: f a b  =>  f(a, b), f a(b) nahi)
                 if allow_call && Self::atom_start(&self.peek().tok) {
                     let mut args = Vec::new();
                     while Self::atom_start(&self.peek().tok) {
-                        args.push(self.parse_atom()?);
+                        args.push(self.atom(false)?);
                     }
                     return Ok(Expr::Call(name, args, tok.line));
                 }
@@ -403,25 +486,36 @@ impl Parser {
         Ok((left, right))
     }
 
-    // Condition: comparison ke saath aur/ya jodkar
+    // Condition: ya (low precedence) upar aur (high precedence) neeche
+    // "a ya b aur c" ka matlab hai: a ya (b aur c)
     fn parse_cond(&mut self) -> Result<Cond, BoliError> {
+        let mut cond = self.parse_aur()?;
+        loop {
+            let tok = self.peek().clone();
+            if tok.tok == Tok::Ya {
+                self.next();
+                let line = tok.line;
+                let right = self.parse_aur()?;
+                cond = Cond::Ya(Box::new(cond), Box::new(right), line);
+            } else {
+                break;
+            }
+        }
+        Ok(cond)
+    }
+
+    // aur (AND) bind karta hai: comparison (aur comparison)*
+    fn parse_aur(&mut self) -> Result<Cond, BoliError> {
         let mut cond = self.parse_comparison()?;
         loop {
             let tok = self.peek().clone();
-            match tok.tok {
-                Tok::Aur => {
-                    self.next();
-                    let line = tok.line;
-                    let right = self.parse_comparison()?;
-                    cond = Cond::Aur(Box::new(cond), Box::new(right), line);
-                }
-                Tok::Ya => {
-                    self.next();
-                    let line = tok.line;
-                    let right = self.parse_comparison()?;
-                    cond = Cond::Ya(Box::new(cond), Box::new(right), line);
-                }
-                _ => break,
+            if tok.tok == Tok::Aur {
+                self.next();
+                let line = tok.line;
+                let right = self.parse_comparison()?;
+                cond = Cond::Aur(Box::new(cond), Box::new(right), line);
+            } else {
+                break;
             }
         }
         Ok(cond)

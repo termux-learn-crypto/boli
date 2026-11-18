@@ -14,6 +14,9 @@ pub enum Tok {
     Bada, Chhota, Barabar, Hai,
     Kaam, Wapas, Do,
     Sahi, Galat, Khaali,
+    Hissa,      // list ka index (1 se shuru)
+    Ruk,        // break
+    Agla,       // continue
     // Numbers (jaise 28 ya 99.50)
     Number(f64),
     // Shuru aur band hona wali quotes ke beech ka text
@@ -64,6 +67,9 @@ impl Token {
             Tok::Sahi => "sahi".to_string(),
             Tok::Galat => "galat".to_string(),
             Tok::Khaali => "khaali".to_string(),
+            Tok::Hissa => "hissa".to_string(),
+            Tok::Ruk => "ruk".to_string(),
+            Tok::Agla => "agla".to_string(),
             Tok::Number(n) => format!("{}", n),
             Tok::Text(s) => format!("\"{}\"", s),
             Tok::Ident(s) => s.clone(),
@@ -71,6 +77,26 @@ impl Token {
             Tok::Eof => "file ka ant".to_string(),
         }
     }
+}
+
+// Unicode combining marks (Devanagari signs, virama etc.) ko word characters mano
+fn is_mark(c: char) -> bool {
+    let cp = c as u32;
+    (0x0300..=0x036F).contains(&cp)   // combining diacriticals
+        || (0x0900..=0x097F).contains(&cp)  // Devanagari block
+        || (0x0980..=0x09FF).contains(&cp)  // Bengali
+        || (0x0A00..=0x0A7F).contains(&cp)  // Gurmukhi
+        || (0x0B00..=0x0B7F).contains(&cp)  // Oriya
+        || (0x0C00..=0x0C7F).contains(&cp)  // Telugu
+        || (0x0D00..=0x0D7F).contains(&cp)  // Malayalam
+        || (0x0E00..=0x0E7F).contains(&cp)  // Thai
+        || (0x1AB0..=0x1AFF).contains(&cp)
+        || (0x1DC0..=0x1DFF).contains(&cp)
+        || (0xFE20..=0xFE2F).contains(&cp)
+}
+
+fn is_word_char(c: char) -> bool {
+    c.is_alphanumeric() || c == '_' || is_mark(c)
 }
 
 // Keyword matching: chhote aksharon me compare karo
@@ -103,6 +129,11 @@ fn keyword(word: &str) -> Option<Tok> {
         "sahi" => Some(Tok::Sahi),
         "galat" => Some(Tok::Galat),
         "khaali" => Some(Tok::Khaali),
+        "hissa" => Some(Tok::Hissa),
+        "ruk" => Some(Tok::Ruk),
+        "agla" => Some(Tok::Agla),
+        "break" => Some(Tok::Ruk),    // English alias
+        "continue" => Some(Tok::Agla),
         _ => None,
     }
 }
@@ -158,11 +189,16 @@ pub fn lex(source: &str) -> Result<Vec<Token>, BoliError> {
                         "text pura nahi hua, band karne ke liye \" lagao",
                     ));
                 }
-                // Simple escape: backslash ke baad quote ya backslash aya to asli character dalo
+                // Simple escape: backslash ke baad quote/backslash/n aya to asli character dalo
                 if ch == '\\' && i + 1 < chars.len() {
                     let next = chars[i + 1];
                     if next == '"' || next == '\\' {
                         text.push(next);
+                        i += 2;
+                        continue;
+                    }
+                    if next == 'n' {
+                        text.push('\n');
                         i += 2;
                         continue;
                     }
@@ -180,10 +216,15 @@ pub fn lex(source: &str) -> Result<Vec<Token>, BoliError> {
             continue;
         }
 
-        // Number - ankh laage hue, ek dot ho sakti hai (jaise 99.50)
-        if c.is_ascii_digit() {
+        // Number - ankh laage hue, ek dot ho sakti hai (jaise 99.50 ya -7)
+        // '-' sirf tab number ka hissa jab uske baad digit ho (BOLI me minus symbol allowed nahi)
+        if c.is_ascii_digit() || (c == '-' && i + 1 < chars.len() && chars[i + 1].is_ascii_digit()) {
             let start_line = line;
             let mut num = String::new();
+            if c == '-' {
+                num.push('-');
+                i += 1;
+            }
             while i < chars.len() && chars[i].is_ascii_digit() {
                 num.push(chars[i]);
                 i += 1;
@@ -202,15 +243,22 @@ pub fn lex(source: &str) -> Result<Vec<Token>, BoliError> {
             let value: f64 = num.parse().map_err(|_| {
                 BoliError::line(start_line, format!("'{}' number sahi nahi hai", num))
             })?;
+            // BOLI me sirf finite numbers chalte hain (inf/nan allowed nahi)
+            if !value.is_finite() {
+                return Err(BoliError::line(
+                    start_line,
+                    format!("'{}' bahut bada hai, finite number nahi hai", num),
+                ));
+            }
             tokens.push(Token { tok: Tok::Number(value), line: start_line });
             continue;
         }
 
         // Shabd - letters (Devanagari bhi chal sakti hai), digits aur underscore
-        if c.is_alphabetic() || c == '_' {
+        if c.is_alphabetic() || c == '_' || is_mark(c) {
             let start_line = line;
             let mut word = String::new();
-            while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') {
+            while i < chars.len() && is_word_char(chars[i]) {
                 word.push(chars[i]);
                 i += 1;
             }

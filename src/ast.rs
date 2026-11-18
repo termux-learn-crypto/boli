@@ -83,6 +83,10 @@ pub enum Expr {
     Arith(ArithOp, Box<Expr>, Box<Expr>, usize),
     // Kaam ka bulana expression me bhi, jaise: likho jodo_kaam 2 3
     Call(String, Vec<Expr>, usize),
+    // List: cheezein rakho 1 2 3
+    List(Vec<Expr>, usize),
+    // List ka ek hissa: cheezein hissa 1  (1 se ginti)
+    Index(Box<Expr>, Box<Expr>, usize),
 }
 
 // Condition - agar aur jab tak me use hoti hai
@@ -116,7 +120,34 @@ pub enum Stmt {
     KaamCall { name: String, args: Vec<Expr>, line: usize },
     // wapas do <expr>
     Wapas { value: Option<Expr>, line: usize },
+    // ruk   (break - loop se bahar)
+    Ruk(usize),
+    // agla  (continue - agli ginti pe jao)
+    Agla(usize),
+    // cheezein hissa 2 rakho 99   (list ke ek hisse ko badlo)
+    ListAssign { target: String, index: Expr, value: Expr, line: usize },
 }
 
 // Pura program statements ki list hai
 pub type Program = Vec<Stmt>;
+
+impl Stmt {
+    // Error line ke liye best-effort line number
+    pub fn line_for_error(&self) -> usize {
+        match self {
+            Stmt::Likho(_, line) => *line,
+            Stmt::Rakho { line, .. } => *line,
+            Stmt::Pucho { line, .. } => *line,
+            Stmt::ArithAssign { line, .. } => *line,
+            Stmt::Agar { line, .. } => *line,
+            Stmt::RangeLoop { line, .. } => *line,
+            Stmt::WhileLoop { line, .. } => *line,
+            Stmt::KaamDef { line, .. } => *line,
+            Stmt::KaamCall { line, .. } => *line,
+            Stmt::Wapas { line, .. } => *line,
+            Stmt::Ruk(line) => *line,
+            Stmt::Agla(line) => *line,
+            Stmt::ListAssign { line, .. } => *line,
+        }
+    }
+}
