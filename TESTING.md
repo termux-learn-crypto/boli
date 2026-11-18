@@ -4,7 +4,7 @@
 
 ```bash
 cargo test          # everything (unit + integration)
-cargo test --test boli      # library-level semantics (89 tests)
+cargo test --test boli      # library-level semantics (93 tests)
 cargo test --test cli       # CLI/binary end-to-end (19 tests)
 ```
 
@@ -13,7 +13,7 @@ Full verification matrix (run before a release):
 ```bash
 cargo fmt --check                          # formatting gate
 cargo check                                # compile gate
-cargo test                                 # 108 tests (89 library + 19 CLI)
+cargo test                                 # 112 tests (93 library + 19 CLI)
 cargo clippy --all-targets --all-features -- -D warnings   # lint gate
 cargo build --release                      # release artifact gate
 ```
@@ -43,6 +43,9 @@ No extra tooling is required — only `cargo` and the BOLI binary (which `cargo 
 - condition `ya` chain parse-time cap (`Parser::with_limits`) and eval-time cap
 - expression/`hissa` chain depth guard
 - fuzz-ish test: deterministic xorshift generator feeds random byte soup into the lexer and parser; neither may panic (no third-party fuzzer needed)
+
+### v0.5.0 tests
+- `traceback_shows_full_call_chain`, `traceback_innermost_first`, `traceback_absent_for_top_level_errors`, `traceback_preserved_through_nested_propagation`
 
 ### v0.4.0 tests
 - Builtins: `builtin_lambayi_text_and_list`, `builtin_upar_neeche`, `builtin_text_cast`, `builtin_sankhya`, `builtin_wrong_arity_errors`, `builtin_user_kaam_shadows_builtin`, `builtin_unicode_text_ops`

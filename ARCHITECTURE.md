@@ -45,6 +45,11 @@ How the REPL works:
 - Lines inside `"..."` and after `#` are ignored for depth calculation; a negative depth resets with a Hinglish message (`'khatam' bina kuch shuru kiye aaya`).
 - Environment persists across REPL inputs (variables and kaam stay); `nikalo`/`exit`/`quit` exits cleanly.
 
-## Why the interpreter is still one file
+## Interpreter layout (v0.5.0)
 
-`Environment` owns the scope stack, the kaam table and the limit counters; `eval_expr`, `eval_cond`, `call_kaam`, `run_stmt` and `run_block` all mutate the same state and call each other mutually. Splitting `interpreter.rs` into `environment.rs` / `evaluator.rs` / `functions.rs` would only move that shared state across module boundaries without changing ownership — more ceremony, same coupling, and a needless diff risk to a working evaluator. The file stays single; `limits.rs` was extracted instead because lexer/parser/interpreter/CLI all need it. Revisit the split if the evaluator grows substantially (e.g. a bytecode VM, which is tracked in docs/UPGRADE_ROADMAP.md).
+`src/interpreter/` is a module:
+- `mod.rs` — `Environment`: scope stack, kaam table, limit counters, `run_program`/`run_block`/`run_stmt`, `call_kaam`, scope/limit wiring, public builders. Owns the trace stack for tracebacks.
+- `eval.rs` — `eval_expr`/`eval_cond` (and `eval_expr_inner`/`eval_cond_inner`) as `impl Environment` methods, plus `eval_arith`, `compare`, `values_equal`, `as_number`, `checked_text`.
+- `value.rs` — `Value` enum, `dikhane_laayak`/`type_naam`, and `value_size` (live-bytes budget accounting).
+
+Split was done once the evaluator had 942 lines and a second concern (live-bytes accounting + trace stack) landed in the same type. The shared-state problem (eval needs `&mut Environment`) is handled by `impl Environment` in `eval.rs`, not by passing state around.

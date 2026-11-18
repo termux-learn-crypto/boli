@@ -403,7 +403,10 @@ boli/
 │   ├── lib.rs          # library crate (tests isi pe based)
 │   ├── lexer.rs        # code ko tokens me todta hai
 │   ├── parser.rs       # tokens se AST banata hai
-│   ├── interpreter.rs  # AST ko chalakar output deta hai
+│   ├── interpreter/    # interpreter module
+│   ├── eval.rs     # expression/condition evaluation
+│   ├── value.rs    # Values + live bytes accounting
+│   └── mod.rs      # Environment: scopes, kaam table, limits wiring
 │   ├── limits.rs       # safety limits (env override + defaults)
 │   └── ast.rs          # AST nodes + Galti (error) type
 └── tests/
@@ -414,7 +417,7 @@ boli/
 ## Testing
 
 ```bash
-cargo test          # 108 tests chalenge
+cargo test          # 112 tests chalenge
 ```
 
 Details aur test-adding guide: [TESTING.md](TESTING.md). Spec: [LANGUAGE_SPEC.md](LANGUAGE_SPEC.md). Changes: [CHANGELOG.md](CHANGELOG.md). Audit: [docs/COMPLETE_AUDIT.md](docs/COMPLETE_AUDIT.md). Security: [docs/SECURITY_REPORT.md](docs/SECURITY_REPORT.md).
@@ -461,7 +464,7 @@ Sab limits env variable se override ho sakti hain — har violation Hinglish Gal
 - `se ... tak` range loop, `jab tak` while loop
 - `kaam` definitions, calls, `wapas do`
 - Built-in kaams: `lambayi`, `upar`, `neeche`, `text`, `sankhya`
-- Error diagnostics: line + column number aur source line ke upar caret (`^`)
+- Error diagnostics: line + column number, source line ke upar caret (`^`), aur runtime errors pe kaam-call traceback
 - types: text, number, sahi/galat, khaali
 
 ## Aage kya aa sakta hai

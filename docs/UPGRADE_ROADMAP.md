@@ -18,7 +18,7 @@ Prioritized by fit with BOLI's philosophy: **Hinglish syntax, no symbols, learni
 | **REPL paste mode** | `paste … .` block delimiters | Fixes multiline heredoc paste; small, self-contained. |
 | **`boli fmt` (formatter)** | Re-indent by block depth; idempotent | Teaches style; reuses parser; no semantics. |
 
-## v0.5.0 (modules & files — behind explicit keywords)
+## v0.6.0 (modules & files — behind explicit keywords)
 | Feature | Sketch | Risk |
 |---|---|---|
 | **Modules: `laao "path.hl"`** | Loads sibling `.hl`, exposes its top-level `kaam`s in an isolated namespace | Needs import cycles error, path confinement (`--allow-fs` flag or `BOLI_FS_ROOT`), tests. High value, high care. |
@@ -26,7 +26,7 @@ Prioritized by fit with BOLI's philosophy: **Hinglish syntax, no symbols, learni
 | **File I/O under explicit capability** | `padho "file.hl"`, `likho_file` — gated by `BOLI_ALLOW_FS=1`; off by default | Security: must never default on. Feeds SECURITY_REPORT update. |
 | **Better error locations** | Column numbers; spans under `^^^` in diagnostics | Parser already tracks lines; columns are moderate work. |
 
-## v0.6.0 (tooling)
+## v0.7.0 (tooling)
 | Feature | Sketch |
 |---|---|
 | **Syntax highlighting** | Tree-sitter grammar (`tree-sitter-boli`) + VS Code extension — grammar already exists in effect as the lexer. |

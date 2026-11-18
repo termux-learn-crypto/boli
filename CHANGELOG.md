@@ -2,6 +2,15 @@
 
 All notable changes to BOLI. BOLI follows [Semantic Versioning](https://semver.org/): breaking changes bump the minor digit (pre-1.0).
 
+## [0.5.0] — 2026-11-18
+
+### Added
+- **Runtime tracebacks:** runtime errors inside nested `kaam`s now print the call chain, innermost first: `kaam '<name>' ke andar (line N)`. `BoliError.trace` carries the frames; top-level errors are unchanged.
+- **Interpreter module split:** `interpreter.rs` → `interpreter/{mod,value,eval}.rs` (no behavior change, public API unchanged).
+
+### Internal
+- 112 tests (93 library + 19 CLI). Gates green: fmt/check/test/clippy -D warnings/release build.
+
 ## [0.4.0] — 2026-11-18
 
 ### Added

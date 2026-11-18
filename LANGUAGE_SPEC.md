@@ -1,6 +1,6 @@
-# BOLI Language Specification (v0.4.0)
+# BOLI Language Specification (v0.5.0)
 
-**Version:** 0.4.0 · **File extension:** `.hl` · **Implementation:** Rust (`cargo run -- run x.hl`, REPL via `cargo run`)
+**Version:** 0.5.0 · **File extension:** `.hl` · **Implementation:** Rust (`cargo run -- run x.hl`, REPL via `cargo run`)
 
 BOLI is a Hinglish-based programming language: Python-like simplicity, Hindi/English keywords, no symbols like `; { } ( ) = :`. Statements are one per line. Only words, numbers, quoted text and whitespace appear in a program.
 
@@ -165,6 +165,14 @@ Galti: line 4 me naam 'xyz' nahi mila
 
 CLI/REPL also print the offending source line with a `^` caret at the error position (clamped at EOF).
 
+Runtime errors inside `kaam`s carry a **traceback** (v0.5.0): after the error head-line, one line per call frame (innermost first) appears as `kaam '<name>' ke andar (line N)`. Top-level errors (no kaam involved) have no traceback. Example:
+
+```
+Galti: line 2 me naam 'naam2' nahi mila
+    kaam 'galti_wala' ke andar (line 6)
+    kaam 'namaste' ke andar (line 10)
+```
+
 ## 10. Contextual keywords
 
 - `kaam` — function keyword; also a valid variable name (`pucho kaam`, `kaam rakho` …).
@@ -187,6 +195,12 @@ Pure Rust, koi external dependency nahi. User-defined kaam in naam se shadow ho 
 | `sankhya` | `sankhya <text\|number>` | strict parse; galat text / overflow → Galti |
 
 Arity mismatch ek Hinglish Galti hai with exact expected count. Arguments eagerly evaluate hote hain (existing call rules).
+
+### v0.5.0 vs v0.4.0
+
+- **Interpreter module split:** `src/interpreter.rs` (942 lines) → `interpreter/{mod,value,eval}.rs`. Public API (`boli::interpreter::Environment`, `Value`, `boli::parser`) unchanged.
+- **Runtime tracebacks:** `BoliError.trace` carries the kaam call chain (innermost-first display). Errors inside nested kaams show each frame as `kaam '<name>' ke andar (line N)`. Top-level errors unchanged.
+- Same `.hl` programs run unchanged.
 
 ### v0.4.0 vs v0.3.1
 

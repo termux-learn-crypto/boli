@@ -1,4 +1,4 @@
-# BOLI — Security Report (v0.4.0)
+# BOLI — Security Report (v0.5.0)
 
 **Scope:** the interpreter and CLI as shipped in `boli` v0.3.0. **Threat model:** BOLI programs may come from untrusted authors (a user running someone else's `.hl`). The host process must not crash, hang forever, exhaust memory without bound, or misreport safety guarantees. **Not in scope:** confidentiality (a run program can legitimately print anything it is given), sandboxing of the target machine (BOLI cannot execute shell, files, or network — by design there is no such capability).
 
@@ -68,7 +68,10 @@ Remaining `unwrap`s are internal invariants (scope stack never empty; last token
 
 ## Verification performed (not claims — actual commands)
 
-- `cargo test` — 108/108 pass (89 library + 19 CLI)
+- `cargo test` — 112/112 pass (93 library + 19 CLI)
+
+## Runtime tracebacks (v0.5.0)
+`BoliError.trace` exposes the kaam call stack on runtime errors (innermost-first, name + call line). This discloses internal kaam names and call line numbers to whoever reads stderr — acceptable for a local interpreter (the program source is visible anyway), but worth noting for CI log hygiene. No new memory risk: frames are small and popped on every exit path (tested).
 
 ## Built-ins (v0.4.0) attack surface
 `lambayi`, `upar`, `neeche`, `text`, `sankhya` — all pure internal Rust; every allocation they make is bounded by the existing string caps (`BOLI_MAX_STRING_BYTES`), list caps (`BOLI_MAX_LIST_ITEMS`) and live-scope budget (`BOLI_MAX_TOTAL_BYTES`). No I/O, no filesystem, no network. `sankhya` rejects inf/NaN.

@@ -125,3 +125,22 @@ Five verified fixes, each reproduced before the change and re-verified after:
 | F9 | Repo layout for stdlib growth | `builtins.rs` is where all future builtins live; no `.hl`-level builtins, no unsafe |
 
 Verified: 108/108 tests green; `cargo fmt --check` ✓; `cargo clippy --all-targets --all-features -- -D warnings` ✓; release build ✓; REPL caret rendering manually verified.
+
+
+---
+
+# Appendix — v0.5.0 addendum (2026-11-18)
+
+| # | Change | Notes |
+|---|---|---|
+| F10 | Interpreter module split | `src/interpreter.rs` (942 lines) → `interpreter/{mod,value,eval}.rs`; no behavior change; `Environment`, `Value`, API unchanged |
+| F11 | Runtime tracebacks | `BoliError.trace` — kaam call chain (name, call line, innermost-first display); top-level errors unchanged; `trace` popped on every exit path |
+
+Verified: 112/112 tests green; example error output shows full chain:
+
+```
+Galti: line 2 me naam 'naam2' nahi mila
+    kaam 'galti_wala' ke andar (line 6)
+    kaam 'namaste' ke andar (line 10)
+    kaam 'shuru_karo' ke andar (line 13)
+```
