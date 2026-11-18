@@ -101,10 +101,10 @@ fn run_file(path: &str) {
     match parser::parse_source(&source) {
         Ok(program) => {
             let mut env = Environment::new();
-            if let Some(parent) = std::path::Path::new(path).parent() {
-                if !parent.as_os_str().is_empty() {
-                    env.set_source_dir(parent.to_path_buf());
-                }
+            if let Some(parent) = std::path::Path::new(path).parent()
+                && !parent.as_os_str().is_empty()
+            {
+                env.set_source_dir(parent.to_path_buf());
             }
             if let Err(e) = env.run_program(&program) {
                 show_boli_error(&source, &e);
