@@ -2,7 +2,7 @@
 
 use boli::ast::{BoliError, Expr, Stmt};
 use boli::interpreter::Environment;
-use boli::lexer::{lex, Tok};
+use boli::lexer::{Tok, lex};
 use boli::parser::parse_source;
 
 // helper: source chalao aur captured lines lo
@@ -31,14 +31,34 @@ fn run_two(src1: &str, src2: &str) -> (Result<(), BoliError>, Result<(), BoliErr
 fn lexer_simple_tokens() {
     let tokens = lex("likho jodo 5 aur 3").unwrap();
     let toks: Vec<Tok> = tokens.into_iter().map(|t| t.tok).collect();
-    assert_eq!(toks, vec![Tok::Likho, Tok::Jodo, Tok::Number(5.0), Tok::Aur, Tok::Number(3.0), Tok::Eof]);
+    assert_eq!(
+        toks,
+        vec![
+            Tok::Likho,
+            Tok::Jodo,
+            Tok::Number(5.0),
+            Tok::Aur,
+            Tok::Number(3.0),
+            Tok::Eof
+        ]
+    );
 }
 
 #[test]
 fn lexer_negative_number() {
     let tokens = lex("jodo jawab -5 aur 3").unwrap();
     let toks: Vec<Tok> = tokens.into_iter().map(|t| t.tok).collect();
-    assert_eq!(toks, vec![Tok::Jodo, Tok::Ident("jawab".into()), Tok::Number(-5.0), Tok::Aur, Tok::Number(3.0), Tok::Eof]);
+    assert_eq!(
+        toks,
+        vec![
+            Tok::Jodo,
+            Tok::Ident("jawab".into()),
+            Tok::Number(-5.0),
+            Tok::Aur,
+            Tok::Number(3.0),
+            Tok::Eof
+        ]
+    );
 }
 
 #[test]
@@ -78,7 +98,10 @@ fn parser_rakho_single_value() {
 fn parser_rakho_multiple_values_makes_list() {
     let stmts = parse_source("cheezein rakho 1 2 3").unwrap();
     match &stmts[0] {
-        Stmt::Rakho { value: Expr::List(items, _), .. } => assert_eq!(items.len(), 3),
+        Stmt::Rakho {
+            value: Expr::List(items, _),
+            ..
+        } => assert_eq!(items.len(), 3),
         other => panic!("List expect kiya tha, mila {:?}", other),
     }
 }
@@ -94,7 +117,10 @@ fn parser_ruk_agla_are_statements() {
 fn parser_hissa_expression() {
     let stmts = parse_source("y rakho cheezein hissa 1").unwrap();
     match &stmts[0] {
-        Stmt::Rakho { value: Expr::Index(_, idx, _), .. } => {
+        Stmt::Rakho {
+            value: Expr::Index(_, idx, _),
+            ..
+        } => {
             assert!(matches!(**idx, Expr::Number(1.0, _)));
         }
         other => panic!("Index expression expect kiya tha, mila {:?}", other),
@@ -104,7 +130,9 @@ fn parser_hissa_expression() {
 #[test]
 fn parser_list_assign_syntax() {
     let stmts = parse_source("cheezein hissa 2 rakho 99").unwrap();
-    assert!(matches!(&stmts[0], Stmt::ListAssign { target, index, .. } if target == "cheezein" && matches!(index, Expr::Number(2.0, _))));
+    assert!(
+        matches!(&stmts[0], Stmt::ListAssign { target, index, .. } if target == "cheezein" && matches!(index, Expr::Number(2.0, _)))
+    );
 }
 
 #[test]
@@ -125,9 +153,17 @@ fn parser_aur_ya_precedence_ast() {
     // ya-level: comparison a ya (comparison b aur c)
     let stmts = parse_source("agar a sahi barabar hai ya b galat barabar hai aur c galat barabar hai to\nlikho \"x\"\nkhatam").unwrap();
     if let Stmt::Agar { cond, .. } = &stmts[0] {
-        assert!(matches!(cond, boli::ast::Cond::Ya(_, _, _)), "root Ya hona chahiye, mila {:?}", cond);
+        assert!(
+            matches!(cond, boli::ast::Cond::Ya(_, _, _)),
+            "root Ya hona chahiye, mila {:?}",
+            cond
+        );
         if let boli::ast::Cond::Ya(_, right, _) = cond {
-            assert!(matches!(**right, boli::ast::Cond::Aur(_, _, _)), "right side Aur hona chahiye, mila {:?}", right);
+            assert!(
+                matches!(**right, boli::ast::Cond::Aur(_, _, _)),
+                "right side Aur hona chahiye, mila {:?}",
+                right
+            );
         }
     } else {
         panic!("Agar statement expect kiya tha");
@@ -143,7 +179,10 @@ fn eval_likho_jodo_inline() {
 
 #[test]
 fn eval_rakho_and_reuse() {
-    assert_eq!(run_out("naam rakho \"Vilas\"\nlikho naam").unwrap(), vec!["Vilas"]);
+    assert_eq!(
+        run_out("naam rakho \"Vilas\"\nlikho naam").unwrap(),
+        vec!["Vilas"]
+    );
 }
 
 #[test]
@@ -172,8 +211,16 @@ fn eval_negative_numbers() {
 
 #[test]
 fn agar_then_and_else() {
-    assert_eq!(run_out("agar 5 3 se bada hai to\nlikho \"bada\"\nnahi to\nlikho \"chhota\"\nkhatam").unwrap(), vec!["bada"]);
-    assert_eq!(run_out("agar 2 3 se bada hai to\nlikho \"bada\"\nnahi to\nlikho \"chhota\"\nkhatam").unwrap(), vec!["chhota"]);
+    assert_eq!(
+        run_out("agar 5 3 se bada hai to\nlikho \"bada\"\nnahi to\nlikho \"chhota\"\nkhatam")
+            .unwrap(),
+        vec!["bada"]
+    );
+    assert_eq!(
+        run_out("agar 2 3 se bada hai to\nlikho \"bada\"\nnahi to\nlikho \"chhota\"\nkhatam")
+            .unwrap(),
+        vec!["chhota"]
+    );
 }
 
 #[test]
@@ -199,24 +246,36 @@ fn agar_aur_ya_precedence() {
 
 #[test]
 fn range_loop_basic() {
-    assert_eq!(run_out("1 se 3 tak\nlikho ginti\nkhatam").unwrap(), vec!["1", "2", "3"]);
+    assert_eq!(
+        run_out("1 se 3 tak\nlikho ginti\nkhatam").unwrap(),
+        vec!["1", "2", "3"]
+    );
 }
 
 #[test]
 fn range_loop_negative() {
-    assert_eq!(run_out("-2 se 1 tak\nlikho ginti\nkhatam").unwrap(), vec!["-2", "-1", "0", "1"]);
+    assert_eq!(
+        run_out("-2 se 1 tak\nlikho ginti\nkhatam").unwrap(),
+        vec!["-2", "-1", "0", "1"]
+    );
 }
 
 #[test]
 fn range_loop_empty() {
-    assert_eq!(run_out("5 se 1 tak\nlikho ginti\nkhatam").unwrap(), Vec::<String>::new());
+    assert_eq!(
+        run_out("5 se 1 tak\nlikho ginti\nkhatam").unwrap(),
+        Vec::<String>::new()
+    );
 }
 
 #[test]
 fn range_loop_large_integers_exact() {
     // 2^52 se 2^52+2 tak sab exact represent hote hain
     let out = run_out("4503599627370496 se 4503599627370498 tak\nlikho ginti\nkhatam").unwrap();
-    assert_eq!(out, vec!["4503599627370496", "4503599627370497", "4503599627370498"]);
+    assert_eq!(
+        out,
+        vec!["4503599627370496", "4503599627370497", "4503599627370498"]
+    );
 }
 
 #[test]
@@ -234,12 +293,20 @@ fn while_loop_basic() {
 
 #[test]
 fn ruk_breaks_range_loop_real() {
-    assert_eq!(run_out("1 se 5 tak\nagar ginti 3 se bada hai to\nruk\nkhatam\nlikho ginti\nkhatam").unwrap(), vec!["1", "2", "3"]);
+    assert_eq!(
+        run_out("1 se 5 tak\nagar ginti 3 se bada hai to\nruk\nkhatam\nlikho ginti\nkhatam")
+            .unwrap(),
+        vec!["1", "2", "3"]
+    );
 }
 
 #[test]
 fn agla_skips_rest_of_iteration() {
-    assert_eq!(run_out("1 se 5 tak\nagar ginti 3 barabar hai to\nagla\nkhatam\nlikho ginti\nkhatam").unwrap(), vec!["1", "2", "4", "5"]);
+    assert_eq!(
+        run_out("1 se 5 tak\nagar ginti 3 barabar hai to\nagla\nkhatam\nlikho ginti\nkhatam")
+            .unwrap(),
+        vec!["1", "2", "4", "5"]
+    );
 }
 
 #[test]
@@ -251,10 +318,7 @@ fn ruk_outside_loop_is_error() {
 #[test]
 fn while_loop_error_restores_state() {
     // error ke baad same env me naya program chalna chahiye
-    let (r1, r2, out) = run_two(
-        "1 se 3 tak\nlikho xyz\nkhatam",
-        "likho \"after-error\"",
-    );
+    let (r1, r2, out) = run_two("1 se 3 tak\nlikho xyz\nkhatam", "likho \"after-error\"");
     assert!(r1.is_err());
     assert!(r2.is_ok());
     assert_eq!(out, vec!["after-error"]);
@@ -282,23 +346,35 @@ fn kaam_call_wapas_do_via_rakho() {
 
 #[test]
 fn kaam_call_zero_args() {
-    assert_eq!(run_out("kaam jawab_do\nwapas do 42\nkhatam\nlikho jawab_do").unwrap(), vec!["42"]);
+    assert_eq!(
+        run_out("kaam jawab_do\nwapas do 42\nkhatam\nlikho jawab_do").unwrap(),
+        vec!["42"]
+    );
 }
 
 #[test]
 fn kaam_call_variable_args_flat() {
     // BUG-001 fix: 2 variable arguments seedha pass hote hain
-    assert_eq!(run_out("kaam two_args x y\nlikho x\nlikho y\nkhatam\ntwo_args 7 9").unwrap(), vec!["7", "9"]);
+    assert_eq!(
+        run_out("kaam two_args x y\nlikho x\nlikho y\nkhatam\ntwo_args 7 9").unwrap(),
+        vec!["7", "9"]
+    );
 }
 
 #[test]
 fn kaam_nested_via_variable() {
-    assert_eq!(run_out("kaam inner\nwapas do 10\nkhatam\nt rakho inner\nlikho t").unwrap(), vec!["10"]);
+    assert_eq!(
+        run_out("kaam inner\nwapas do 10\nkhatam\nt rakho inner\nlikho t").unwrap(),
+        vec!["10"]
+    );
 }
 
 #[test]
 fn kaam_expression_as_argument() {
-    assert_eq!(run_out("kaam echo x\nlikho x\nkhatam\necho jodo 2 aur 3").unwrap(), vec!["5"]);
+    assert_eq!(
+        run_out("kaam echo x\nlikho x\nkhatam\necho jodo 2 aur 3").unwrap(),
+        vec!["5"]
+    );
 }
 
 #[test]
@@ -316,34 +392,52 @@ fn kaam_infinite_recursion_error() {
 #[test]
 fn global_not_overwritten_by_kaam_body() {
     // BUG-002 related: kaam me rakho bahar ka global nahi badalna chahiye
-    assert_eq!(run_out("x rakho 99\nkaam tweak\nx rakho 7\nkhatam\ntweak\nlikho x").unwrap(), vec!["99"]);
+    assert_eq!(
+        run_out("x rakho 99\nkaam tweak\nx rakho 7\nkhatam\ntweak\nlikho x").unwrap(),
+        vec!["99"]
+    );
 }
 
 #[test]
 fn kaam_can_read_global() {
-    assert_eq!(run_out("y rakho 5\nkaam reader\nlikho y\nkhatam\nreader").unwrap(), vec!["5"]);
+    assert_eq!(
+        run_out("y rakho 5\nkaam reader\nlikho y\nkhatam\nreader").unwrap(),
+        vec!["5"]
+    );
 }
 
 // ---------- Interpreter: lists ----------
 
 #[test]
 fn list_create_and_print() {
-    assert_eq!(run_out("cheezein rakho 1 2 3\nlikho cheezein").unwrap(), vec!["1, 2, 3"]);
+    assert_eq!(
+        run_out("cheezein rakho 1 2 3\nlikho cheezein").unwrap(),
+        vec!["1, 2, 3"]
+    );
 }
 
 #[test]
 fn list_index_hissa() {
-    assert_eq!(run_out("cheezein rakho 10 20 30\nlikho cheezein hissa 2").unwrap(), vec!["20"]);
+    assert_eq!(
+        run_out("cheezein rakho 10 20 30\nlikho cheezein hissa 2").unwrap(),
+        vec!["20"]
+    );
 }
 
 #[test]
 fn list_assign_hissa() {
-    assert_eq!(run_out("cheezein rakho 1 2 3\ncheezein hissa 2 rakho 99\nlikho cheezein").unwrap(), vec!["1, 99, 3"]);
+    assert_eq!(
+        run_out("cheezein rakho 1 2 3\ncheezein hissa 2 rakho 99\nlikho cheezein").unwrap(),
+        vec!["1, 99, 3"]
+    );
 }
 
 #[test]
 fn list_concat_with_jodo() {
-    assert_eq!(run_out("a rakho 1 2\nb rakho 3 4\nc rakho jodo a aur b\nlikho c").unwrap(), vec!["1, 2, 3, 4"]);
+    assert_eq!(
+        run_out("a rakho 1 2\nb rakho 3 4\nc rakho jodo a aur b\nlikho c").unwrap(),
+        vec!["1, 2, 3, 4"]
+    );
 }
 
 #[test]
@@ -395,7 +489,10 @@ fn arith_overflow_is_runtime_error_not_inf() {
 #[test]
 fn arith_normal_finite_results_still_work() {
     assert_eq!(run_out("likho jodo 100 aur 200").unwrap(), vec!["300"]);
-    assert_eq!(run_out("bhaag jawaab 10 ko 4 se\nlikho jawaab").unwrap(), vec!["2.5"]);
+    assert_eq!(
+        run_out("bhaag jawaab 10 ko 4 se\nlikho jawaab").unwrap(),
+        vec!["2.5"]
+    );
 }
 
 // ---------- misc regression ----------

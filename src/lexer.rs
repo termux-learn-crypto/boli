@@ -7,16 +7,36 @@ use crate::ast::BoliError;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Tok {
     // Keywords (rakhe hue shabd)
-    Likho, Rakho, Pucho,
-    Jodo, Ghatao, Guna, Bhaag,
-    Agar, Nahi, To, Khatam,
-    Se, Aur, Ya, Ko, Tak, Jab,
-    Bada, Chhota, Barabar, Hai,
-    Kaam, Wapas, Do,
-    Sahi, Galat, Khaali,
-    Hissa,      // list ka index (1 se shuru)
-    Ruk,        // break
-    Agla,       // continue
+    Likho,
+    Rakho,
+    Pucho,
+    Jodo,
+    Ghatao,
+    Guna,
+    Bhaag,
+    Agar,
+    Nahi,
+    To,
+    Khatam,
+    Se,
+    Aur,
+    Ya,
+    Ko,
+    Tak,
+    Jab,
+    Bada,
+    Chhota,
+    Barabar,
+    Hai,
+    Kaam,
+    Wapas,
+    Do,
+    Sahi,
+    Galat,
+    Khaali,
+    Hissa, // list ka index (1 se shuru)
+    Ruk,   // break
+    Agla,  // continue
     // Numbers (jaise 28 ya 99.50)
     Number(f64),
     // Shuru aur band hona wali quotes ke beech ka text
@@ -132,7 +152,7 @@ fn keyword(word: &str) -> Option<Tok> {
         "hissa" => Some(Tok::Hissa),
         "ruk" => Some(Tok::Ruk),
         "agla" => Some(Tok::Agla),
-        "break" => Some(Tok::Ruk),    // English alias
+        "break" => Some(Tok::Ruk), // English alias
         "continue" => Some(Tok::Agla),
         _ => None,
     }
@@ -156,7 +176,10 @@ pub fn lex(source: &str) -> Result<Vec<Token>, BoliError> {
 
         // Nai line
         if c == '\n' {
-            tokens.push(Token { tok: Tok::Newline, line });
+            tokens.push(Token {
+                tok: Tok::Newline,
+                line,
+            });
             line += 1;
             i += 1;
             continue;
@@ -212,13 +235,17 @@ pub fn lex(source: &str) -> Result<Vec<Token>, BoliError> {
                     "text pura nahi hua, band karne ke liye \" lagao",
                 ));
             }
-            tokens.push(Token { tok: Tok::Text(text), line: start_line });
+            tokens.push(Token {
+                tok: Tok::Text(text),
+                line: start_line,
+            });
             continue;
         }
 
         // Number - ankh laage hue, ek dot ho sakti hai (jaise 99.50 ya -7)
         // '-' sirf tab number ka hissa jab uske baad digit ho (BOLI me minus symbol allowed nahi)
-        if c.is_ascii_digit() || (c == '-' && i + 1 < chars.len() && chars[i + 1].is_ascii_digit()) {
+        if c.is_ascii_digit() || (c == '-' && i + 1 < chars.len() && chars[i + 1].is_ascii_digit())
+        {
             let start_line = line;
             let mut num = String::new();
             if c == '-' {
@@ -230,8 +257,10 @@ pub fn lex(source: &str) -> Result<Vec<Token>, BoliError> {
                 i += 1;
             }
             // Dot sirf tab lo jab uske baad digit ho (warna oh alag galti hai)
-            if i < chars.len() && chars[i] == '.'
-                && i + 1 < chars.len() && chars[i + 1].is_ascii_digit()
+            if i < chars.len()
+                && chars[i] == '.'
+                && i + 1 < chars.len()
+                && chars[i + 1].is_ascii_digit()
             {
                 num.push('.');
                 i += 1;
@@ -250,7 +279,10 @@ pub fn lex(source: &str) -> Result<Vec<Token>, BoliError> {
                     format!("'{}' bahut bada hai, finite number nahi hai", num),
                 ));
             }
-            tokens.push(Token { tok: Tok::Number(value), line: start_line });
+            tokens.push(Token {
+                tok: Tok::Number(value),
+                line: start_line,
+            });
             continue;
         }
 
@@ -264,8 +296,14 @@ pub fn lex(source: &str) -> Result<Vec<Token>, BoliError> {
             }
             let lower = word.to_lowercase();
             match keyword(&lower) {
-                Some(kw) => tokens.push(Token { tok: kw, line: start_line }),
-                None => tokens.push(Token { tok: Tok::Ident(word), line: start_line }),
+                Some(kw) => tokens.push(Token {
+                    tok: kw,
+                    line: start_line,
+                }),
+                None => tokens.push(Token {
+                    tok: Tok::Ident(word),
+                    line: start_line,
+                }),
             }
             continue;
         }
@@ -273,10 +311,16 @@ pub fn lex(source: &str) -> Result<Vec<Token>, BoliError> {
         // Koi symbol (jaise ; { } ( ) = : .) BOLI me allowed nahi
         return Err(BoliError::line(
             line,
-            format!("'{}' nahi chahiye, BOLI me sirf shabd, number aur \"text\" use hota hai", c),
+            format!(
+                "'{}' nahi chahiye, BOLI me sirf shabd, number aur \"text\" use hota hai",
+                c
+            ),
         ));
     }
 
-    tokens.push(Token { tok: Tok::Eof, line });
+    tokens.push(Token {
+        tok: Tok::Eof,
+        line,
+    });
     Ok(tokens)
 }

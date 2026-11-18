@@ -14,7 +14,10 @@ pub struct BoliError {
 impl BoliError {
     // Line number wali galti
     pub fn line(line: usize, message: impl Into<String>) -> Self {
-        BoliError { line: Some(line), message: message.into() }
+        BoliError {
+            line: Some(line),
+            message: message.into(),
+        }
     }
 }
 
@@ -52,11 +55,11 @@ impl ArithOp {
 // Tulna (comparison) ke operator
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CmpOp {
-    Bada,           // >
-    Chhota,         // <
-    BadaYaBarabar,  // >=
-    ChhotaYaBarabar,// <=
-    Barabar,        // ==
+    Bada,            // >
+    Chhota,          // <
+    BadaYaBarabar,   // >=
+    ChhotaYaBarabar, // <=
+    Barabar,         // ==
 }
 
 impl CmpOp {
@@ -76,9 +79,9 @@ impl CmpOp {
 pub enum Expr {
     Number(f64, usize),
     Text(String, usize),
-    Bool(bool, usize),   // sahi / galat
-    Khaali(usize),       // khaali (null)
-    Var(String, usize),  // variable ka naam
+    Bool(bool, usize),  // sahi / galat
+    Khaali(usize),      // khaali (null)
+    Var(String, usize), // variable ka naam
     // jodo/ghatao/guna/bhaag ka inline hisaab, jaise: likho jodo 5 aur 3
     Arith(ArithOp, Box<Expr>, Box<Expr>, usize),
     // Kaam ka bulana expression me bhi, jaise: likho jodo_kaam 2 3
@@ -92,7 +95,12 @@ pub enum Expr {
 // Condition - agar aur jab tak me use hoti hai
 #[derive(Debug, Clone, PartialEq)]
 pub enum Cond {
-    Cmp { left: Expr, op: CmpOp, right: Expr, line: usize },
+    Cmp {
+        left: Expr,
+        op: CmpOp,
+        right: Expr,
+        line: usize,
+    },
     Aur(Box<Cond>, Box<Cond>, usize), // dono sahi ho tabhi sahi
     Ya(Box<Cond>, Box<Cond>, usize),  // koi ek bhi sahi ho tab bhi sahi
 }
@@ -103,29 +111,74 @@ pub enum Stmt {
     // likho <expr>
     Likho(Expr, usize),
     // <naam> rakho <expr>
-    Rakho { name: String, value: Expr, line: usize },
+    Rakho {
+        name: String,
+        value: Expr,
+        line: usize,
+    },
     // pucho <naam> "sawal"
-    Pucho { name: String, prompt: String, line: usize },
+    Pucho {
+        name: String,
+        prompt: String,
+        line: usize,
+    },
     // jodo <var> <a> aur <b>  (rakho NAHI, bas jodo/ghatao/guna/bhaag)
-    ArithAssign { target: String, op: ArithOp, left: Expr, right: Expr, line: usize },
+    ArithAssign {
+        target: String,
+        op: ArithOp,
+        left: Expr,
+        right: Expr,
+        line: usize,
+    },
     // agar <cond> to ... nahi to ... khatam
-    Agar { cond: Cond, then_block: Vec<Stmt>, else_block: Option<Vec<Stmt>>, line: usize },
+    Agar {
+        cond: Cond,
+        then_block: Vec<Stmt>,
+        else_block: Option<Vec<Stmt>>,
+        line: usize,
+    },
     // 1 se 5 tak ... khatam   (ginti naam ka variable apne aap milta hai)
-    RangeLoop { from: Expr, to: Expr, body: Vec<Stmt>, line: usize },
+    RangeLoop {
+        from: Expr,
+        to: Expr,
+        body: Vec<Stmt>,
+        line: usize,
+    },
     // jab tak <cond> to ... khatam
-    WhileLoop { cond: Cond, body: Vec<Stmt>, line: usize },
+    WhileLoop {
+        cond: Cond,
+        body: Vec<Stmt>,
+        line: usize,
+    },
     // kaam <naam> <params> ... khatam
-    KaamDef { name: String, params: Vec<String>, body: Vec<Stmt>, line: usize },
+    KaamDef {
+        name: String,
+        params: Vec<String>,
+        body: Vec<Stmt>,
+        line: usize,
+    },
     // <naam> <args>   (kaam ko bulana)
-    KaamCall { name: String, args: Vec<Expr>, line: usize },
+    KaamCall {
+        name: String,
+        args: Vec<Expr>,
+        line: usize,
+    },
     // wapas do <expr>
-    Wapas { value: Option<Expr>, line: usize },
+    Wapas {
+        value: Option<Expr>,
+        line: usize,
+    },
     // ruk   (break - loop se bahar)
     Ruk(usize),
     // agla  (continue - agli ginti pe jao)
     Agla(usize),
     // cheezein hissa 2 rakho 99   (list ke ek hisse ko badlo)
-    ListAssign { target: String, index: Expr, value: Expr, line: usize },
+    ListAssign {
+        target: String,
+        index: Expr,
+        value: Expr,
+        line: usize,
+    },
 }
 
 // Pura program statements ki list hai

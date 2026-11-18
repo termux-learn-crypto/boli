@@ -8,7 +8,6 @@ use std::fs;
 use std::io::{self, Write};
 use std::process;
 
-
 fn main() {
     let args: Vec<String> = env::args().collect();
 
@@ -157,7 +156,8 @@ fn repl() {
             }
             // range loop: last shabd "tak" ho to block khulta hai
             // ("jab tak ..." pehle hi count ho chuka hai, dobara mat jodo)
-            if words.len() > 1 && words.last().map(|s| s.as_str()) == Some("tak")
+            if words.len() > 1
+                && words.last().map(|s| s.as_str()) == Some("tak")
                 && words.first().map(|s| s.as_str()) != Some("jab")
             {
                 depth += 1;

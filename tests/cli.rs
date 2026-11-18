@@ -19,7 +19,11 @@ fn write_program(name: &str, contents: &str) -> PathBuf {
 
 // program chalao, stdin feed karo, exit code / stdout / stderr do
 // har test ka apna file naam (tests parallel chalte hain)
-fn run_with_stdin(name: &str, program: &str, stdin_text: &str) -> (std::process::ExitStatus, String, String) {
+fn run_with_stdin(
+    name: &str,
+    program: &str,
+    stdin_text: &str,
+) -> (std::process::ExitStatus, String, String) {
     let path = write_program(name, program);
     let mut child = Command::new(boli_bin())
         .arg("run")
@@ -78,7 +82,11 @@ fn cli_repl_extra_khatam_does_not_latch() {
     }
     let output = child.wait_with_output().unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("after-khatam"), "REPL ne text nahi print kiya: {}", stdout);
+    assert!(
+        stdout.contains("after-khatam"),
+        "REPL ne text nahi print kiya: {}",
+        stdout
+    );
     assert!(output.status.success());
 }
 
@@ -92,11 +100,19 @@ fn cli_repl_multiblock() {
     {
         let stdin = child.stdin.as_mut().unwrap();
         // multi-line block REPL me abhi bhi kaam karta hai
-        write!(stdin, "agar 5 3 se bada hai to\nlikho \"inside\"\nkhatam\nnikalo\n").unwrap();
+        write!(
+            stdin,
+            "agar 5 3 se bada hai to\nlikho \"inside\"\nkhatam\nnikalo\n"
+        )
+        .unwrap();
     }
     let output = child.wait_with_output().unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("inside"), "multi-block REPL nahi chala: {}", stdout);
+    assert!(
+        stdout.contains("inside"),
+        "multi-block REPL nahi chala: {}",
+        stdout
+    );
 }
 
 #[test]
@@ -121,17 +137,23 @@ fn cli_calculator2_example_works() {
 
 #[test]
 fn cli_pucho_nan_stays_text() {
-    let (status, stdout, _) = run_with_stdin("nan.hl",
+    let (status, stdout, _) = run_with_stdin(
+        "nan.hl",
         "pucho x \"X: \"\njodo y x aur 1\nlikho y",
         "nan\n",
     );
     assert!(status.success());
-    assert!(stdout.contains("nan1"), "nan text banana chahiye tha, got: {}", stdout);
+    assert!(
+        stdout.contains("nan1"),
+        "nan text banana chahiye tha, got: {}",
+        stdout
+    );
 }
 
 #[test]
 fn cli_pucho_inf_stays_text() {
-    let (status, stdout, _) = run_with_stdin("inf.hl",
+    let (status, stdout, _) = run_with_stdin(
+        "inf.hl",
         "pucho x \"X: \"\njodo y x aur 1\nlikho y",
         "inf\n",
     );
@@ -141,7 +163,8 @@ fn cli_pucho_inf_stays_text() {
 
 #[test]
 fn cli_pucho_negative_infinity_stays_text() {
-    let (status, stdout, _) = run_with_stdin("neg_inf.hl",
+    let (status, stdout, _) = run_with_stdin(
+        "neg_inf.hl",
         "pucho x \"X: \"\njodo y x aur 1\nlikho y",
         "-Infinity\n",
     );
@@ -151,7 +174,8 @@ fn cli_pucho_negative_infinity_stays_text() {
 
 #[test]
 fn cli_pucho_infinity_word_stays_text() {
-    let (status, stdout, _) = run_with_stdin("inf_word.hl",
+    let (status, stdout, _) = run_with_stdin(
+        "inf_word.hl",
         "pucho x \"X: \"\njodo y x aur 1\nlikho y",
         "Infinity\n",
     );
@@ -161,7 +185,8 @@ fn cli_pucho_infinity_word_stays_text() {
 
 #[test]
 fn cli_pucho_number_works_as_number() {
-    let (status, stdout, _) = run_with_stdin("decimal.hl",
+    let (status, stdout, _) = run_with_stdin(
+        "decimal.hl",
         "pucho x \"X: \"\njodo y x aur 1\nlikho y",
         "99.50\n",
     );
@@ -171,7 +196,8 @@ fn cli_pucho_number_works_as_number() {
 
 #[test]
 fn cli_pucho_huge_finite_number_stays_number() {
-    let (status, stdout, _) = run_with_stdin("huge.hl",
+    let (status, stdout, _) = run_with_stdin(
+        "huge.hl",
         "pucho x \"X: \"\njodo y x aur 0\nlikho y",
         "1.7976931348623157e308\n",
     );
@@ -182,12 +208,17 @@ fn cli_pucho_huge_finite_number_stays_number() {
 
 #[test]
 fn cli_reken_overflow_is_hinglish_error_not_inf() {
-    let (status, stdout, stderr) = run_with_stdin("overflow.hl",
+    let (status, stdout, stderr) = run_with_stdin(
+        "overflow.hl",
         "y rakho 1000000000000000\nguna y y ko y se\nguna y y ko y se\nguna y y ko y se\nguna y y ko y se\nguna y y ko y se\nlikho y",
         "",
     );
     assert!(!status.success());
-    assert!(stderr.contains("finite nahi raha"), "overflow error expect kiya tha, got: {}", stderr);
+    assert!(
+        stderr.contains("finite nahi raha"),
+        "overflow error expect kiya tha, got: {}",
+        stderr
+    );
     let _ = stdout;
 }
 

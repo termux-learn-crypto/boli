@@ -11,8 +11,8 @@ use crate::ast::{ArithOp, BoliError, CmpOp, Cond, Expr, Stmt};
 pub enum Value {
     Text(String),
     Number(f64),
-    Bool(bool),     // sahi / galat
-    Khaali,         // khaali (null)
+    Bool(bool),       // sahi / galat
+    Khaali,           // khaali (null)
     List(Vec<Value>), // cheezein rakho 1 2 3
 }
 
@@ -27,9 +27,19 @@ impl Value {
                     format!("{}", n)
                 }
             }
-            Value::Bool(b) => if *b { "sahi".to_string() } else { "galat".to_string() },
+            Value::Bool(b) => {
+                if *b {
+                    "sahi".to_string()
+                } else {
+                    "galat".to_string()
+                }
+            }
             Value::Khaali => "khaali".to_string(),
-            Value::List(items) => items.iter().map(|v| v.dikhane_laayak()).collect::<Vec<_>>().join(", "),
+            Value::List(items) => items
+                .iter()
+                .map(|v| v.dikhane_laayak())
+                .collect::<Vec<_>>()
+                .join(", "),
         }
     }
 
@@ -129,16 +139,28 @@ impl Environment {
     }
 
     fn set(&mut self, name: &str, value: Value) {
-        self.scopes.last_mut().unwrap().insert(name.to_string(), value);
+        self.scopes
+            .last_mut()
+            .unwrap()
+            .insert(name.to_string(), value);
     }
 
     pub fn run_program(&mut self, stmts: &[Stmt]) -> Result<(), BoliError> {
         self.reset_steps();
         match self.run_block(stmts)? {
             Flow::Normal => Ok(()),
-            Flow::Wapas(_, line) => Err(BoliError::line(line, "'wapas do' sirf kaam ke andar use hota hai")),
-            Flow::Ruk(line) => Err(BoliError::line(line, "'ruk' sirf loop ke andar use hota hai")),
-            Flow::Agla(line) => Err(BoliError::line(line, "'agla' sirf loop ke andar use hota hai")),
+            Flow::Wapas(_, line) => Err(BoliError::line(
+                line,
+                "'wapas do' sirf kaam ke andar use hota hai",
+            )),
+            Flow::Ruk(line) => Err(BoliError::line(
+                line,
+                "'ruk' sirf loop ke andar use hota hai",
+            )),
+            Flow::Agla(line) => Err(BoliError::line(
+                line,
+                "'agla' sirf loop ke andar use hota hai",
+            )),
         }
     }
 
@@ -155,7 +177,13 @@ impl Environment {
     fn run_stmt(&mut self, stmt: &Stmt) -> Result<Flow, BoliError> {
         self.steps += 1;
         if self.steps > self.max_steps {
-            return Err(BoliError::line(stmt.line_for_error(), format!("program bahut zyada steps chal gaya (max {}), infinite loop to nahi?", self.max_steps)));
+            return Err(BoliError::line(
+                stmt.line_for_error(),
+                format!(
+                    "program bahut zyada steps chal gaya (max {}), infinite loop to nahi?",
+                    self.max_steps
+                ),
+            ));
         }
 
         match stmt {
@@ -181,17 +209,24 @@ impl Environment {
                     self.set(name, Value::Khaali);
                     return Ok(Flow::Normal);
                 }
-                let prompt_ok = write!(io::stdout(), "{}", prompt).is_ok() && io::stdout().flush().is_ok();
+                let prompt_ok =
+                    write!(io::stdout(), "{}", prompt).is_ok() && io::stdout().flush().is_ok();
                 if !prompt_ok {
                     std::process::exit(0);
                 }
                 let mut line_in = String::new();
-                io::stdin().read_line(&mut line_in).map_err(|_| BoliError::line(*line, "input nahi mil raha"))?;
+                io::stdin()
+                    .read_line(&mut line_in)
+                    .map_err(|_| BoliError::line(*line, "input nahi mil raha"))?;
                 let trimmed = line_in.trim();
                 let value = if trimmed.is_empty() {
                     Value::Khaali
                 } else if let Ok(n) = trimmed.parse::<f64>() {
-                    if n.is_finite() { Value::Number(n) } else { Value::Text(trimmed.to_string()) }
+                    if n.is_finite() {
+                        Value::Number(n)
+                    } else {
+                        Value::Text(trimmed.to_string())
+                    }
                 } else if trimmed == "sahi" {
                     Value::Bool(true)
                 } else if trimmed == "galat" {
@@ -204,14 +239,25 @@ impl Environment {
                 self.set(name, value);
                 Ok(Flow::Normal)
             }
-            Stmt::ArithAssign { target, op, left, right, line } => {
+            Stmt::ArithAssign {
+                target,
+                op,
+                left,
+                right,
+                line,
+            } => {
                 let left_v = self.eval_expr(left)?;
                 let right_v = self.eval_expr(right)?;
                 let value = eval_arith(*op, &left_v, &right_v, *line, self.max_string_bytes)?;
                 self.set(target, value);
                 Ok(Flow::Normal)
             }
-            Stmt::Agar { cond, then_block, else_block, .. } => {
+            Stmt::Agar {
+                cond,
+                then_block,
+                else_block,
+                ..
+            } => {
                 if self.eval_cond(cond)? {
                     self.run_block(then_block)
                 } else if let Some(block) = else_block {
@@ -220,7 +266,12 @@ impl Environment {
                     Ok(Flow::Normal)
                 }
             }
-            Stmt::RangeLoop { from, to, body, line } => {
+            Stmt::RangeLoop {
+                from,
+                to,
+                body,
+                line,
+            } => {
                 let from_v = self.eval_expr(from)?;
                 let to_v = self.eval_expr(to)?;
                 let from_n = as_number(&from_v, *line, "se ke pehle")?;
@@ -232,7 +283,9 @@ impl Environment {
                         return Err(BoliError::line(*line, "range bahut badi hai"));
                     }
                     match distance.to_i64_checked() {
-                        Some(d) => d.checked_add(1).ok_or_else(|| BoliError::line(*line, "range itni badi hai ki chal nahi sakti"))?,
+                        Some(d) => d.checked_add(1).ok_or_else(|| {
+                            BoliError::line(*line, "range itni badi hai ki chal nahi sakti")
+                        })?,
                         None => return Err(BoliError::line(*line, "range bahut badi hai")),
                     }
                 } else {
@@ -244,9 +297,18 @@ impl Environment {
                     for i in 0..count {
                         self.steps += 1;
                         if self.steps > self.max_steps {
-                            return Err(BoliError::line(*line, format!("program bahut zyada steps chal gaya (max {}), infinite loop to nahi?", self.max_steps)));
+                            return Err(BoliError::line(
+                                *line,
+                                format!(
+                                    "program bahut zyada steps chal gaya (max {}), infinite loop to nahi?",
+                                    self.max_steps
+                                ),
+                            ));
                         }
-                        self.scopes.last_mut().unwrap().insert("ginti".to_string(), Value::Number(from_n + i as f64));
+                        self.scopes
+                            .last_mut()
+                            .unwrap()
+                            .insert("ginti".to_string(), Value::Number(from_n + i as f64));
                         match self.run_block(body)? {
                             Flow::Normal => {}
                             Flow::Wapas(value, wline) => return Ok(Flow::Wapas(value, wline)),
@@ -263,9 +325,17 @@ impl Environment {
                 loop {
                     self.steps += 1;
                     if self.steps > self.max_steps {
-                        return Err(BoliError::line(stmt.line_for_error(), format!("program bahut zyada steps chal gaya (max {}), infinite loop to nahi?", self.max_steps)));
+                        return Err(BoliError::line(
+                            stmt.line_for_error(),
+                            format!(
+                                "program bahut zyada steps chal gaya (max {}), infinite loop to nahi?",
+                                self.max_steps
+                            ),
+                        ));
                     }
-                    if !self.eval_cond(cond)? { break; }
+                    if !self.eval_cond(cond)? {
+                        break;
+                    }
                     match self.run_block(body)? {
                         Flow::Normal => {}
                         Flow::Wapas(value, line) => return Ok(Flow::Wapas(value, line)),
@@ -275,11 +345,25 @@ impl Environment {
                 }
                 Ok(Flow::Normal)
             }
-            Stmt::KaamDef { name, params, body, line } => {
+            Stmt::KaamDef {
+                name,
+                params,
+                body,
+                line,
+            } => {
                 if self.kaam.contains_key(name) {
-                    return Err(BoliError::line(*line, format!("kaam '{}' pehle se bana hua hai", name)));
+                    return Err(BoliError::line(
+                        *line,
+                        format!("kaam '{}' pehle se bana hua hai", name),
+                    ));
                 }
-                self.kaam.insert(name.clone(), Kaam { params: params.clone(), body: body.clone() });
+                self.kaam.insert(
+                    name.clone(),
+                    Kaam {
+                        params: params.clone(),
+                        body: body.clone(),
+                    },
+                );
                 Ok(Flow::Normal)
             }
             Stmt::KaamCall { name, args, line } => {
@@ -295,29 +379,56 @@ impl Environment {
             }
             Stmt::Ruk(line) => Ok(Flow::Ruk(*line)),
             Stmt::Agla(line) => Ok(Flow::Agla(*line)),
-            Stmt::ListAssign { target, index, value, line } => {
+            Stmt::ListAssign {
+                target,
+                index,
+                value,
+                line,
+            } => {
                 self.list_assign(target, index, value, *line)?;
                 Ok(Flow::Normal)
             }
         }
     }
 
-    fn list_assign(&mut self, target: &str, index: &Expr, value: &Expr, line: usize) -> Result<(), BoliError> {
+    fn list_assign(
+        &mut self,
+        target: &str,
+        index: &Expr,
+        value: &Expr,
+        line: usize,
+    ) -> Result<(), BoliError> {
         let idx_v = self.eval_expr(index)?;
         let idx = as_number(&idx_v, line, "hissa ke liye")?;
         if idx.fract() != 0.0 || idx < 1.0 {
-            return Err(BoliError::line(line, "hissa 1 se shuru hone wali integer ginti honi chahiye"));
+            return Err(BoliError::line(
+                line,
+                "hissa 1 se shuru hone wali integer ginti honi chahiye",
+            ));
         }
         let i = idx as usize;
         let new_value = self.eval_expr(value)?;
         let mut current = match self.get(target) {
             Some(v) => v,
-            None => return Err(BoliError::line(line, format!("naam '{}' nahi mila", target))),
+            None => {
+                return Err(BoliError::line(
+                    line,
+                    format!("naam '{}' nahi mila", target),
+                ));
+            }
         };
         match &mut current {
             Value::List(items) => {
                 if i > items.len() {
-                    return Err(BoliError::line(line, format!("'{}' me sirf {} hisse hain, {} maanga", target, items.len(), i)));
+                    return Err(BoliError::line(
+                        line,
+                        format!(
+                            "'{}' me sirf {} hisse hain, {} maanga",
+                            target,
+                            items.len(),
+                            i
+                        ),
+                    ));
                 }
                 items[i - 1] = new_value;
             }
@@ -328,13 +439,34 @@ impl Environment {
     }
 
     fn call_kaam(&mut self, name: &str, args: Vec<Expr>, line: usize) -> Result<Value, BoliError> {
-        let arg_values: Vec<Value> = args.iter().map(|a| self.eval_expr(a)).collect::<Result<_, _>>()?;
-        let kaam = self.kaam.get(name).cloned().ok_or_else(|| BoliError::line(line, format!("kaam '{}' nahi mila", name)))?;
+        let arg_values: Vec<Value> = args
+            .iter()
+            .map(|a| self.eval_expr(a))
+            .collect::<Result<_, _>>()?;
+        let kaam = self
+            .kaam
+            .get(name)
+            .cloned()
+            .ok_or_else(|| BoliError::line(line, format!("kaam '{}' nahi mila", name)))?;
         if kaam.params.len() != arg_values.len() {
-            return Err(BoliError::line(line, format!("kaam '{}' ko {} cheezein chahiye, {} di gai", name, kaam.params.len(), arg_values.len())));
+            return Err(BoliError::line(
+                line,
+                format!(
+                    "kaam '{}' ko {} cheezein chahiye, {} di gai",
+                    name,
+                    kaam.params.len(),
+                    arg_values.len()
+                ),
+            ));
         }
         if self.call_depth >= self.max_call_depth {
-            return Err(BoliError::line(line, format!("kaam '{}' bahut zyada gehra ho gaya (max {}), infinite recursion to nahi?", name, self.max_call_depth)));
+            return Err(BoliError::line(
+                line,
+                format!(
+                    "kaam '{}' bahut zyada gehra ho gaya (max {}), infinite recursion to nahi?",
+                    name, self.max_call_depth
+                ),
+            ));
         }
         self.call_depth += 1;
         self.push_scope();
@@ -347,8 +479,14 @@ impl Environment {
         match result? {
             Flow::Normal => Ok(Value::Khaali),
             Flow::Wapas(value, _) => Ok(value),
-            Flow::Ruk(rline) => Err(BoliError::line(rline, "'ruk' sirf loop ke andar use hota hai")),
-            Flow::Agla(aline) => Err(BoliError::line(aline, "'agla' sirf loop ke andar use hota hai")),
+            Flow::Ruk(rline) => Err(BoliError::line(
+                rline,
+                "'ruk' sirf loop ke andar use hota hai",
+            )),
+            Flow::Agla(aline) => Err(BoliError::line(
+                aline,
+                "'agla' sirf loop ke andar use hota hai",
+            )),
         }
     }
 
@@ -357,7 +495,10 @@ impl Environment {
         self.eval_depth += 1;
         if self.eval_depth > 256 {
             self.eval_depth -= 1;
-            return Err(BoliError::line(expr.line_for_error(), "expression bahut zyada gehra hai (max 256)"));
+            return Err(BoliError::line(
+                expr.line_for_error(),
+                "expression bahut zyada gehra hai (max 256)",
+            ));
         }
         let result = self.eval_expr_inner(expr);
         self.eval_depth -= 1;
@@ -371,11 +512,22 @@ impl Environment {
             Expr::Bool(b, _) => Ok(Value::Bool(*b)),
             Expr::Khaali(_) => Ok(Value::Khaali),
             Expr::Var(name, line) => {
-                if let Some(v) = self.get(name) { return Ok(v); }
+                if let Some(v) = self.get(name) {
+                    return Ok(v);
+                }
                 match self.kaam.get(name) {
-                    Some(kaam) if kaam.params.is_empty() => return self.call_kaam(name, Vec::new(), *line),
+                    Some(kaam) if kaam.params.is_empty() => {
+                        return self.call_kaam(name, Vec::new(), *line);
+                    }
                     Some(kaam) => {
-                        return Err(BoliError::line(*line, format!("kaam '{}' ko {} cheezein chahiye, seedha call karo", name, kaam.params.len())));
+                        return Err(BoliError::line(
+                            *line,
+                            format!(
+                                "kaam '{}' ko {} cheezein chahiye, seedha call karo",
+                                name,
+                                kaam.params.len()
+                            ),
+                        ));
                     }
                     None => {}
                 }
@@ -388,7 +540,10 @@ impl Environment {
             }
             Expr::Call(name, args, line) => self.call_kaam(name, args.clone(), *line),
             Expr::List(items, _) => {
-                let values = items.iter().map(|e| self.eval_expr(e)).collect::<Result<Vec<_>, _>>()?;
+                let values = items
+                    .iter()
+                    .map(|e| self.eval_expr(e))
+                    .collect::<Result<Vec<_>, _>>()?;
                 Ok(Value::List(values))
             }
             Expr::Index(target, index, line) => {
@@ -396,19 +551,40 @@ impl Environment {
                 let idx_v = self.eval_expr(index)?;
                 let idx = as_number(&idx_v, *line, "hissa ke liye")?;
                 if idx.fract() != 0.0 || idx < 1.0 {
-                    return Err(BoliError::line(*line, "hissa 1 se shuru hone wali integer ginti honi chahiye"));
+                    return Err(BoliError::line(
+                        *line,
+                        "hissa 1 se shuru hone wali integer ginti honi chahiye",
+                    ));
                 }
                 let i = idx as usize;
                 match target_v {
                     Value::List(items) => {
-                        if i > items.len() { return Err(BoliError::line(*line, format!("list me sirf {} hisse hain, {} maanga", items.len(), i))); }
+                        if i > items.len() {
+                            return Err(BoliError::line(
+                                *line,
+                                format!("list me sirf {} hisse hain, {} maanga", items.len(), i),
+                            ));
+                        }
                         Ok(items[i - 1].clone())
                     }
                     Value::Text(s) => match s.chars().nth(i - 1) {
                         Some(c) => Ok(Value::Text(c.to_string())),
-                        None => Err(BoliError::line(*line, format!("text me sirf {} unicode chars hain, {} maanga", s.chars().count(), i))),
+                        None => Err(BoliError::line(
+                            *line,
+                            format!(
+                                "text me sirf {} unicode chars hain, {} maanga",
+                                s.chars().count(),
+                                i
+                            ),
+                        )),
                     },
-                    other => Err(BoliError::line(*line, format!("hissa sirf list ya text pe chal sakta hai, {} pe nahi", other.type_naam()))),
+                    other => Err(BoliError::line(
+                        *line,
+                        format!(
+                            "hissa sirf list ya text pe chal sakta hai, {} pe nahi",
+                            other.type_naam()
+                        ),
+                    )),
                 }
             }
         }
@@ -416,7 +592,12 @@ impl Environment {
 
     fn eval_cond(&mut self, cond: &Cond) -> Result<bool, BoliError> {
         match cond {
-            Cond::Cmp { left, op, right, line } => {
+            Cond::Cmp {
+                left,
+                op,
+                right,
+                line,
+            } => {
                 let left_v = self.eval_expr(left)?;
                 let right_v = self.eval_expr(right)?;
                 Ok(compare(*op, &left_v, &right_v, *line)?)
@@ -428,7 +609,9 @@ impl Environment {
 }
 
 impl Default for Environment {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 trait F64ToI64Checked {
@@ -437,17 +620,28 @@ trait F64ToI64Checked {
 
 impl F64ToI64Checked for f64 {
     fn to_i64_checked(self) -> Option<i64> {
-        if self < i64::MIN as f64 || self >= (i64::MAX as f64) { None } else { Some(self as i64) }
+        if self < i64::MIN as f64 || self >= (i64::MAX as f64) {
+            None
+        } else {
+            Some(self as i64)
+        }
     }
 }
 
 fn env_limit(name: &str, default: u64) -> u64 {
-    std::env::var(name).ok().and_then(|v| v.parse::<u64>().ok()).filter(|&v| v > 0).unwrap_or(default)
+    std::env::var(name)
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .filter(|&v| v > 0)
+        .unwrap_or(default)
 }
 
 fn checked_text(s: String, line: usize, max_string_bytes: usize) -> Result<Value, BoliError> {
     if s.len() > max_string_bytes {
-        return Err(BoliError::line(line, format!("text bahut bada ho gaya (max {} bytes)", max_string_bytes)));
+        return Err(BoliError::line(
+            line,
+            format!("text bahut bada ho gaya (max {} bytes)", max_string_bytes),
+        ));
     }
     Ok(Value::Text(s))
 }
@@ -455,11 +649,20 @@ fn checked_text(s: String, line: usize, max_string_bytes: usize) -> Result<Value
 fn as_number(value: &Value, line: usize, kahan: &str) -> Result<f64, BoliError> {
     match value {
         Value::Number(n) => Ok(*n),
-        other => Err(BoliError::line(line, format!("{} number chahiye, par {} mila", kahan, other.type_naam()))),
+        other => Err(BoliError::line(
+            line,
+            format!("{} number chahiye, par {} mila", kahan, other.type_naam()),
+        )),
     }
 }
 
-fn eval_arith(op: ArithOp, left: &Value, right: &Value, line: usize, max_string_bytes: usize) -> Result<Value, BoliError> {
+fn eval_arith(
+    op: ArithOp,
+    left: &Value,
+    right: &Value,
+    line: usize,
+    max_string_bytes: usize,
+) -> Result<Value, BoliError> {
     if op == ArithOp::Jodo
         && let (Value::List(a), Value::List(b)) = (left, right)
     {
@@ -472,7 +675,11 @@ fn eval_arith(op: ArithOp, left: &Value, right: &Value, line: usize, max_string_
             return checked_text(format!("{}{}", a, b), line, max_string_bytes);
         }
         if matches!(left, Value::Text(_)) || matches!(right, Value::Text(_)) {
-            return checked_text(format!("{}{}", left.dikhane_laayak(), right.dikhane_laayak()), line, max_string_bytes);
+            return checked_text(
+                format!("{}{}", left.dikhane_laayak(), right.dikhane_laayak()),
+                line,
+                max_string_bytes,
+            );
         }
     }
     let a = as_number(left, line, op.naam())?;
@@ -482,18 +689,28 @@ fn eval_arith(op: ArithOp, left: &Value, right: &Value, line: usize, max_string_
         ArithOp::Ghatao => a - b,
         ArithOp::Guna => a * b,
         ArithOp::Bhaag => {
-            if b == 0.0 { return Err(BoliError::line(line, "zero se bhaag nahi kar sakte")); }
+            if b == 0.0 {
+                return Err(BoliError::line(line, "zero se bhaag nahi kar sakte"));
+            }
             a / b
         }
     };
     if !result.is_finite() {
-        return Err(BoliError::line(line, format!("'{}' ka result finite nahi raha, number bahut bada hai", op.naam())));
+        return Err(BoliError::line(
+            line,
+            format!(
+                "'{}' ka result finite nahi raha, number bahut bada hai",
+                op.naam()
+            ),
+        ));
     }
     Ok(Value::Number(result))
 }
 
 fn compare(op: CmpOp, left: &Value, right: &Value, line: usize) -> Result<bool, BoliError> {
-    if op == CmpOp::Barabar { return Ok(values_equal(left, right)); }
+    if op == CmpOp::Barabar {
+        return Ok(values_equal(left, right));
+    }
     match (left, right) {
         (Value::Number(a), Value::Number(b)) => Ok(match op {
             CmpOp::Bada => a > b,
@@ -509,7 +726,15 @@ fn compare(op: CmpOp, left: &Value, right: &Value, line: usize) -> Result<bool, 
             CmpOp::ChhotaYaBarabar => a <= b,
             CmpOp::Barabar => a == b,
         }),
-        _ => Err(BoliError::line(line, format!("'{}' ki tulna {} aur {} ke beech nahi ho sakti", op.naam(), left.type_naam(), right.type_naam()))),
+        _ => Err(BoliError::line(
+            line,
+            format!(
+                "'{}' ki tulna {} aur {} ke beech nahi ho sakti",
+                op.naam(),
+                left.type_naam(),
+                right.type_naam()
+            ),
+        )),
     }
 }
 
@@ -519,7 +744,9 @@ fn values_equal(left: &Value, right: &Value) -> bool {
         (Value::Text(a), Value::Text(b)) => a == b,
         (Value::Bool(a), Value::Bool(b)) => a == b,
         (Value::Khaali, Value::Khaali) => true,
-        (Value::List(a), Value::List(b)) => a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| values_equal(x, y)),
+        (Value::List(a), Value::List(b)) => {
+            a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| values_equal(x, y))
+        }
         _ => false,
     }
 }

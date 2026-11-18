@@ -2,7 +2,7 @@
 // Line hi statement ka khatam hai, isliye statements newline pe alag hote hain
 
 use crate::ast::{ArithOp, BoliError, CmpOp, Cond, Expr, Program, Stmt};
-use crate::lexer::{lex, Tok, Token};
+use crate::lexer::{Tok, Token, lex};
 
 const MAX_PARSE_DEPTH: usize = 64;
 
@@ -14,7 +14,11 @@ pub struct Parser {
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
-        Parser { tokens, pos: 0, depth: 0 }
+        Parser {
+            tokens,
+            pos: 0,
+            depth: 0,
+        }
     }
 
     // Abhi ka token (bina aage badhe)
@@ -52,7 +56,11 @@ impl Parser {
         }
         Err(BoliError::line(
             tok.line,
-            format!("yahan '{}' chahiye tha, par '{}' mila", what, tok.describe()),
+            format!(
+                "yahan '{}' chahiye tha, par '{}' mila",
+                what,
+                tok.describe()
+            ),
         ))
     }
 
@@ -68,7 +76,10 @@ impl Parser {
                 let tok = self.peek();
                 Err(BoliError::line(
                     tok.line,
-                    format!("'{}' yahan nahi aa sakta, ek line me ek hi kaam hota hai", tok.describe()),
+                    format!(
+                        "'{}' yahan nahi aa sakta, ek line me ek hi kaam hota hai",
+                        tok.describe()
+                    ),
                 ))
             }
         }
@@ -106,7 +117,10 @@ impl Parser {
             let tok = self.peek().clone();
             return Err(BoliError::line(
                 line,
-                format!("rakho ke baad value chahiye thi, par '{}' mila", tok.describe()),
+                format!(
+                    "rakho ke baad value chahiye thi, par '{}' mila",
+                    tok.describe()
+                ),
             ));
         }
         let mut atoms = vec![self.parse_atom()?];
@@ -148,9 +162,17 @@ impl Parser {
     fn atom_start(tok: &Tok) -> bool {
         matches!(
             tok,
-            Tok::Number(_) | Tok::Text(_) | Tok::Sahi | Tok::Galat | Tok::Khaali | Tok::Ident(_)
+            Tok::Number(_)
+                | Tok::Text(_)
+                | Tok::Sahi
+                | Tok::Galat
+                | Tok::Khaali
+                | Tok::Ident(_)
                 | Tok::Kaam
-                | Tok::Jodo | Tok::Ghatao | Tok::Guna | Tok::Bhaag
+                | Tok::Jodo
+                | Tok::Ghatao
+                | Tok::Guna
+                | Tok::Bhaag
         )
     }
 
@@ -158,7 +180,13 @@ impl Parser {
         self.depth += 1;
         if self.depth > MAX_PARSE_DEPTH {
             self.depth -= 1;
-            return Err(BoliError::line(self.peek().line, format!("code bahut zyada gehra hai (max nesting {})", MAX_PARSE_DEPTH)));
+            return Err(BoliError::line(
+                self.peek().line,
+                format!(
+                    "code bahut zyada gehra hai (max nesting {})",
+                    MAX_PARSE_DEPTH
+                ),
+            ));
         }
         let result = self.parse_stmt_inner();
         self.depth -= 1;
@@ -207,13 +235,23 @@ impl Parser {
                     _ => {
                         return Err(BoliError::line(
                             tok.line,
-                            format!("'{}' ke baad variable ka naam do, jaise '{} jawab 5 aur 3'", op.naam(), op.naam()),
-                        ))
+                            format!(
+                                "'{}' ke baad variable ka naam do, jaise '{} jawab 5 aur 3'",
+                                op.naam(),
+                                op.naam()
+                            ),
+                        ));
                     }
                 };
                 let (left, right) = self.parse_arith_tail(op, tok.line)?;
                 self.expect_line_end()?;
-                Ok(Stmt::ArithAssign { target, op, left, right, line })
+                Ok(Stmt::ArithAssign {
+                    target,
+                    op,
+                    left,
+                    right,
+                    line,
+                })
             }
             // agar <cond> to ... khatam
             Tok::Agar => {
@@ -231,7 +269,12 @@ impl Parser {
                 };
                 self.expect(Tok::Khatam, "khatam")?;
                 self.expect_line_end()?;
-                Ok(Stmt::Agar { cond, then_block, else_block, line })
+                Ok(Stmt::Agar {
+                    cond,
+                    then_block,
+                    else_block,
+                    line,
+                })
             }
             // jab tak <cond> to ... khatam
             Tok::Jab => {
@@ -255,7 +298,12 @@ impl Parser {
                 let body = self.parse_block()?;
                 self.expect(Tok::Khatam, "khatam")?;
                 self.expect_line_end()?;
-                Ok(Stmt::RangeLoop { from, to, body, line })
+                Ok(Stmt::RangeLoop {
+                    from,
+                    to,
+                    body,
+                    line,
+                })
             }
             // kaam keyword teen cheezein ho sakti hai:
             //   kaam rakho x   =>  "kaam" naam ka variable
@@ -271,7 +319,12 @@ impl Parser {
                     self.expect(Tok::Rakho, "rakho")?;
                     let value = self.parse_atom()?;
                     self.expect_line_end()?;
-                    return Ok(Stmt::ListAssign { target: "kaam".to_string(), index, value, line });
+                    return Ok(Stmt::ListAssign {
+                        target: "kaam".to_string(),
+                        index,
+                        value,
+                        line,
+                    });
                 }
                 // "kaam rakho ..." => variable "kaam"
                 if self.peek_at(1).tok == Tok::Rakho {
@@ -279,7 +332,11 @@ impl Parser {
                     self.next(); // rakho
                     let value = self.parse_rakho_value()?;
                     self.expect_line_end()?;
-                    return Ok(Stmt::Rakho { name: "kaam".to_string(), value, line });
+                    return Ok(Stmt::Rakho {
+                        name: "kaam".to_string(),
+                        value,
+                        line,
+                    });
                 }
                 // "kaam 5" / "kaam \"x\"" => ek kaam ka bulana (definition nahi)
                 let call_path = matches!(
@@ -293,7 +350,11 @@ impl Parser {
                         args.push(self.atom(false)?);
                     }
                     self.expect_line_end()?;
-                    return Ok(Stmt::KaamCall { name: "kaam".to_string(), args, line });
+                    return Ok(Stmt::KaamCall {
+                        name: "kaam".to_string(),
+                        args,
+                        line,
+                    });
                 }
                 // Warna yeh kaam definition hai
                 self.next();
@@ -306,7 +367,12 @@ impl Parser {
                 let body = self.parse_block()?;
                 self.expect(Tok::Khatam, "khatam")?;
                 self.expect_line_end()?;
-                Ok(Stmt::KaamDef { name, params, body, line })
+                Ok(Stmt::KaamDef {
+                    name,
+                    params,
+                    body,
+                    line,
+                })
             }
             // wapas do <expr>
             Tok::Wapas => {
@@ -345,7 +411,12 @@ impl Parser {
                     // value me list nahi, seedha single atom hi expect karte hain
                     let value = self.parse_atom()?;
                     self.expect_line_end()?;
-                    return Ok(Stmt::ListAssign { target: name, index, value, line });
+                    return Ok(Stmt::ListAssign {
+                        target: name,
+                        index,
+                        value,
+                        line,
+                    });
                 }
                 // Warna yeh kaam ka bulana (function call) hai
                 self.next(); // kaam ka naam
@@ -379,7 +450,10 @@ impl Parser {
             )),
             _ => Err(BoliError::line(
                 tok.line,
-                format!("'{}' yahan se statement nahi shuru ho sakta", tok.describe()),
+                format!(
+                    "'{}' yahan se statement nahi shuru ho sakta",
+                    tok.describe()
+                ),
             )),
         }
     }
@@ -424,7 +498,13 @@ impl Parser {
         self.depth += 1;
         if self.depth > MAX_PARSE_DEPTH {
             self.depth -= 1;
-            return Err(BoliError::line(self.peek().line, format!("expression bahut zyada gehra hai (max nesting {})", MAX_PARSE_DEPTH)));
+            return Err(BoliError::line(
+                self.peek().line,
+                format!(
+                    "expression bahut zyada gehra hai (max nesting {})",
+                    MAX_PARSE_DEPTH
+                ),
+            ));
         }
         let result = self.atom_base_inner(allow_call);
         self.depth -= 1;
@@ -598,7 +678,12 @@ impl Parser {
         };
 
         self.expect(Tok::Hai, "hai")?;
-        Ok(Cond::Cmp { left, op, right, line })
+        Ok(Cond::Cmp {
+            left,
+            op,
+            right,
+            line,
+        })
     }
 }
 
