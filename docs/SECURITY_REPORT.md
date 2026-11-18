@@ -1,4 +1,4 @@
-# BOLI — Security Report (v0.3.1)
+# BOLI — Security Report (v0.4.0)
 
 **Scope:** the interpreter and CLI as shipped in `boli` v0.3.0. **Threat model:** BOLI programs may come from untrusted authors (a user running someone else's `.hl`). The host process must not crash, hang forever, exhaust memory without bound, or misreport safety guarantees. **Not in scope:** confidentiality (a run program can legitimately print anything it is given), sandboxing of the target machine (BOLI cannot execute shell, files, or network — by design there is no such capability).
 
@@ -68,7 +68,10 @@ Remaining `unwrap`s are internal invariants (scope stack never empty; last token
 
 ## Verification performed (not claims — actual commands)
 
-- `cargo test` — 95/95 pass (77 library + 18 CLI)
+- `cargo test` — 108/108 pass (89 library + 19 CLI)
+
+## Built-ins (v0.4.0) attack surface
+`lambayi`, `upar`, `neeche`, `text`, `sankhya` — all pure internal Rust; every allocation they make is bounded by the existing string caps (`BOLI_MAX_STRING_BYTES`), list caps (`BOLI_MAX_LIST_ITEMS`) and live-scope budget (`BOLI_MAX_TOTAL_BYTES`). No I/O, no filesystem, no network. `sankhya` rejects inf/NaN.
 - `cargo clippy --all-targets --all-features -- -D warnings` — clean
 - Reproduced & confirmed fixed: 200k-term condition SIGSEGV → Galti; 3,000-deep expression nesting SIGSEGV → Galti (0.2.0); 20,000-item list → Galti; literal bypass → Galti; 11 MiB file → Galti; `LIKHO` keyword equivalence; REPL multiblock.
 

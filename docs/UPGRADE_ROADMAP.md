@@ -22,7 +22,7 @@ Prioritized by fit with BOLI's philosophy: **Hinglish syntax, no symbols, learni
 | Feature | Sketch | Risk |
 |---|---|---|
 | **Modules: `laao "path.hl"`** | Loads sibling `.hl`, exposes its top-level `kaam`s in an isolated namespace | Needs import cycles error, path confinement (`--allow-fs` flag or `BOLI_FS_ROOT`), tests. High value, high care. |
-| **Standard library (built-in kaams)** | `ginti(…)`, `lambayi(…)`, `chhota(…)`, `bada(…)` on lists/text; `text(…)` convert | Implemented in Rust, no files; limits: result size caps. |
+| ~~Standard library (built-in kaams)~~ **Done in v0.4.0** (`lambayi`, `upar`, `neeche`, `text`, `sankhya`) | More: `chhota`/`bada` min-max, `jodai` join/split | Same rules: Rust-only, caps enforced. |
 | **File I/O under explicit capability** | `padho "file.hl"`, `likho_file` — gated by `BOLI_ALLOW_FS=1`; off by default | Security: must never default on. Feeds SECURITY_REPORT update. |
 | **Better error locations** | Column numbers; spans under `^^^` in diagnostics | Parser already tracks lines; columns are moderate work. |
 

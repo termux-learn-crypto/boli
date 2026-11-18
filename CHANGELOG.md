@@ -2,6 +2,18 @@
 
 All notable changes to BOLI. BOLI follows [Semantic Versioning](https://semver.org/): breaking changes bump the minor digit (pre-1.0).
 
+## [0.4.0] — 2026-11-18
+
+### Added
+- **Built-in kaams** (pure Rust, zero dependencies): `lambayi <text|list|khaali>` (Unicode chars / items), `upar`, `neeche` (full Unicode case mapping), `text <anything>` (value → display text), `sankhya <text>` (strict parse; invalid text / inf → Galti). User-defined kaam in naam se shadow ho sakta hai (user ki priority). `boli help` lists them.
+- **Column diagnostics:** lexer/parser errors carry 1-based char columns (`BoliError.col`); CLI and REPL print the offending source line with a `^` caret (EOF-clamped). Runtime errors remain line-only by design.
+- **Repository organization:** audit reports and logs moved to `docs/` with links fixed.
+- `builtins.rs` extracted as its own module.
+
+### Internal
+- 108 tests (89 library + 19 CLI); gates green: fmt, check, test, clippy -D warnings, release build.
+- API additions only: `BoliError { line, col }`, `line_col`, `builtins` module, `Token.col`.
+
 ## [0.3.1] — 2026-11-18
 
 ### Fixed (critical)

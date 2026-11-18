@@ -111,3 +111,17 @@ Five verified fixes, each reproduced before the change and re-verified after:
 
 **Verified:** 95/95 tests green; fmt/check/clippy(-D warnings)/release build green; manually re-ran all examples + REPL.
 **Remaining limitations:** see SECURITY_REPORT.md / UPGRADE_ROADMAP.md.
+
+
+---
+
+# Appendix — v0.4.0 addendum (2026-11-18)
+
+| # | Change | Notes |
+|---|---|---|
+| F6 | `docs/` reorganization | audit reports/logs moved; all links fixed; root clean |
+| F7 | Standard library extracted (`src/builtins.rs`) | 5 builtins: lambayi/upar/neeche/text/sankhya; user kaam wins on name clash |
+| F8 | Column diagnostics | `BoliError.col`, lexer/parser errors carry 1-based columns; CLI/REPL `^` caret rendering (EOF-clamped) |
+| F9 | Repo layout for stdlib growth | `builtins.rs` is where all future builtins live; no `.hl`-level builtins, no unsafe |
+
+Verified: 108/108 tests green; `cargo fmt --check` ✓; `cargo clippy --all-targets --all-features -- -D warnings` ✓; release build ✓; REPL caret rendering manually verified.

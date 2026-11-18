@@ -1,6 +1,6 @@
-# BOLI Language Specification (v0.3.1)
+# BOLI Language Specification (v0.4.0)
 
-**Version:** 0.3.1 · **File extension:** `.hl` · **Implementation:** Rust (`cargo run -- run x.hl`, REPL via `cargo run`)
+**Version:** 0.4.0 · **File extension:** `.hl` · **Implementation:** Rust (`cargo run -- run x.hl`, REPL via `cargo run`)
 
 BOLI is a Hinglish-based programming language: Python-like simplicity, Hindi/English keywords, no symbols like `; { } ( ) = :`. Statements are one per line. Only words, numbers, quoted text and whitespace appear in a program.
 
@@ -154,13 +154,16 @@ Input from `pucho` is read in bounded chunks (at most `BOLI_MAX_STRING_BYTES` + 
 
 ## 9. Errors
 
-All runtime and syntax errors are Hinglish with line numbers:
+Lexer/parser errors carry line **and column** (1-based, Unicode chars); runtime errors carry the line. Display (v0.4.0+):
 
 ```
+Galti: line 1, col 4 me ';' nahi chahiye, BOLI me sirf shabd, number aur "text" use hota hai
+    nam;aste
+       ^
 Galti: line 4 me naam 'xyz' nahi mila
-Galti: line 7 me zero se bhaag nahi kar sakte
-Galti: line 1 me ';' nahi chahiye, BOLI me sirf shabd, number aur "text" use hota hai
 ```
+
+CLI/REPL also print the offending source line with a `^` caret at the error position (clamped at EOF).
 
 ## 10. Contextual keywords
 
@@ -184,6 +187,12 @@ Pure Rust, koi external dependency nahi. User-defined kaam in naam se shadow ho 
 | `sankhya` | `sankhya <text\|number>` | strict parse; galat text / overflow → Galti |
 
 Arity mismatch ek Hinglish Galti hai with exact expected count. Arguments eagerly evaluate hote hain (existing call rules).
+
+### v0.4.0 vs v0.3.1
+
+- **Built-in kaams:** `lambayi` (text chars / list items), `upar`, `neeche` (Unicode case mapping), `text` (value → text), `sankhya` (strict parse, inf rejected). Pure Rust, zero dependencies; user kaam in naam se shadow kar sakta hai (user ki priority).
+- **Column diagnostics:** lexer/parser errors carry 1-based columns (Unicode-char honest); the CLI and REPL print the offending line with a `^` caret. Runtime errors stay line-only (documented).
+- **Repository:** audit reports/logs moved to `docs/`; `builtins.rs` extracted.
 
 ### v0.3.1 vs v0.3.0
 

@@ -4,8 +4,8 @@
 
 ```bash
 cargo test          # everything (unit + integration)
-cargo test --test boli      # library-level semantics (77 tests)
-cargo test --test cli       # CLI/binary end-to-end (18 tests)
+cargo test --test boli      # library-level semantics (89 tests)
+cargo test --test cli       # CLI/binary end-to-end (19 tests)
 ```
 
 Full verification matrix (run before a release):
@@ -13,7 +13,7 @@ Full verification matrix (run before a release):
 ```bash
 cargo fmt --check                          # formatting gate
 cargo check                                # compile gate
-cargo test                                 # 95 tests (77 library + 18 CLI)
+cargo test                                 # 108 tests (89 library + 19 CLI)
 cargo clippy --all-targets --all-features -- -D warnings   # lint gate
 cargo build --release                      # release artifact gate
 ```
@@ -43,6 +43,11 @@ No extra tooling is required — only `cargo` and the BOLI binary (which `cargo 
 - condition `ya` chain parse-time cap (`Parser::with_limits`) and eval-time cap
 - expression/`hissa` chain depth guard
 - fuzz-ish test: deterministic xorshift generator feeds random byte soup into the lexer and parser; neither may panic (no third-party fuzzer needed)
+
+### v0.4.0 tests
+- Builtins: `builtin_lambayi_text_and_list`, `builtin_upar_neeche`, `builtin_text_cast`, `builtin_sankhya`, `builtin_wrong_arity_errors`, `builtin_user_kaam_shadows_builtin`, `builtin_unicode_text_ops`
+- Columns/caret: `lexer_error_has_column`, `parser_error_has_column`, `unterminated_text_error_has_position`, `symbol_error_caret_position`, `khaali_message_format_with_col`
+- CLI: `cli_syntax_error_shows_line_and_caret`
 
 ### v0.3.1 regression tests
 - `eval_depth_limit_is_configurable_and_enforced` — `with_eval_depth_limit(10)` errors, `with_eval_depth_limit(500)` passes (and the env var itself is covered by `cli_env_eval_depth_is_respected`)

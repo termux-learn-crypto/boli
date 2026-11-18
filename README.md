@@ -414,7 +414,7 @@ boli/
 ## Testing
 
 ```bash
-cargo test          # 95 tests chalenge
+cargo test          # 108 tests chalenge
 ```
 
 Details aur test-adding guide: [TESTING.md](TESTING.md). Spec: [LANGUAGE_SPEC.md](LANGUAGE_SPEC.md). Changes: [CHANGELOG.md](CHANGELOG.md). Audit: [docs/COMPLETE_AUDIT.md](docs/COMPLETE_AUDIT.md). Security: [docs/SECURITY_REPORT.md](docs/SECURITY_REPORT.md).
@@ -435,7 +435,7 @@ Kaam karne ka flow: `source.hl` → **lexer** (tokens) → **parser** (AST) → 
 
 User-defined kaam in naam se shadow kar sakta hai — user kaam ki priority zyada hai.
 
-## Safety limits (BOLI v0.3.1)
+## Safety limits (BOLI v0.4.0)
 
 Sab limits env variable se override ho sakti hain — har violation Hinglish Galti error hai, kabhi crash nahi:
 
@@ -461,6 +461,7 @@ Sab limits env variable se override ho sakti hain — har violation Hinglish Gal
 - `se ... tak` range loop, `jab tak` while loop
 - `kaam` definitions, calls, `wapas do`
 - Built-in kaams: `lambayi`, `upar`, `neeche`, `text`, `sankhya`
+- Error diagnostics: line + column number aur source line ke upar caret (`^`)
 - types: text, number, sahi/galat, khaali
 
 ## Aage kya aa sakta hai

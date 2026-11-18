@@ -21,6 +21,7 @@ Modules (each with a brief responsibility):
 | `src/interpreter.rs` | Tree-walking evaluator: scopes stack + kaam table + env-based safety limits; output capture hook (`collect_output`/`take_output`) used by tests | `Environment`, `Value`, `BoliError` |
 | `src/main.rs` | CLI (`run`, `help`, `version`) and the interactive REPL with quote/comment-aware depth tracking | binary `boli` |
 | `src/limits.rs` | Single source of truth for every safety limit (defaults + `BOLI_MAX_*` env override) | `limits` module |
+| `src/builtins.rs` | Built-in kaam (lambayi/upar/neeche/text/sankhya) — pure Rust, user kaams shadow them | `builtins` module |
 | `src/lib.rs` | Exposes the modules above as the library `boli` | used by `tests/boli.rs` |
 
 Data flow:
