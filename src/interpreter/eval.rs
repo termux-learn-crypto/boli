@@ -50,7 +50,14 @@ impl Environment {
                     }
                     None => {}
                 }
-                Err(BoliError::line(*line, format!("naam '{}' nahi mila", name)))
+                let hint = self
+                    .nearest_name(name)
+                    .map(|n| format!(" Shayad '{}' likhna tha?", n))
+                    .unwrap_or_default();
+                Err(BoliError::line(
+                    *line,
+                    format!("naam '{}' nahi mila.{}", name, hint),
+                ))
             }
             Expr::Arith(op, left, right, line) => {
                 let left_v = self.eval_expr(left)?;

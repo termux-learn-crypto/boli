@@ -540,7 +540,14 @@ impl Environment {
                 if crate::builtins::is_builtin(name) {
                     return crate::builtins::call_builtin(name, arg_values, line);
                 }
-                return Err(BoliError::line(line, format!("kaam '{}' nahi mila", name)));
+                let hint = self
+                    .nearest_name(name)
+                    .map(|n| format!(" Shayad '{}' likhna tha?", n))
+                    .unwrap_or_default();
+                return Err(BoliError::line(
+                    line,
+                    format!("kaam '{}' nahi mila.{}", name, hint),
+                ));
             }
         };
         if kaam.params.len() != arg_values.len() {
@@ -592,6 +599,61 @@ impl Environment {
                 "'agla' sirf loop ke andar use hota hai",
             )),
         }
+    }
+}
+
+
+
+// "Did you mean...?" - simple Damerau-Levenshtein over known names
+fn edit_distance(a: &str, b: &str) -> usize {
+    let a: Vec<char> = a.chars().collect();
+    let b: Vec<char> = b.chars().collect();
+    let (m, n) = (a.len(), b.len());
+    let mut dp = vec![vec![0usize; n + 1]; m + 1];
+    for i in 0..=m {
+        dp[i][0] = i;
+    }
+    for j in 0..=n {
+        dp[0][j] = j;
+    }
+    for i in 1..=m {
+        for j in 1..=n {
+            let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };
+            dp[i][j] = (dp[i - 1][j] + 1)
+                .min(dp[i][j - 1] + 1)
+                .min(dp[i - 1][j - 1] + cost);
+        }
+    }
+    dp[m][n]
+}
+
+impl Environment {
+    // sabhi known names (scope + kaam table) se sabse chhota edit distance wala return karo
+    fn nearest_name(&self, wanted: &str) -> Option<String> {
+        if wanted.is_empty() {
+            return None;
+        }
+        let mut candidates: Vec<String> = self.kaam.keys().cloned().collect();
+        for scope in &self.scopes {
+            for k in scope.map.keys() {
+                if !candidates.contains(k) {
+                    candidates.push(k.clone());
+                }
+            }
+        }
+        for builtin in crate::builtins::BUILTINS {
+            candidates.push((*builtin).to_string());
+        }
+        let mut best: Option<(usize, String)> = None;
+        for c in candidates {
+            let d = edit_distance(wanted, &c);
+            if d <= wanted.chars().count().max(c.chars().count()) / 2 + 1 {
+                if best.as_ref().map(|b| d < b.0).unwrap_or(true) {
+                    best = Some((d, c));
+                }
+            }
+        }
+        best.map(|(_, c)| c)
     }
 }
 
