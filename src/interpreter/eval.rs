@@ -91,61 +91,7 @@ impl Environment {
             Expr::Index(target, index, line) => {
                 let target_v = self.eval_expr(target)?;
                 let idx_v = self.eval_expr(index)?;
-                // Map access: mapa hissa "chaabi"
-                if let Value::Map(m) = &target_v {
-                    let key = match idx_v {
-                        Value::Text(t) => t,
-                        other => {
-                            return Err(BoliError::line(
-                                *line,
-                                format!(
-                                    "map ki chaabi text honi chahiye, {} nahi",
-                                    other.type_naam()
-                                ),
-                            ));
-                        }
-                    };
-                    return m.get(&key).cloned().ok_or_else(|| {
-                        BoliError::line(*line, format!("map me chaabi '{}' nahi mili", key))
-                    });
-                }
-                let idx = as_number(&idx_v, *line, "hissa ke liye")?;
-                if idx.fract() != 0.0 || idx < 1.0 {
-                    return Err(BoliError::line(
-                        *line,
-                        "hissa 1 se shuru hone wali integer ginti honi chahiye",
-                    ));
-                }
-                let i = idx as usize;
-                match target_v {
-                    Value::List(items) => {
-                        if i > items.len() {
-                            return Err(BoliError::line(
-                                *line,
-                                format!("list me sirf {} hisse hain, {} maanga", items.len(), i),
-                            ));
-                        }
-                        Ok(items[i - 1].clone())
-                    }
-                    Value::Text(s) => match s.chars().nth(i - 1) {
-                        Some(c) => Ok(Value::Text(c.to_string())),
-                        None => Err(BoliError::line(
-                            *line,
-                            format!(
-                                "text me sirf {} unicode chars hain, {} maanga",
-                                s.chars().count(),
-                                i
-                            ),
-                        )),
-                    },
-                    other => Err(BoliError::line(
-                        *line,
-                        format!(
-                            "hissa sirf list ya text pe chal sakta hai, {} pe nahi",
-                            other.type_naam()
-                        ),
-                    )),
-                }
+                index_get_pub(&target_v, &idx_v, *line)
             }
         }
     }
@@ -340,5 +286,115 @@ pub(crate) fn values_equal(left: &Value, right: &Value) -> bool {
             a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| values_equal(x, y))
         }
         _ => false,
+    }
+}
+
+// hissa (index) validation - list ke liye 1 se shuru integer
+pub(crate) fn list_index_pub(index: &Value, line: usize) -> Result<usize, BoliError> {
+    let idx = as_number(index, line, "hissa ke liye")?;
+    if idx.fract() != 0.0 || idx < 1.0 {
+        return Err(BoliError::line(
+            line,
+            "hissa 1 se shuru hone wali integer ginti honi chahiye",
+        ));
+    }
+    Ok(idx as usize)
+}
+
+// Map ya list ka ek hissa padho
+pub(crate) fn index_get_pub(
+    target: &Value,
+    index: &Value,
+    line: usize,
+) -> Result<Value, BoliError> {
+    if let Value::Map(m) = target {
+        let key = match index {
+            Value::Text(t) => t.clone(),
+            other => {
+                return Err(BoliError::line(
+                    line,
+                    format!(
+                        "map ki chaabi text honi chahiye, {} nahi",
+                        other.type_naam()
+                    ),
+                ));
+            }
+        };
+        return m
+            .get(&key)
+            .cloned()
+            .ok_or_else(|| BoliError::line(line, format!("map me chaabi '{}' nahi mili", key)));
+    }
+    let i = list_index_pub(index, line)?;
+    match target {
+        Value::List(items) => {
+            if i > items.len() {
+                return Err(BoliError::line(
+                    line,
+                    format!("list me sirf {} hisse hain, {} maanga", items.len(), i),
+                ));
+            }
+            Ok(items[i - 1].clone())
+        }
+        Value::Text(s) => match s.chars().nth(i - 1) {
+            Some(c) => Ok(Value::Text(c.to_string())),
+            None => Err(BoliError::line(
+                line,
+                format!(
+                    "text me sirf {} unicode chars hain, {} maanga",
+                    s.chars().count(),
+                    i
+                ),
+            )),
+        },
+        other => Err(BoliError::line(
+            line,
+            format!(
+                "hissa sirf list ya text pe chal sakta hai, {} pe nahi",
+                other.type_naam()
+            ),
+        )),
+    }
+}
+
+// Map ya list ka ek hissa badlo (naya value wapas)
+pub(crate) fn index_set_pub(
+    target: Value,
+    index: &Value,
+    value: Value,
+    line: usize,
+) -> Result<Value, BoliError> {
+    match target {
+        Value::Map(mut m) => {
+            let key = match index {
+                Value::Text(t) => t.clone(),
+                other => {
+                    return Err(BoliError::line(
+                        line,
+                        format!(
+                            "map ki chaabi text honi chahiye, {} nahi",
+                            other.type_naam()
+                        ),
+                    ));
+                }
+            };
+            m.insert(key, value);
+            Ok(Value::Map(m))
+        }
+        Value::List(mut items) => {
+            let i = list_index_pub(index, line)?;
+            if i > items.len() {
+                return Err(BoliError::line(
+                    line,
+                    format!("list me sirf {} hisse hain, {} maanga", items.len(), i),
+                ));
+            }
+            items[i - 1] = value;
+            Ok(Value::List(items))
+        }
+        other => Err(BoliError::line(
+            line,
+            format!("'{}' list nahi hai", other.type_naam()),
+        )),
     }
 }

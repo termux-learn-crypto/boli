@@ -21,3 +21,49 @@ pub fn env_limit(name: &str, default: u64) -> u64 {
         .filter(|&v| v > 0)
         .unwrap_or(default)
 }
+
+use std::io::BufRead;
+
+// Bounded stdin line read: max_bytes tak hi padhta hai (invalid UTF-8 -> lossy)
+// EOF par Khaali milta hai (caller handle kare)
+pub(crate) enum InputLine {
+    Line(String),
+    TooLarge,
+    Eof,
+}
+
+pub(crate) fn read_input_line(max_bytes: u64) -> std::io::Result<InputLine> {
+    let mut buf: Vec<u8> = Vec::new();
+    let mut stdin = std::io::stdin().lock();
+    loop {
+        let chunk = match stdin.fill_buf() {
+            Ok(c) => c,
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(e) => return Err(e),
+        };
+        if chunk.is_empty() {
+            return Ok(if buf.is_empty() {
+                InputLine::Eof
+            } else {
+                InputLine::Line(String::from_utf8_lossy(&buf).into_owned())
+            });
+        }
+        match chunk.iter().position(|&b| b == b'\n') {
+            Some(pos) => {
+                buf.extend_from_slice(&chunk[..pos]);
+                stdin.consume(pos + 1);
+                return Ok(InputLine::Line(String::from_utf8_lossy(&buf).into_owned()));
+            }
+            None => {
+                if buf.len() as u64 + chunk.len() as u64 > max_bytes {
+                    let len = chunk.len();
+                    stdin.consume(len);
+                    return Ok(InputLine::TooLarge);
+                }
+                buf.extend_from_slice(chunk);
+                let len = chunk.len();
+                stdin.consume(len);
+            }
+        }
+    }
+}

@@ -144,3 +144,20 @@ Galti: line 2 me naam 'naam2' nahi mila
     kaam 'namaste' ke andar (line 10)
     kaam 'shuru_karo' ke andar (line 13)
 ```
+
+
+---
+
+# Appendix — v0.6.0 addendum (2026-11-18)
+
+| # | Change | Notes |
+|---|---|---|
+| F12 | maps (word-based) | `mapa` + `map` keyword; hissa indexing; BTreeMap; budget-counted |
+| F13 | `laao` module system | import-time inline, circular-safe, dir-relative paths, bounded by BOLI_MAX_SOURCE_BYTES |
+| F14 | bytecode VM (experimental) | `--vm`/`BOLI_VM=1`; tree-walker remains default; 21 parity tests |
+| F15 | did-you-mean hints | nearest-name suggestion on naam/kaam missing errors |
+| F16 | parser associativity bug | `hissa` index is left-associative (was right-nested) |
+| F17 | `chaabiyan` builtin | map keys, sorted, as text list |
+| F18 | REPL/help EPIPE-safe | no panics on closed stdout pipes |
+
+Verified: 147/147 tests green; examples run identically under both backends (`--vm` and tree-walker).

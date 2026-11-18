@@ -19,7 +19,9 @@ Modules (each with a brief responsibility):
 | `src/lexer.rs` | UTF-8 tokenizer: keywords, identifiers (Unicode incl. Devanagari), numbers (finite-only), text with escapes, `#` comments, `-` negative numbers | `lex(&str) -> Result<Vec<Token>, BoliError>` |
 | `src/parser.rs` | Recursive-descent parser; statement split by newlines; two-level condition precedence (`aur` > `ya`); `hissa` contextual index; flat call arguments | `parse_source(&str) -> Result<Program, BoliError>` |
 | `src/interpreter.rs` | Tree-walking evaluator: scopes stack + kaam table + env-based safety limits; output capture hook (`collect_output`/`take_output`) used by tests | `Environment`, `Value`, `BoliError` |
-| `src/main.rs` | CLI (`run`, `help`, `version`) and the interactive REPL with quote/comment-aware depth tracking | binary `boli` |
+| `src/main.rs` | CLI (`run`, `help`, `version`, `--vm`, `BOLI_VM=1`) and the interactive REPL with quote/comment-aware depth tracking | binary `boli` |
+| `src/vm.rs` | Bytecode VM (experimental): compiler (AST → `Op` chunks) + stack machine; shares `Value`, `eval_arith`, builtins and the budget helpers. `laao` is compiled inline (import-time inlining) | `boli::vm::Vm` |
+| `src/scope.rs` | Live-scope `Scope` + `value_size` accounting shared by interpreter and VM | `scope` module |
 | `src/limits.rs` | Single source of truth for every safety limit (defaults + `BOLI_MAX_*` env override) | `limits` module |
 | `src/builtins.rs` | Built-in kaam (lambayi/upar/neeche/text/sankhya) — pure Rust, user kaams shadow them | `builtins` module |
 | `src/lib.rs` | Exposes the modules above as the library `boli` | used by `tests/boli.rs` |

@@ -417,7 +417,7 @@ boli/
 ## Testing
 
 ```bash
-cargo test          # 112 tests chalenge
+cargo test          # 147 tests chalenge (103 library + 23 CLI + 21 VM)
 ```
 
 Details aur test-adding guide: [TESTING.md](TESTING.md). Spec: [LANGUAGE_SPEC.md](LANGUAGE_SPEC.md). Changes: [CHANGELOG.md](CHANGELOG.md). Audit: [docs/COMPLETE_AUDIT.md](docs/COMPLETE_AUDIT.md). Security: [docs/SECURITY_REPORT.md](docs/SECURITY_REPORT.md).
@@ -438,7 +438,7 @@ Kaam karne ka flow: `source.hl` → **lexer** (tokens) → **parser** (AST) → 
 
 User-defined kaam in naam se shadow kar sakta hai — user kaam ki priority zyada hai.
 
-## Safety limits (BOLI v0.4.0)
+## Safety limits (BOLI v0.6.0)
 
 Sab limits env variable se override ho sakti hain — har violation Hinglish Galti error hai, kabhi crash nahi:
 
@@ -462,8 +462,12 @@ Sab limits env variable se override ho sakti hain — har violation Hinglish Gal
 - `jodo`, `ghatao`, `guna`, `bhaag` (inline aur variable-assign dono forms)
 - `agar ... nahi to ... khatam`, `aur / ya` logic, `bada / chhota / barabar / bada ya barabar / chhota ya barabar`
 - `se ... tak` range loop, `jab tak` while loop
-- `kaam` definitions, calls, `wapas do`
-- Built-in kaams: `lambayi`, `upar`, `neeche`, `text`, `sankhya`
+- `kaam` definitions, calls, `wapas do`, recursion
+- `mapa` maps (word-based, no symbols): `mapa rakho map "naam" "Vilas" "umar" 28`
+- Modules: `laao "math.hl"` (current environment import, circular-safe)
+- Bytecode VM (experimental): `boli --vm run x.hl` ya `BOLI_VM=1`
+- Did-you-mean suggestions for unknown names
+- Built-in kaams: `lambayi`, `upar`, `neeche`, `text`, `sankhya`, `chaabiyan`
 - Error diagnostics: line + column number, source line ke upar caret (`^`), aur runtime errors pe kaam-call traceback
 - types: text, number, sahi/galat, khaali
 
@@ -472,7 +476,7 @@ Sab limits env variable se override ho sakti hain — har violation Hinglish Gal
 - list/array type
 - string formatting kaam
 - kaam ke saath default arguments
-- modules (`laao`)
+- dictionaries with more ops (`has`, `miti` / delete)
 
 ---
 

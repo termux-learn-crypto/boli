@@ -1,6 +1,6 @@
-# BOLI Language Specification (v0.5.0)
+# BOLI Language Specification (v0.6.0)
 
-**Version:** 0.5.0 · **File extension:** `.hl` · **Implementation:** Rust (`cargo run -- run x.hl`, REPL via `cargo run`)
+**Version:** 0.6.0 · **File extension:** `.hl` · **Implementation:** Rust (`cargo run -- run x.hl`, REPL via `cargo run`)
 
 BOLI is a Hinglish-based programming language: Python-like simplicity, Hindi/English keywords, no symbols like `; { } ( ) = :`. Statements are one per line. Only words, numbers, quoted text and whitespace appear in a program.
 
@@ -195,6 +195,15 @@ Pure Rust, koi external dependency nahi. User-defined kaam in naam se shadow ho 
 | `sankhya` | `sankhya <text\|number>` | strict parse; galat text / overflow → Galti |
 
 Arity mismatch ek Hinglish Galti hai with exact expected count. Arguments eagerly evaluate hote hain (existing call rules).
+
+### v0.6.0 vs v0.5.0
+
+- **Maps:** `mapa rakho map "naam" "Vilas" "umar" 28` — word-based (no `{}`/`[]`). `mapa hissa "naam"` read, `mapa hissa "umar" rakho 29` assign, `lambayi mapa` key count, `chaabiyan mapa` sorted keys. Missing key → Galti. Map keys are text; maps support `barabar` equality and nesting.
+- **Modules:** `laao "math.hl"` — executes the file once in the current environment (import-time inlining); circular imports are silently skipped; relative paths resolve against the `.hl` file's directory; file size bound by `BOLI_MAX_SOURCE_BYTES`.
+- **Bytecode VM (experimental):** `boli --vm run x.hl` or `BOLI_VM=1 boli run x.hl` — same program semantics, stack-machine execution; tree-walking remains the default and the fallback.
+- **Diagnostics:** did-you-mean hints for unknown names (edit distance); traceback frames on runtime errors.
+- Parser bug fixed: `hissa` indexing is left-associative now (`a hissa 1 hissa 2` = `(a[1])[2]`).
+- New builtin: `chaabiyan` (map keys as a sorted list of text).
 
 ### v0.5.0 vs v0.4.0
 

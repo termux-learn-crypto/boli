@@ -1,9 +1,10 @@
 // BOLI ka Interpreter - AST ko chalakar output deta hai
 // Environment scopes ki list hai: andar ka kaam (function) khatam hote hi scope pop ho jata hai
 
-mod eval;
-mod value;
+pub(crate) mod eval;
+pub(crate) mod value;
 
+use crate::scope::Scope;
 use eval::{F64ToI64Checked, as_number, eval_arith};
 pub use value::Value;
 use value::value_size;
@@ -27,28 +28,6 @@ enum Flow {
     Wapas(Value, usize),
     Ruk(usize),
     Agla(usize),
-}
-
-struct Scope {
-    map: HashMap<String, Value>,
-    bytes: u64,
-}
-
-impl Scope {
-    fn new() -> Self {
-        Scope {
-            map: HashMap::new(),
-            bytes: 0,
-        }
-    }
-
-    fn total_bytes_add(&mut self, delta: i128) {
-        if delta >= 0 {
-            self.bytes += delta as u64;
-        } else {
-            self.bytes = self.bytes.saturating_sub((-delta) as u64);
-        }
-    }
 }
 
 pub struct Environment {
@@ -333,51 +312,27 @@ impl Environment {
                 if !prompt_ok {
                     std::process::exit(0);
                 }
-                // input ko chunked-read karke max_string_bytes pe kaato (unbounded alloc nahi)
-                let mut input_buf: Vec<u8> = Vec::new();
+                // input ko bounded padho (shared helper)
+                let input_line = match crate::limits::read_input_line(self.max_string_bytes as u64)
                 {
-                    use std::io::BufRead;
-                    let mut stdin = io::stdin().lock();
-                    loop {
-                        let chunk = stdin
-                            .fill_buf()
-                            .map_err(|_| BoliError::line(*line, "input nahi mil raha"))?;
-                        if chunk.is_empty() {
-                            break; // EOF
-                        }
-                        match chunk.iter().position(|&b| b == b'\n') {
-                            Some(pos) => {
-                                input_buf.extend_from_slice(&chunk[..pos]);
-                                stdin.consume(pos + 1);
-                                break;
-                            }
-                            None => {
-                                if input_buf.len() + chunk.len() > self.max_string_bytes {
-                                    return Err(BoliError::line(
-                                        *line,
-                                        format!(
-                                            "input text bahut bada hai (max {} bytes)",
-                                            self.max_string_bytes
-                                        ),
-                                    ));
-                                }
-                                input_buf.extend_from_slice(chunk);
-                                let len = chunk.len();
-                                stdin.consume(len);
-                            }
-                        }
+                    Ok(v) => v,
+                    Err(_) => {
+                        return Err(BoliError::line(*line, "input nahi mil raha"));
                     }
-                }
-                if input_buf.len() > self.max_string_bytes {
-                    return Err(BoliError::line(
-                        *line,
-                        format!(
-                            "input text bahut bada hai (max {} bytes)",
-                            self.max_string_bytes
-                        ),
-                    ));
-                }
-                let line_in = String::from_utf8_lossy(&input_buf).into_owned();
+                };
+                let line_in = match input_line {
+                    crate::limits::InputLine::Line(s) => s,
+                    crate::limits::InputLine::TooLarge => {
+                        return Err(BoliError::line(
+                            *line,
+                            format!(
+                                "input text bahut bada hai (max {} bytes)",
+                                self.max_string_bytes
+                            ),
+                        ));
+                    }
+                    crate::limits::InputLine::Eof => String::new(),
+                };
                 let trimmed = line_in.trim();
                 let value = if trimmed.is_empty() {
                     Value::Khaali
@@ -593,16 +548,8 @@ impl Environment {
             }
         }
         let idx_v = self.eval_expr(index)?;
-        let idx = as_number(&idx_v, line, "hissa ke liye")?;
-        if idx.fract() != 0.0 || idx < 1.0 {
-            return Err(BoliError::line(
-                line,
-                "hissa 1 se shuru hone wali integer ginti honi chahiye",
-            ));
-        }
-        let i = idx as usize;
         let new_value = self.eval_expr(value)?;
-        let mut current = match self.get(target) {
+        let current = match self.get(target) {
             Some(v) => v,
             None => {
                 return Err(BoliError::line(
@@ -611,24 +558,8 @@ impl Environment {
                 ));
             }
         };
-        match &mut current {
-            Value::List(items) => {
-                if i > items.len() {
-                    return Err(BoliError::line(
-                        line,
-                        format!(
-                            "'{}' me sirf {} hisse hain, {} maanga",
-                            target,
-                            items.len(),
-                            i
-                        ),
-                    ));
-                }
-                items[i - 1] = new_value;
-            }
-            _ => return Err(BoliError::line(line, format!("'{}' list nahi hai", target))),
-        }
-        self.set(target, current, line)?;
+        let updated = crate::interpreter::eval::index_set_pub(current, &idx_v, new_value, line)?;
+        self.set(target, updated, line)?;
         Ok(())
     }
 

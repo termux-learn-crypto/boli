@@ -1,6 +1,7 @@
 // BOLI - ek Hinglish programming language jo Rust me bani hai
 // cargo run se REPL, `cargo run -- run x.hl` se file chale
 use boli::interpreter::Environment;
+use boli::vm::Vm;
 
 // stdout crash nahi hona chahiye (broken pipe -> clean exit), print!/println! se EPIPE panic hotas
 fn out_line(text: &str) -> bool {
@@ -18,8 +19,16 @@ use std::fs;
 use std::io::{self, BufRead, Read, Write};
 use std::process;
 
+// --vm ya BOLI_VM=1: bytecode VM use karo (default: tree-walking interpreter)
+fn vm_mode(args: &[String]) -> bool {
+    std::env::var("BOLI_VM").is_ok_and(|v| v == "1") || args.iter().any(|a| a == "--vm")
+}
+
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let mut args: Vec<String> = env::args().collect();
+    let vm = vm_mode(&args);
+    // --vm flag ko hat do (baaki args same rahein)
+    args.retain(|a| a != "--vm");
 
     match args.len() {
         // sirf `cargo run` - REPL kholo
@@ -32,7 +41,13 @@ fn main() {
                     let _ = out_line(&format!("BOLI version {}", env!("CARGO_PKG_VERSION")));
                 }
                 // convenience: `cargo run -- file.hl` bhi chalega
-                _ if cmd.ends_with(".hl") => run_file(cmd),
+                _ if cmd.ends_with(".hl") => {
+                    if vm {
+                        run_file_vm(cmd)
+                    } else {
+                        run_file(cmd)
+                    }
+                }
                 _ => {
                     eprintln!("Galti: '{}' samajh nahi aaya", cmd);
                     print_help();
@@ -40,7 +55,13 @@ fn main() {
                 }
             }
         }
-        3 if args[1] == "run" => run_file(&args[2]),
+        3 if args[1] == "run" => {
+            if vm {
+                run_file_vm(&args[2])
+            } else {
+                run_file(&args[2])
+            }
+        }
         _ => {
             eprintln!("Galti: galat command");
             print_help();
@@ -153,6 +174,53 @@ fn show_boli_error(source: &str, e: &boli::ast::BoliError) {
         if !line_str.is_empty() {
             eprintln!("    {}", line_str);
             eprintln!("    {}^", " ".repeat(caret_col - 1));
+        }
+    }
+}
+
+// VM variant of run_file (--vm flag)
+fn run_file_vm(path: &str) {
+    let max_source = env_limit("BOLI_MAX_SOURCE_BYTES", DEFAULT_MAX_SOURCE_BYTES);
+    match fs::metadata(path) {
+        Ok(meta) => {
+            if meta.len() > max_source {
+                eprintln!(
+                    "Galti: file '{}' bahut badi hai ({} bytes, max {})",
+                    path,
+                    meta.len(),
+                    max_source
+                );
+                process::exit(1);
+            }
+        }
+        Err(e) => {
+            eprintln!("Galti: file '{}' nahi khuli: {}", path, e);
+            process::exit(1);
+        }
+    }
+    let source = match read_capped(path, max_source) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("{}", e);
+            process::exit(1);
+        }
+    };
+    match parser::parse_source(&source) {
+        Ok(program) => {
+            let mut vm = Vm::new();
+            if let Some(parent) = std::path::Path::new(path).parent()
+                && !parent.as_os_str().is_empty()
+            {
+                vm.set_source_dir(parent.to_path_buf());
+            }
+            if let Err(e) = vm.run_program(&program) {
+                show_boli_error(&source, &e);
+                process::exit(1);
+            }
+        }
+        Err(e) => {
+            show_boli_error(&source, &e);
+            process::exit(1);
         }
     }
 }

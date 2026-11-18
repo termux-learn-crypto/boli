@@ -2,6 +2,19 @@
 
 All notable changes to BOLI. BOLI follows [Semantic Versioning](https://semver.org/): breaking changes bump the minor digit (pre-1.0).
 
+## [0.6.0] — 2026-11-18
+
+### Added
+- **Maps** (word-based syntax, no symbols): `mapa rakho map "k" v ...`; `mapa hissa "k"`/`mapa hissa "k" rakho v`; text keys; nesting; `barabar` equality; `chaabiyan` builtin for sorted keys; map bytes count toward the live-scope budget.
+- **Modules** (`laao "file.hl"`): executes an imported `.hl` file once in the current environment; circular-safe; relative paths resolve against the importing file's directory; bounded by `BOLI_MAX_SOURCE_BYTES`; import errors reported as `file 'x.hl' me error: ...`.
+- **Bytecode VM (experimental):** `boli --vm run x.hl` or `BOLI_VM=1 boli run x.hl`. Same language semantics: expressions, statements, `kaam` (recursion, zero-arg fallback, builtins), maps, lists, loops, `laao` (compile-time inline), the step/depth/memory limits, did-you-mean hints, runtime tracebacks. Tree-walker stays the default; VM is parity-tested on the example corpus (21 VM tests).
+- **Did-you-mean hints:** unknown `naam`/`kaam` errors suggest the closest known identifier (edit distance).
+- **Parser fix:** `hissa` indexing is left-associative — `a hissa 1 hissa 2` means `(a[1])[2]` (was `a[1[2]]`).
+
+### Internal
+- 147 tests (103 library + 23 CLI + 21 VM). `cargo fmt --check` / `cargo check` / `cargo clippy --all-targets --all-features -- -D warnings` / `cargo build --release` all green.
+- Interpreter/VM share `value_size`, `eval_arith`, `eval::compare`, `index_get_pub`/`index_set_pub`, and the live-scope budget helpers in `src/scope.rs`.
+
 ## [0.5.0] — 2026-11-18
 
 ### Added
