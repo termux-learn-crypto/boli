@@ -656,11 +656,11 @@ fn edit_distance(a: &str, b: &str) -> usize {
     let b: Vec<char> = b.chars().collect();
     let (m, n) = (a.len(), b.len());
     let mut dp = vec![vec![0usize; n + 1]; m + 1];
-    for i in 0..=m {
-        dp[i][0] = i;
+    for (i, row) in dp.iter_mut().enumerate().take(m + 1) {
+        row[0] = i;
     }
-    for j in 0..=n {
-        dp[0][j] = j;
+    for (j, cell) in dp[0].iter_mut().enumerate().take(n + 1) {
+        *cell = j;
     }
     for i in 1..=m {
         for j in 1..=n {
@@ -693,10 +693,10 @@ impl Environment {
         let mut best: Option<(usize, String)> = None;
         for c in candidates {
             let d = edit_distance(wanted, &c);
-            if d <= wanted.chars().count().max(c.chars().count()) / 2 + 1 {
-                if best.as_ref().map(|b| d < b.0).unwrap_or(true) {
-                    best = Some((d, c));
-                }
+            if d <= wanted.chars().count().max(c.chars().count()) / 2 + 1
+                && best.as_ref().map(|b| d < b.0).unwrap_or(true)
+            {
+                best = Some((d, c));
             }
         }
         best.map(|(_, c)| c)
