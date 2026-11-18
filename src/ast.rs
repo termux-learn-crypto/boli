@@ -10,6 +10,8 @@ pub struct BoliError {
     pub line: Option<usize>,
     pub col: Option<usize>,
     pub message: String,
+    // Runtime kaam-call trace (innermost sabse pehle print hota hai)
+    pub trace: Vec<(String, usize)>,
 }
 
 impl BoliError {
@@ -19,6 +21,7 @@ impl BoliError {
             line: Some(line),
             col: None,
             message: message.into(),
+            trace: Vec::new(),
         }
     }
 
@@ -28,6 +31,7 @@ impl BoliError {
             line: Some(line),
             col: Some(col),
             message: message.into(),
+            trace: Vec::new(),
         }
     }
 }
@@ -36,11 +40,15 @@ impl fmt::Display for BoliError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match (self.line, self.col) {
             (Some(line), Some(col)) => {
-                write!(f, "Galti: line {}, col {} me {}", line, col, self.message)
+                write!(f, "Galti: line {}, col {} me {}", line, col, self.message)?
             }
-            (Some(line), None) => write!(f, "Galti: line {} me {}", line, self.message),
-            (None, _) => write!(f, "Galti: {}", self.message),
+            (Some(line), None) => write!(f, "Galti: line {} me {}", line, self.message)?,
+            (None, _) => write!(f, "Galti: {}", self.message)?,
         }
+        for (name, call_line) in self.trace.iter().rev() {
+            write!(f, "\n    kaam '{}' ke andar (line {})", name, call_line)?;
+        }
+        Ok(())
     }
 }
 

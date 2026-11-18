@@ -870,3 +870,62 @@ fn khaali_message_format_with_col() {
     assert!(err.to_string().starts_with("Galti: line 1"));
     assert!(err.to_string().contains("col"));
 }
+
+// ---------- runtime tracebacks (v0.5.0) ----------
+
+#[test]
+fn traceback_shows_full_call_chain() {
+    let src = "kaam galti_wala naam\n    likho naam2\nkhatam\n\
+               kaam namaste purush\n    galti_wala purush\nkhatam\n\
+               kaam shuru_karo\n    namaste \"Vilas\"\nkhatam\n\
+               shuru_karo";
+    let err = run_out(src).unwrap_err();
+    let msg = err.to_string();
+    assert!(
+        msg.contains("kaam 'galti_wala' ke andar (line 5)"),
+        "msg: {}",
+        msg
+    );
+    assert!(
+        msg.contains("kaam 'namaste' ke andar (line 8)"),
+        "msg: {}",
+        msg
+    );
+    assert!(
+        msg.contains("kaam 'shuru_karo' ke andar (line 10)"),
+        "msg: {}",
+        msg
+    );
+}
+
+#[test]
+fn traceback_innermost_first() {
+    let src = "kaam inner\n    likho nonexistent\nkhatam\n\
+               kaam outer\n    inner\nkhatam\n\
+               outer";
+    let err = run_out(src).unwrap_err();
+    let msg = err.to_string();
+    let inner_pos = msg.find("kaam 'inner'").unwrap();
+    let outer_pos = msg.find("kaam 'outer'").unwrap();
+    assert!(inner_pos < outer_pos, "msg: {}", msg);
+}
+
+#[test]
+fn traceback_absent_for_top_level_errors() {
+    let err = run_out("ruk").unwrap_err(); // top-level ruk
+    assert!(!err.to_string().contains("kaam"));
+}
+
+#[test]
+fn traceback_preserved_through_nested_propagation() {
+    let src = "kaam deep1\n    likho xyz\nkhatam\n\
+               kaam deep2\n    deep1\nkhatam\n\
+               kaam deep3\n    deep2\nkhatam\n\
+               kaam deep4\n    deep3\nkhatam\n\
+               deep4";
+    let err = run_out(src).unwrap_err();
+    let msg = err.to_string();
+    for name in ["deep1", "deep2", "deep3", "deep4"] {
+        assert!(msg.contains(name), "msg: {}", msg);
+    }
+}
