@@ -131,6 +131,23 @@ pub enum Stmt {
 // Pura program statements ki list hai
 pub type Program = Vec<Stmt>;
 
+impl Expr {
+    // Error line ke liye best-effort line number
+    pub fn line_for_error(&self) -> usize {
+        match self {
+            Expr::Number(_, line) => *line,
+            Expr::Text(_, line) => *line,
+            Expr::Bool(_, line) => *line,
+            Expr::Khaali(line) => *line,
+            Expr::Var(_, line) => *line,
+            Expr::Arith(_, _, _, line) => *line,
+            Expr::Call(_, _, line) => *line,
+            Expr::List(_, line) => *line,
+            Expr::Index(_, _, line) => *line,
+        }
+    }
+}
+
 impl Stmt {
     // Error line ke liye best-effort line number
     pub fn line_for_error(&self) -> usize {

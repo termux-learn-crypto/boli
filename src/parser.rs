@@ -4,14 +4,17 @@
 use crate::ast::{ArithOp, BoliError, CmpOp, Cond, Expr, Program, Stmt};
 use crate::lexer::{lex, Tok, Token};
 
+const MAX_PARSE_DEPTH: usize = 64;
+
 pub struct Parser {
     tokens: Vec<Token>,
     pos: usize,
+    depth: usize,
 }
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
-        Parser { tokens, pos: 0 }
+        Parser { tokens, pos: 0, depth: 0 }
     }
 
     // Abhi ka token (bina aage badhe)
@@ -152,6 +155,17 @@ impl Parser {
     }
 
     fn parse_stmt(&mut self) -> Result<Stmt, BoliError> {
+        self.depth += 1;
+        if self.depth > MAX_PARSE_DEPTH {
+            self.depth -= 1;
+            return Err(BoliError::line(self.peek().line, format!("code bahut zyada gehra hai (max nesting {})", MAX_PARSE_DEPTH)));
+        }
+        let result = self.parse_stmt_inner();
+        self.depth -= 1;
+        result
+    }
+
+    fn parse_stmt_inner(&mut self) -> Result<Stmt, BoliError> {
         let tok = self.peek().clone();
         match tok.tok {
             // likho <expr>
@@ -407,6 +421,17 @@ impl Parser {
 
     // Ek base operand (index se pehle wala hissa)
     fn atom_base(&mut self, allow_call: bool) -> Result<Expr, BoliError> {
+        self.depth += 1;
+        if self.depth > MAX_PARSE_DEPTH {
+            self.depth -= 1;
+            return Err(BoliError::line(self.peek().line, format!("expression bahut zyada gehra hai (max nesting {})", MAX_PARSE_DEPTH)));
+        }
+        let result = self.atom_base_inner(allow_call);
+        self.depth -= 1;
+        result
+    }
+
+    fn atom_base_inner(&mut self, allow_call: bool) -> Result<Expr, BoliError> {
         let tok = self.peek().clone();
         match tok.tok {
             Tok::Number(n) => {

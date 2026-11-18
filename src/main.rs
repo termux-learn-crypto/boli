@@ -156,7 +156,10 @@ fn repl() {
                 _ => {}
             }
             // range loop: last shabd "tak" ho to block khulta hai
-            if words.len() > 1 && words.last().map(|s| s.as_str()) == Some("tak") {
+            // ("jab tak ..." pehle hi count ho chuka hai, dobara mat jodo)
+            if words.len() > 1 && words.last().map(|s| s.as_str()) == Some("tak")
+                && words.first().map(|s| s.as_str()) != Some("jab")
+            {
                 depth += 1;
             }
             // har "khatam" ek block band karta hai; bina block ke khatam = Galti, line ignore karo

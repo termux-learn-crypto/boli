@@ -405,3 +405,35 @@ fn unknown_variable_line_number() {
     let err = run_out("likho naam").unwrap_err();
     assert!(err.to_string().contains("line 1"));
 }
+
+// ---------- depth limit regression (stack overflow se bachao) ----------
+
+#[test]
+fn deeply_nested_agar_errors_not_crashes() {
+    let src = "agar 1 1 barabar hai to\n".repeat(200) + "likho 1\n" + &"khatam\n".repeat(200);
+    assert!(parse_source(&src).is_err());
+}
+
+#[test]
+fn deeply_nested_expression_errors_not_crashes() {
+    let src = format!("likho {}1", "jodo 1 aur ".repeat(150));
+    assert!(parse_source(&src).is_err());
+}
+
+#[test]
+fn deeply_nested_hissa_chain_errors_not_crashes() {
+    let mut src = String::from("naam rakho \"Vilas\"\nlikho naam");
+    for _ in 0..300 {
+        src.push_str(" hissa 1");
+    }
+    let program = parse_source(&src).unwrap();
+    let mut env = Environment::new();
+    env.collect_output();
+    assert!(env.run_program(&program).is_err());
+}
+
+#[test]
+fn moderately_nested_code_still_works() {
+    let src = "agar 1 1 barabar hai to\n".repeat(20) + "likho 42\n" + &"khatam\n".repeat(20);
+    assert_eq!(run_out(&src).unwrap(), vec!["42"]);
+}

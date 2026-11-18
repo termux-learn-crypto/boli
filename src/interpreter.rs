@@ -54,7 +54,7 @@ enum Flow {
     Normal,
     Wapas(Value, usize),
     Ruk(usize),
-    Agla,
+    Agla(usize),
 }
 
 pub struct Environment {
@@ -65,6 +65,7 @@ pub struct Environment {
     max_call_depth: usize,
     max_string_bytes: usize,
     call_depth: usize,
+    eval_depth: usize,
     captured: Option<Vec<String>>,
 }
 
@@ -81,6 +82,7 @@ impl Environment {
             max_call_depth,
             max_string_bytes,
             call_depth: 0,
+            eval_depth: 0,
             captured: None,
         }
     }
@@ -136,7 +138,7 @@ impl Environment {
             Flow::Normal => Ok(()),
             Flow::Wapas(_, line) => Err(BoliError::line(line, "'wapas do' sirf kaam ke andar use hota hai")),
             Flow::Ruk(line) => Err(BoliError::line(line, "'ruk' sirf loop ke andar use hota hai")),
-            Flow::Agla => Err(BoliError::line(1, "'agla' sirf loop ke andar use hota hai")),
+            Flow::Agla(line) => Err(BoliError::line(line, "'agla' sirf loop ke andar use hota hai")),
         }
     }
 
@@ -249,7 +251,7 @@ impl Environment {
                             Flow::Normal => {}
                             Flow::Wapas(value, wline) => return Ok(Flow::Wapas(value, wline)),
                             Flow::Ruk(_) => break,
-                            Flow::Agla => {}
+                            Flow::Agla(_) => {}
                         }
                     }
                     Ok(Flow::Normal)
@@ -268,7 +270,7 @@ impl Environment {
                         Flow::Normal => {}
                         Flow::Wapas(value, line) => return Ok(Flow::Wapas(value, line)),
                         Flow::Ruk(_) => break,
-                        Flow::Agla => {}
+                        Flow::Agla(_) => {}
                     }
                 }
                 Ok(Flow::Normal)
@@ -292,7 +294,7 @@ impl Environment {
                 Ok(Flow::Wapas(value, *line))
             }
             Stmt::Ruk(line) => Ok(Flow::Ruk(*line)),
-            Stmt::Agla(_) => Ok(Flow::Agla),
+            Stmt::Agla(line) => Ok(Flow::Agla(*line)),
             Stmt::ListAssign { target, index, value, line } => {
                 self.list_assign(target, index, value, *line)?;
                 Ok(Flow::Normal)
@@ -346,11 +348,23 @@ impl Environment {
             Flow::Normal => Ok(Value::Khaali),
             Flow::Wapas(value, _) => Ok(value),
             Flow::Ruk(rline) => Err(BoliError::line(rline, "'ruk' sirf loop ke andar use hota hai")),
-            Flow::Agla => Err(BoliError::line(line, "'agla' sirf loop ke andar use hota hai")),
+            Flow::Agla(aline) => Err(BoliError::line(aline, "'agla' sirf loop ke andar use hota hai")),
         }
     }
 
     fn eval_expr(&mut self, expr: &Expr) -> Result<Value, BoliError> {
+        // Bahut gehra nested expression/AST se stack overflow nahi hona chahiye
+        self.eval_depth += 1;
+        if self.eval_depth > 256 {
+            self.eval_depth -= 1;
+            return Err(BoliError::line(expr.line_for_error(), "expression bahut zyada gehra hai (max 256)"));
+        }
+        let result = self.eval_expr_inner(expr);
+        self.eval_depth -= 1;
+        result
+    }
+
+    fn eval_expr_inner(&mut self, expr: &Expr) -> Result<Value, BoliError> {
         match expr {
             Expr::Number(n, _) => Ok(Value::Number(*n)),
             Expr::Text(s, _) => Ok(Value::Text(s.clone())),
@@ -358,8 +372,12 @@ impl Environment {
             Expr::Khaali(_) => Ok(Value::Khaali),
             Expr::Var(name, line) => {
                 if let Some(v) = self.get(name) { return Ok(v); }
-                if let Some(kaam) = self.kaam.get(name) {
-                    if kaam.params.is_empty() { return self.call_kaam(name, Vec::new(), *line); }
+                match self.kaam.get(name) {
+                    Some(kaam) if kaam.params.is_empty() => return self.call_kaam(name, Vec::new(), *line),
+                    Some(kaam) => {
+                        return Err(BoliError::line(*line, format!("kaam '{}' ko {} cheezein chahiye, seedha call karo", name, kaam.params.len())));
+                    }
+                    None => {}
                 }
                 Err(BoliError::line(*line, format!("naam '{}' nahi mila", name)))
             }
@@ -442,12 +460,12 @@ fn as_number(value: &Value, line: usize, kahan: &str) -> Result<f64, BoliError> 
 }
 
 fn eval_arith(op: ArithOp, left: &Value, right: &Value, line: usize, max_string_bytes: usize) -> Result<Value, BoliError> {
-    if op == ArithOp::Jodo {
-        if let (Value::List(a), Value::List(b)) = (left, right) {
-            let mut items = a.clone();
-            items.extend(b.iter().cloned());
-            return Ok(Value::List(items));
-        }
+    if op == ArithOp::Jodo
+        && let (Value::List(a), Value::List(b)) = (left, right)
+    {
+        let mut items = a.clone();
+        items.extend(b.iter().cloned());
+        return Ok(Value::List(items));
     }
     if op == ArithOp::Jodo {
         if let (Value::Text(a), Value::Text(b)) = (left, right) {
