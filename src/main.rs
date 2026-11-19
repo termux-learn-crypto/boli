@@ -80,12 +80,16 @@ fn print_help() {
     let _ = out_line("  cargo run -- help      yeh message dikhao");
     let _ = out_line("  cargo run -- version   version dikhao");
     let _ = out_line("");
-    let _ = out_line("Built-in kaams: lambayi, upar, neeche, text, sankhya");
-    let _ = out_line("  lambayi <text|list>   text ke characters / list ke items");
-    let _ = out_line("  upar <text>           UPPERCASE");
-    let _ = out_line("  neeche <text>         lowercase");
-    let _ = out_line("  text <anything>       kisi bhi value ko text me");
-    let _ = out_line("  sankhya <text>        text ko number me (galat text par error)");
+    let _ = out_line("Built-in kaams (37): docs/STANDARD_LIBRARY.md me poori list hai");
+    let _ = out_line(
+        "  text: lambayi, upar, neeche, kato, khojo, hai_text, badlo, baton, jodo_text, chhilo, akshar, escape_text, unescape_text",
+    );
+    let _ = out_line(
+        "  list: chaabiyan, jodega, dalein, hatao, ant, ant_hatao, tukda, nakal, saaf, ultana, ek_hai",
+    );
+    let _ = out_line(
+        "  number/type/test: text, sankhya, purnank, uparank, nirapeksh, mool, shesh, sabse_chhota, sabse_bada, prakaar, prakaar_hai, sahi_banao, saman",
+    );
 }
 
 // File padhkar chalao
