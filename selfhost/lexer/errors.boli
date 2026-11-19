@@ -1,0 +1,26 @@
+kaam lexer_make_error kind message line col
+    err rakho map "kind" kind "message" message "line" line "col" col
+    wapas do err
+khatam
+
+kaam lexer_fail kind message line col
+    err rakho lexer_make_error kind message line col
+    res rakho map "ok" galat "tokens" khaali "state" khaali "error" err
+    wapas do res
+khatam
+
+kaam lexer_ok tokens
+    res rakho map "ok" sahi "tokens" tokens "state" khaali "error" khaali
+    wapas do res
+khatam
+
+kaam lexer_error_text err
+    line rakho err hissa "line"
+    col rakho err hissa "col"
+    msg rakho err hissa "message"
+    ltext rakho text line
+    ctext rakho text col
+    parts rakho "Galti: line " ltext ", col " ctext " me " msg
+    out rakho jodo_text parts ""
+    wapas do out
+khatam

@@ -1,0 +1,5 @@
+source rakho "likho 5\n"
+max_source rakho 1000000
+max_string rakho 1000000
+max_tokens rakho 1000000
+laao "run.boli"

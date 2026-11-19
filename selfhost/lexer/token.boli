@@ -1,0 +1,25 @@
+kaam lexer_token kind value line col
+    t rakho map "kind" kind "value" value "line" line "col" col
+    wapas do t
+khatam
+
+kaam lexer_token_text t
+    kind rakho t hissa "kind"
+    value rakho t hissa "value"
+    line rakho t hissa "line"
+    col rakho t hissa "col"
+    shown rakho value
+    agar kind "Text" barabar hai to
+        shown rakho escape_text value
+    khatam
+    ltext rakho text line
+    ctext rakho text col
+    out rakho kind
+    jodo out out aur "|"
+    jodo out out aur shown
+    jodo out out aur "|"
+    jodo out out aur ltext
+    jodo out out aur "|"
+    jodo out out aur ctext
+    wapas do out
+khatam

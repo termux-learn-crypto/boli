@@ -1,0 +1,73 @@
+kaam lexer_empty_list unused
+    seed rakho 0 0
+    empty rakho hatao seed 1
+    empty rakho hatao empty 1
+    wapas do empty
+khatam
+
+kaam lexer_state_new source max_string max_tokens
+    items rakho lexer_empty_list 0
+    size rakho lambayi source
+    st rakho map "src" source "pos" 1 "line" 1 "col" 1 "separated" sahi "tokens" items "max_string" max_string "max_tokens" max_tokens "src_len" size
+    wapas do st
+khatam
+
+kaam lexer_current st
+    pos rakho st hissa "pos"
+    src rakho st hissa "src"
+    size rakho lambayi src
+    agar pos size se bada hai to
+        wapas do ""
+    khatam
+    ch rakho akshar src pos
+    wapas do ch
+khatam
+
+kaam lexer_peek_next st
+    pos rakho st hissa "pos"
+    src rakho st hissa "src"
+    size rakho lambayi src
+    next_pos rakho jodo pos aur 1
+    agar next_pos size se bada hai to
+        wapas do ""
+    khatam
+    ch rakho akshar src next_pos
+    wapas do ch
+khatam
+
+kaam lexer_bump st
+    ch rakho lexer_current st
+    pos rakho st hissa "pos"
+    line rakho st hissa "line"
+    col rakho st hissa "col"
+    jodo pos pos aur 1
+    agar ch "\n" barabar hai to
+        col rakho 1
+        jodo line line aur 1
+        nahi to
+        jodo col col aur 1
+    khatam
+    st hissa "pos" rakho pos
+    st hissa "line" rakho line
+    st hissa "col" rakho col
+    wapas do st
+khatam
+
+kaam lexer_push st kind value line col
+    pushed rakho lexer_token kind value line col
+    items rakho st hissa "tokens"
+    count rakho lambayi items
+    limit rakho st hissa "max_tokens"
+    agar count limit se bada ya barabar hai to
+        ltext rakho text limit
+        msg rakho "code me bahut zyada tokens hain (max "
+        jodo msg msg aur ltext
+        jodo msg msg aur ")"
+        res rakho lexer_fail "token_limit" msg line col
+        wapas do res
+    khatam
+    next_items rakho jodega items pushed
+    st hissa "tokens" rakho next_items
+    ok rakho map "ok" sahi "state" st "error" khaali
+    wapas do ok
+khatam

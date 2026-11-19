@@ -1,0 +1,507 @@
+likho_info rakho map "kind" "Likho" "value" ""
+rakho_info rakho map "kind" "Rakho" "value" ""
+pucho_info rakho map "kind" "Pucho" "value" ""
+jodo_info rakho map "kind" "Jodo" "value" ""
+ghatao_info rakho map "kind" "Ghatao" "value" ""
+guna_info rakho map "kind" "Guna" "value" ""
+bhaag_info rakho map "kind" "Bhaag" "value" ""
+agar_info rakho map "kind" "Agar" "value" ""
+nahi_info rakho map "kind" "Nahi" "value" ""
+to_info rakho map "kind" "To" "value" ""
+khatam_info rakho map "kind" "Khatam" "value" ""
+se_info rakho map "kind" "Se" "value" ""
+aur_info rakho map "kind" "Aur" "value" ""
+ya_info rakho map "kind" "Ya" "value" ""
+ko_info rakho map "kind" "Ko" "value" ""
+tak_info rakho map "kind" "Tak" "value" ""
+jab_info rakho map "kind" "Jab" "value" ""
+bada_info rakho map "kind" "Bada" "value" ""
+chhota_info rakho map "kind" "Chhota" "value" ""
+barabar_info rakho map "kind" "Barabar" "value" ""
+hai_info rakho map "kind" "Hai" "value" ""
+kaam_info rakho map "kind" "Kaam" "value" ""
+wapas_info rakho map "kind" "Wapas" "value" ""
+do_info rakho map "kind" "Do" "value" ""
+sahi_info rakho map "kind" "Sahi" "value" ""
+galat_info rakho map "kind" "Galat" "value" ""
+khaali_info rakho map "kind" "Khaali" "value" ""
+hissa_info rakho map "kind" "Hissa" "value" ""
+map_info rakho map "kind" "Map" "value" ""
+laao_info rakho map "kind" "Laao" "value" ""
+ruk_info rakho map "kind" "Ruk" "value" ""
+agla_info rakho map "kind" "Agla" "value" ""
+break_info rakho map "kind" "Ruk" "value" ""
+continue_info rakho map "kind" "Agla" "value" ""
+
+lexer_keyword_map rakho map "likho" likho_info "rakho" rakho_info "pucho" pucho_info "jodo" jodo_info "ghatao" ghatao_info "guna" guna_info "bhaag" bhaag_info "agar" agar_info "nahi" nahi_info "to" to_info "khatam" khatam_info "se" se_info "aur" aur_info "ya" ya_info "ko" ko_info "tak" tak_info "jab" jab_info "bada" bada_info "chhota" chhota_info "barabar" barabar_info "hai" hai_info "kaam" kaam_info "wapas" wapas_info "do" do_info "sahi" sahi_info "galat" galat_info "khaali" khaali_info "hissa" hissa_info "map" map_info "laao" laao_info "ruk" ruk_info "agla" agla_info "break" break_info "continue" continue_info
+
+kaam lexer_keyword word
+    keys rakho chaabiyan lexer_keyword_map
+    has rakho ek_hai keys word
+    agar has galat barabar hai to
+        miss rakho map "found" galat "kind" "" "value" ""
+        wapas do miss
+    khatam
+    info rakho lexer_keyword_map hissa word
+    kind rakho info hissa "kind"
+    value rakho info hissa "value"
+    hit rakho map "found" sahi "kind" kind "value" value
+    wapas do hit
+khatam
+
+kaam lexer_is_digit ch
+    size rakho lambayi ch
+    agar size 0 barabar hai to
+        wapas do galat
+    khatam
+    found rakho hai_text "0123456789" ch
+    wapas do found
+khatam
+
+kaam lexer_in_range ch low high
+    size rakho lambayi ch
+    agar size 0 barabar hai to
+        wapas do galat
+    khatam
+    agar ch low se chhota hai to
+        wapas do galat
+    khatam
+    agar ch high se bada hai to
+        wapas do galat
+    khatam
+    wapas do sahi
+khatam
+
+kaam lexer_is_word_atom ch
+    size rakho lambayi ch
+    agar size 0 barabar hai to
+        wapas do galat
+    khatam
+    agar ch "_" barabar hai to
+        wapas do sahi
+    khatam
+    basic rakho hai_text "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" ch
+    agar basic sahi barabar hai to
+        wapas do sahi
+    khatam
+    r rakho lexer_in_range ch "̀" "ͯ"
+    agar r sahi barabar hai to
+        wapas do sahi
+    khatam
+    r rakho lexer_in_range ch "ऀ" "ॿ"
+    agar r sahi barabar hai to
+        wapas do sahi
+    khatam
+    r rakho lexer_in_range ch "ঀ" "৿"
+    agar r sahi barabar hai to
+        wapas do sahi
+    khatam
+    r rakho lexer_in_range ch "਀" "੿"
+    agar r sahi barabar hai to
+        wapas do sahi
+    khatam
+    r rakho lexer_in_range ch "଀" "୿"
+    agar r sahi barabar hai to
+        wapas do sahi
+    khatam
+    r rakho lexer_in_range ch "ఀ" "౿"
+    agar r sahi barabar hai to
+        wapas do sahi
+    khatam
+    r rakho lexer_in_range ch "ഀ" "ൿ"
+    agar r sahi barabar hai to
+        wapas do sahi
+    khatam
+    r rakho lexer_in_range ch "฀" "๿"
+    agar r sahi barabar hai to
+        wapas do sahi
+    khatam
+    r rakho lexer_in_range ch "᪰" "᫿"
+    agar r sahi barabar hai to
+        wapas do sahi
+    khatam
+    r rakho lexer_in_range ch "᷀" "᷿"
+    agar r sahi barabar hai to
+        wapas do sahi
+    khatam
+    r rakho lexer_in_range ch "︠" "︯"
+    agar r sahi barabar hai to
+        wapas do sahi
+    khatam
+    wapas do galat
+khatam
+
+kaam lexer_is_word_start ch
+    atom rakho lexer_is_word_atom ch
+    agar atom galat barabar hai to
+        wapas do galat
+    khatam
+    digit rakho lexer_is_digit ch
+    agar digit sahi barabar hai to
+        wapas do galat
+    khatam
+    wapas do sahi
+khatam
+
+kaam lexer_is_word_char ch
+    atom rakho lexer_is_word_atom ch
+    wapas do atom
+khatam
+
+kaam lexer_check_text_size st acc line
+    limit rakho st hissa "max_string"
+    size rakho lambayi acc
+    agar size limit se bada hai to
+        ltext rakho text limit
+        msg rakho "text bahut bada hai (max "
+        jodo msg msg aur ltext
+        jodo msg msg aur " bytes)"
+        col rakho st hissa "col"
+        res rakho lexer_fail "text_too_large" msg line col
+        wapas do res
+    khatam
+    ok rakho map "ok" sahi
+    wapas do ok
+khatam
+
+kaam lexer_check_word_size st word line
+    limit rakho st hissa "max_string"
+    size rakho lambayi word
+    agar size limit se bada hai to
+        ltext rakho text limit
+        msg rakho "shabd bahut bada hai (max "
+        jodo msg msg aur ltext
+        jodo msg msg aur " bytes)"
+        col rakho st hissa "col"
+        res rakho lexer_fail "word_too_large" msg line col
+        wapas do res
+    khatam
+    ok rakho map "ok" sahi
+    wapas do ok
+khatam
+
+kaam lexer_finite_error num line col
+    msg rakho "'"
+    jodo msg msg aur num
+    jodo msg msg aur "' bahut bada hai, finite number nahi hai"
+    res rakho lexer_fail "number_not_finite" msg line col
+    wapas do res
+khatam
+
+kaam lexer_is_finite_text value
+    bad rakho hai_text value "inf"
+    agar bad sahi barabar hai to
+        wapas do galat
+    khatam
+    bad rakho hai_text value "NaN"
+    agar bad sahi barabar hai to
+        wapas do galat
+    khatam
+    wapas do sahi
+khatam
+
+kaam lexer_lex source max_source max_string max_tokens
+    src_len rakho lambayi source
+    agar src_len max_source se bada hai to
+        sl rakho text src_len
+        ml rakho text max_source
+        msg rakho "source bahut bada hai ("
+        jodo msg msg aur sl
+        jodo msg msg aur " bytes, max "
+        jodo msg msg aur ml
+        jodo msg msg aur ")"
+        res rakho lexer_fail "source_too_large" msg 1 1
+        wapas do res
+    khatam
+    st rakho lexer_state_new source max_string max_tokens
+    tab rakho unescape_text "\\t"
+    cr rakho unescape_text "\\r"
+    running rakho sahi
+    jab tak running sahi barabar hai to
+        ch rakho lexer_current st
+        clen rakho lambayi ch
+        agar clen 0 barabar hai to
+            running rakho galat
+            nahi to
+                agar ch " " barabar hai ya ch tab barabar hai ya ch cr barabar hai to
+                    st rakho lexer_bump st
+                    st hissa "separated" rakho sahi
+                    nahi to
+                        agar ch "\n" barabar hai to
+                            start_line rakho st hissa "line"
+                            start_col rakho st hissa "col"
+                            pushed rakho lexer_push st "Newline" "" start_line start_col
+                            flag rakho pushed hissa "ok"
+                            agar flag galat barabar hai to
+                                wapas do pushed
+                            khatam
+                            st rakho pushed hissa "state"
+                            st rakho lexer_bump st
+                            st hissa "separated" rakho sahi
+                            nahi to
+                                agar ch "#" barabar hai to
+                                    commenting rakho sahi
+                                    jab tak commenting sahi barabar hai to
+                                        nxt rakho lexer_current st
+                                        nlen rakho lambayi nxt
+                                        agar nlen 0 barabar hai to
+                                            commenting rakho galat
+                                            nahi to
+                                                agar nxt "\n" barabar hai to
+                                                    commenting rakho galat
+                                                    nahi to
+                                                        st rakho lexer_bump st
+                                                    khatam
+                                                khatam
+                                            khatam
+                                    st hissa "separated" rakho sahi
+                                    nahi to
+                                        agar ch "\"" barabar hai to
+                                            start_line rakho st hissa "line"
+                                            start_col rakho st hissa "col"
+                                            st rakho lexer_bump st
+                                            acc rakho ""
+                                            closed rakho galat
+                                            scanning rakho sahi
+                                            jab tak scanning sahi barabar hai to
+                                                sch rakho lexer_current st
+                                                slen rakho lambayi sch
+                                                handled rakho galat
+                                                agar slen 0 barabar hai to
+                                                    scanning rakho galat
+                                                    handled rakho sahi
+                                                    agar closed galat barabar hai to
+                                                        bad_col rakho st hissa "col"
+                                                        res rakho lexer_fail "unterminated_text" "text pura nahi hua, band karne ke liye \" lagao" start_line bad_col
+                                                        wapas do res
+                                                    khatam
+                                                khatam
+                                                agar handled galat barabar hai to
+                                                    agar sch "\"" barabar hai to
+                                                        st rakho lexer_bump st
+                                                        closed rakho sahi
+                                                        scanning rakho galat
+                                                        handled rakho sahi
+                                                    khatam
+                                                khatam
+                                                agar handled galat barabar hai to
+                                                    agar sch "\n" barabar hai to
+                                                    bad_col rakho st hissa "col"
+                                                        res rakho lexer_fail "unterminated_text" "text pura nahi hua, band karne ke liye \" lagao" start_line bad_col
+                                                        wapas do res
+                                                    khatam
+                                                khatam
+                                                agar handled galat barabar hai to
+                                                    agar sch "\\" barabar hai to
+                                                    nxt rakho lexer_peek_next st
+                                                    nn rakho lambayi nxt
+                                                    agar nn 0 se bada hai to
+                                                        agar nxt "\"" barabar hai ya nxt "\\" barabar hai to
+                                                            jodo acc acc aur nxt
+                                                            st rakho lexer_bump st
+                                                            st rakho lexer_bump st
+                                                            nahi to
+                                                                agar nxt "n" barabar hai to
+                                                                    jodo acc acc aur "\n"
+                                                                    st rakho lexer_bump st
+                                                                    st rakho lexer_bump st
+                                                                    nahi to
+                                                                        jodo acc acc aur "\\"
+                                                                        st rakho lexer_bump st
+                                                                    khatam
+                                                                khatam
+                                                        nahi to
+                                                            jodo acc acc aur "\\"
+                                                            st rakho lexer_bump st
+                                                        khatam
+                                                        checked rakho lexer_check_text_size st acc start_line
+                                                        cflag rakho checked hissa "ok"
+                                                        agar cflag galat barabar hai to
+                                                            wapas do checked
+                                                        khatam
+                                                        nahi to
+                                                            st rakho lexer_bump st
+                                                            jodo acc acc aur sch
+                                                            checked rakho lexer_check_text_size st acc start_line
+                                                            cflag rakho checked hissa "ok"
+                                                            agar cflag galat barabar hai to
+                                                                wapas do checked
+                                                            khatam
+                                                        khatam
+                                                    khatam
+                                                khatam
+                                            agar closed galat barabar hai to
+                                                bad_col rakho st hissa "col"
+                                                res rakho lexer_fail "unterminated_text" "text pura nahi hua, band karne ke liye \" lagao" start_line bad_col
+                                                wapas do res
+                                            khatam
+                                            pushed rakho lexer_push st "Text" acc start_line start_col
+                                            flag rakho pushed hissa "ok"
+                                            agar flag galat barabar hai to
+                                                wapas do pushed
+                                            khatam
+                                            st rakho pushed hissa "state"
+                                            st hissa "separated" rakho galat
+                                            nahi to
+                                        is_number_start rakho lexer_is_digit ch
+                                        agar ch "-" barabar hai ya is_number_start sahi barabar hai to
+                                            start_line rakho st hissa "line"
+                                                    start_col rakho st hissa "col"
+                                                    sep rakho st hissa "separated"
+                                                    agar ch "-" barabar hai to
+                                                        agar sep galat barabar hai to
+                                                            msg rakho "'-' number ke saath chipka hai, space do ya 'ghatao' likho"
+                                                            res rakho lexer_fail "stuck_minus" msg start_line start_col
+                                                            wapas do res
+                                                        khatam
+                                                    khatam
+                                                    acc rakho ""
+                                                    agar ch "-" barabar hai to
+                                                        jodo acc acc aur "-"
+                                                        st rakho lexer_bump st
+                                                    khatam
+                                                    scanning rakho sahi
+                                                    jab tak scanning sahi barabar hai to
+                                                        nch rakho lexer_current st
+                                                        dig rakho lexer_is_digit nch
+                                                        agar dig sahi barabar hai to
+                                                            jodo acc acc aur nch
+                                                            st rakho lexer_bump st
+                                                            nahi to
+                                                                scanning rakho galat
+                                                            khatam
+                                                        khatam
+                                                    dot rakho lexer_current st
+                                                    after rakho lexer_peek_next st
+                                                    adig rakho lexer_is_digit after
+                                                    agar dot "." barabar hai to
+                                                        agar adig sahi barabar hai to
+                                                            jodo acc acc aur "."
+                                                            st rakho lexer_bump st
+                                                            scanning rakho sahi
+                                                            jab tak scanning sahi barabar hai to
+                                                                nch rakho lexer_current st
+                                                                dig rakho lexer_is_digit nch
+                                                                agar dig sahi barabar hai to
+                                                                    jodo acc acc aur nch
+                                                                    st rakho lexer_bump st
+                                                                    nahi to
+                                                                        scanning rakho galat
+                                                                    khatam
+                                                                khatam
+                                                            khatam
+                                                        khatam
+                                                    digits rakho acc
+                                                    dsize rakho lambayi acc
+                                                    agar dsize 1 se bada hai to
+                                                        first rakho akshar acc 1
+                                                        agar first "-" barabar hai to
+                                                            digits rakho kato acc 2 dsize
+                                                        khatam
+                                                    khatam
+                                                    dcount rakho lambayi digits
+                                                    too_big rakho galat
+                                                    agar dcount 309 se bada hai to
+                                                        too_big rakho sahi
+                                                        nahi to
+                                                            agar dcount 309 barabar hai to
+                                                                first rakho akshar digits 1
+                                                                agar first "1" se bada hai to
+                                                                    too_big rakho sahi
+                                                                    nahi to
+                                                                        agar first "1" barabar hai to
+                                                                            second rakho akshar digits 2
+                                                                            big_second rakho hai_text "23456789" second
+                                                                            agar big_second sahi barabar hai to
+                                                                                too_big rakho sahi
+                                                                            khatam
+                                                                        khatam
+                                                                    khatam
+                                                                khatam
+                                                            khatam
+                                                    end_col rakho st hissa "col"
+                                                    agar too_big sahi barabar hai to
+                                                        res rakho lexer_finite_error acc start_line end_col
+                                                        wapas do res
+                                                    khatam
+                                                    val rakho sankhya acc
+                                                    vtext rakho text val
+                                                    finite rakho lexer_is_finite_text vtext
+                                                    agar finite galat barabar hai to
+                                                        res rakho lexer_finite_error acc start_line end_col
+                                                        wapas do res
+                                                    khatam
+                                                    pushed rakho lexer_push st "Number" vtext start_line start_col
+                                                    flag rakho pushed hissa "ok"
+                                                    agar flag galat barabar hai to
+                                                        wapas do pushed
+                                                    khatam
+                                                    st rakho pushed hissa "state"
+                                                    st hissa "separated" rakho galat
+                                                    nahi to
+                                                        is_word_start rakho lexer_is_word_start ch
+                                                        agar is_word_start sahi barabar hai to
+                                                            start_line rakho st hissa "line"
+                                                            start_col rakho st hissa "col"
+                                                            acc rakho ""
+                                                            scanning rakho sahi
+                                                            jab tak scanning sahi barabar hai to
+                                                                wch rakho lexer_current st
+                                                                wlen rakho lambayi wch
+                                                                wis rakho lexer_is_word_char wch
+                                                                agar wlen 0 barabar hai ya wis galat barabar hai to
+                                                                    scanning rakho galat
+                                                                    nahi to
+                                                                        jodo acc acc aur wch
+                                                                        st rakho lexer_bump st
+                                                                        checked rakho lexer_check_word_size st acc start_line
+                                                                        cflag rakho checked hissa "ok"
+                                                                        agar cflag galat barabar hai to
+                                                                            wapas do checked
+                                                                        khatam
+                                                                    khatam
+                                                                khatam
+                                                            lower rakho neeche acc
+                                                            info rakho lexer_keyword lower
+                                                            found rakho info hissa "found"
+                                                            agar found sahi barabar hai to
+                                                                kind rakho info hissa "kind"
+                                                                value rakho info hissa "value"
+                                                                pushed rakho lexer_push st kind value start_line start_col
+                                                                nahi to
+                                                                    pushed rakho lexer_push st "Ident" acc start_line start_col
+                                                                khatam
+                                                            flag rakho pushed hissa "ok"
+                                                            agar flag galat barabar hai to
+                                                                wapas do pushed
+                                                            khatam
+                                                            st rakho pushed hissa "state"
+                                                            st hissa "separated" rakho galat
+                                                            nahi to
+                                                                line rakho st hissa "line"
+                                                                col rakho st hissa "col"
+                                                                msg rakho "'"
+                                                                jodo msg msg aur ch
+                                                                jodo msg msg aur "' nahi chahiye, BOLI me sirf shabd, number aur \"text\" use hota hai"
+                                                                res rakho lexer_fail "unexpected_character" msg line col
+                                                                wapas do res
+                                                            khatam
+                                                        khatam
+                                                    khatam
+                                                khatam
+                                            khatam
+                                        khatam
+                                     khatam
+                                  khatam
+    eof_line rakho st hissa "line"
+    eof_col rakho st hissa "col"
+    pushed rakho lexer_push st "Eof" "" eof_line eof_col
+    flag rakho pushed hissa "ok"
+    agar flag galat barabar hai to
+        wapas do pushed
+    khatam
+    st rakho pushed hissa "state"
+    tokens rakho st hissa "tokens"
+    res rakho lexer_ok tokens
+    wapas do res
+khatam

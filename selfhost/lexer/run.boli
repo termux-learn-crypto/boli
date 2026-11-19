@@ -1,0 +1,26 @@
+laao "errors.boli"
+laao "token.boli"
+laao "reader.boli"
+laao "lexer.boli"
+
+kaam lexer_display_result res
+    flag rakho res hissa "ok"
+    agar flag sahi barabar hai to
+        items rakho res hissa "tokens"
+        total rakho lambayi items
+        i rakho 1
+        jab tak i total se chhota ya barabar hai to
+            item rakho items hissa i
+            line rakho lexer_token_text item
+            likho line
+            jodo i i aur 1
+        khatam
+        nahi to
+            err rakho res hissa "error"
+            line rakho lexer_error_text err
+            likho line
+        khatam
+    khatam
+
+result rakho lexer_lex source max_source max_string max_tokens
+lexer_display_result result
