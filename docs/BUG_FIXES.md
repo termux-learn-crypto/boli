@@ -1,5 +1,7 @@
 # BOLI v0.3.0 — Bug Fixes
 
+> Historical snapshot — kept for traceability. Current status: [TEST_RESULTS.md](TEST_RESULTS.md) and [COMPLETE_AUDIT.md](COMPLETE_AUDIT.md).
+
 Each entry: symptom → root cause → fix → verification. (Full audit table in COMPLETE_AUDIT.md.)
 
 ---

@@ -155,13 +155,7 @@ impl Environment {
         let resolve_base = self.source_dir.clone().unwrap_or_else(|| {
             std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
         });
-        let joined = if std::path::Path::new(raw_path).is_absolute() {
-            std::path::PathBuf::from(raw_path)
-        } else {
-            resolve_base.join(raw_path)
-        };
-        let canonical = std::fs::canonicalize(&joined)
-            .map_err(|e| BoliError::line(line, format!("file '{}' nahi mili: {}", raw_path, e)))?;
+        let canonical = crate::limits::resolve_import_path(raw_path, &resolve_base, line)?;
         if !self.loaded_modules.insert(canonical.clone()) {
             // pehle hi import ho chuka hai - ek baar execute karna hai
             return Ok(());

@@ -1,88 +1,96 @@
-# BOLI v0.6.1 — Test Results (actual commands, actual output)
+# BOLI v0.6.2 — Test Results (actual commands, actual output)
 
-**Host:** Termux on Android (aarch64), rustc/cargo 1.100.0 via system Termux package (note: `~/.cargo/bin/cargo` is a broken rustup shim; `/data/data/com.termux/files/usr/bin/cargo` is used — see Environment notes). **Date:** 2026-11-18. **Commit:** v0.3.0 (release).
+**Host:** Termux on Android (aarch64), rustc/cargo 1.100.0 via the system Termux package. **Date:** 2026-11-19. **Version:** `BOLI version 0.6.2`. **Note:** `~/.cargo/bin/cargo` is a broken rustup shim; commands below use `/data/data/com.termux/files/usr/bin/cargo` (exported via `PATH`).
+
+This is the current status page. Older reports remain as historical snapshots: [COMPLETE_AUDIT.md](COMPLETE_AUDIT.md), [SECURITY_REPORT.md](SECURITY_REPORT.md), [UPGRADE_ROADMAP.md](UPGRADE_ROADMAP.md).
 
 ## Commands and results
 
 ### 1. `cargo fmt --check`
 ```
-(clean — zero diffs; one-time reformat commit df5c012 made this a green gate)
+(clean — zero diffs)
 ```
 
-### 2. `cargo check`
+### 2. `cargo check --all-targets`
 ```
-Checking boli v0.3.0 (/data/data/com.termux/files/home/boli)
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.92s
-```
-
-### 3. `cargo test`
-
-```
-running 77 tests
-test result: ok. 77 passed; 0 failed
-running 18 tests
-test result: ok. 18 passed; 0 failed
+    Checking boli v0.6.2 (/data/data/com.termux/files/home/boli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.70s
 ```
 
+### 3. `cargo clippy --all-targets --all-features -- -D warnings`
 ```
+    Checking boli v0.6.2 (/data/data/com.termux/files/home/boli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.11s
+```
+Zero warnings.
+
+### 4. `cargo test`
+```
+running 2 tests
+test limits::tests::oversized_line_across_chunks_is_drained ... ok
+test limits::tests::oversized_line_with_newline_in_same_chunk_is_drained ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
 running 0 tests
-test result: ok. 0 passed; 0 failed
-running 0 tests
-test result: ok. 0 passed; 0 failed
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
 running 108 tests
-test result: ok. 108 passed; 0 failed; finished in 0.08s
-running 27 tests
-test result: ok. 27 passed; 0 failed; finished in 0.19s
-running 24 tests
-test result: ok. 24 passed; 0 failed; finished in 0.27s
+test result: ok. 108 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+running 28 tests
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+running 29 tests
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
 running 0 tests
-test result: ok. 0 passed; 0 failed
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 ```
-**159 passed / 0 failed** (108 `tests/boli.rs` library + 27 `tests/cli.rs` end-to-end + 24 `tests/vm.rs` VM parity).
 
-New tests added in v0.3.0 (all in `tests/boli.rs` unless noted):
-- `literal_string_size_limit` — literal bypasses the string-bytes limit → error
-- `list_creation_limit`, `list_concat_limit`, `list_under_limit_works`
-- `condition_ya_chain_parse_limit`, `condition_ya_chain_eval_limit`
-- `lexer_rejects_control_characters`
-- `deeply_nested_agar_errors_not_crashes`, `deeply_nested_expression_errors_not_crashes`, `deeply_nested_hissa_chain_errors_not_crashes`, `moderately_nested_code_still_works`
-- `fuzz_lex_parse_never_panics` — deterministic xorshift, 2,000 random-ish inputs through lexer+parser; neither may panic; no dependencies
-- `malformed_programs_error_not_crash`
-- CLI (`tests/cli.rs`): `cli_bogus_subcommand_errors`, `cli_run_with_too_many_args_errors`
+**167 passed / 0 failed** (2 unit + 108 `tests/boli.rs` library + 28 `tests/cli.rs` end-to-end + 29 `tests/vm.rs` VM/parity).
 
-### v0.3.1 tests added
-- Unit: `eval_depth_limit_is_configurable_and_enforced` (10 → error "(max 10)", 500 → ok), `lexer_string_literal_byte_limit`, `lexer_identifier_byte_limit`, `lexer_token_limit`, `lexer_source_byte_limit`, `lexer_degrammar_still_works_after_cursor_rewrite`, `total_budget_caps_string_storage`, `total_budget_caps_list_storage`, `total_budget_freed_by_scope_pop`, `total_budget_replacement_is_not_double_counted`
-- CLI (subprocess with real env): `cli_source_bytes_boundary`, `cli_env_eval_depth_is_respected`, `cli_repl_oversized_line_is_rejected_and_repl_survives`
-
-### 4. `cargo clippy --all-targets --all-features -- -D warnings`
+Regenerate the count with:
+```bash
+cargo test -- --list | grep ': test$' | wc -l
 ```
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.92s
-```
-Zero warnings (run with `-D warnings`; failing would abort).
 
 ### 5. `cargo build --release`
 ```
-Finished `release` profile [optimized] target(s) in 0.57s
--rwxr-xr-x boli 782,672 bytes
+   Compiling boli v0.6.2 (/data/data/com.termux/files/home/boli)
+    Finished `release` profile [optimized] target(s) in 10.19s
 ```
+
+### 6. `./target/release/boli version`
+```
+BOLI version 0.6.2
+```
+
+## What v0.6.2 added to verification
+
+- `src/limits.rs` unit: over-limit `pucho` lines are drained both when the newline is in the same buffer and when it arrives in a later chunk; the following line is readable.
+- `cli_import_root_confines_laao`: `BOLI_IMPORT_ROOT` permits an in-root import and rejects `../` and absolute escapes for both the interpreter and `BOLI_VM=1`.
+- `vm_error_resets_stack_to_baseline`, `vm_steps_reset_between_programs`, `vm_failing_range_program_then_reuse_same_vm`: reused VMs start clean and step counters restart.
+- `vm_list_and_map_assignment_compiles_rhs_once_and_clears_stack`: list/map index assignment evaluates the RHS once and leaves no stack residue.
+- `vm_matches_interpreter_on_core_corpus`, `vm_and_interpreter_agree_on_runtime_errors`: interpreter and VM produce the same output and error text for a shared corpus.
 
 ## Manual verification (examples & CLI)
 
-- `boli run examples/loop.hl` → all loops print correct output (ginti 1..5, Adult ho).
-- `boli run examples/calculator.hl` (stdin `5\n3`) → `8`, `2`, `15`, `1.666…`; inline `150`/`50` after prompts.
-- `boli run examples/calculator2.hl` → `8` for `jodo`; EOF paths print `khaali`/`Galat kaam likha hai` without panic.
-- `boli run examples/namaste.hl` → prints greeting; EOF on `pucho` yields `khaali` gracefully.
+- `boli run examples/loop.hl` → loops print correct output.
+- `boli run examples/calculator.hl` with stdin `5\n3` → `8`, `2`, `15`, `1.666…`.
+- `boli run examples/calculator2.hl` → `8` for `jodo`; EOF paths stay graceful.
+- `boli run examples/namaste.hl` → greeting prints; EOF on `pucho` yields `khaali`.
 - REPL: `likho jodo 6 aur 7` → `13`; `nikalo` exits cleanly.
-- 11 MiB source file → `Galti: file '…' bahut badi hai (11534336 bytes, max 10485760)`, exit 1.
-- 200,000-term `ya` condition → `Galti: line 2 me condition bahut lambi ho gayi (max 128 'ya')`, exit 1, <1s (previously SIGSEGV).
-- 20,000-item list literal → `Galti: line 1 me list bahut badi ho gayi (max 10000 items)`.
-- `BOLI_MAX_STRING_BYTES=1` with `likho "abcd1234"` → `Galti: line 1 me text bahut bada ho gaya (max 1 bytes)` (previously printed).
-- `install.sh` with `BOLI_INSTALL_DIR=$HOME/boli-install-test` → installs, `boli version` → `BOLI version 0.3.0`, runs examples; test dir removed after verification.
+- 11 MiB source file → Hinglish Galti with size and cap; exit 1.
+- 200,000-term `ya` condition → Hinglish Galti in under a second.
+- 20,000-item list literal → Hinglish Galti.
+- Oversized `pucho` line in REPL → Galti, then the next short line is accepted.
 
 ## Environment notes (honest)
-- `cargo` in `~/.cargo/bin` is a rustup shim with no default toolchain configured; the system Termux `cargo`/`rustc` 1.100.0 (`/data/data/com.termux/files/usr/bin/cargo`) is used throughout. `cargo fmt` works via Termux's rustfmt 1.11.0.
-- This environment IS Android (Termux, aarch64) — Termux compatibility is genuinely verified here. Windows/macOS/iOS are **not** tested; claims are not made.
-- `cargo fmt --check` initially reported 118 pre-existing diffs (author's compact style); commit `df5c012` is a pure reformat (no logic change; 71→71 tests still passing), after which the gate is clean.
+
+- `cargo` in `~/.cargo/bin` is a rustup shim with no default toolchain; the system Termux `cargo`/`rustc` 1.100.0 is used.
+- This environment is Android/Termux (aarch64) — Termux compatibility is genuinely verified. Windows/macOS/iOS are **not** tested; no claims are made.
+- The VM uses bytecode step semantics; step counts need not equal the tree-walker's statement count for an identical source file. Both enforce their configured `BOLI_MAX_STEPS`.
 
 ## Conclusion
-All configured gates are green and all v0.3.0 fixes are verified with passing tests or direct CLI reproduction. No regressions detected in 82 automated tests.
+
+All configured gates are green, 167/167 tests pass, and the release binary reports v0.6.2. No regressions detected.

@@ -4,6 +4,8 @@ BOLI - Bina + - * / ke, sirf shabdon se programming
 Yahan `+ - * / { } ( ) = :` jaise symbols ki jagah shabd use hote hain. Poor poora program sirf shabdon, number aur text se likha jata hai.
 Interpreter **Rust** me bana hai. File extension: **`.hl`**.
 
+**Current status:** v0.6.2 — zero dependencies, 167 tests green, tree-walking interpreter (default) + experimental bytecode VM, read-only local modules via `laao`. Current verification: [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md).
+
 ```boli
 likho "Namaste Duniya"
 ```
@@ -411,18 +413,19 @@ boli/
 │   └── ast.rs          # AST nodes + Galti (error) type
 └── tests/
     ├── boli.rs         # semantics + regression tests (library-level)
-    └── cli.rs          # binary-level end-to-end tests (spawns boli)
+    ├── cli.rs          # binary-level end-to-end tests (spawns boli)
+    └── vm.rs           # bytecode VM + interpreter/VM parity tests
 ```
 
 ## Testing
 
 ```bash
-cargo test          # 159 tests chalenge (108 library + 27 CLI + 24 VM)
+cargo test          # 167 tests chalenge (2 unit + 108 library + 28 CLI + 29 VM)
 ```
 
 Details aur test-adding guide: [TESTING.md](TESTING.md). Spec: [LANGUAGE_SPEC.md](LANGUAGE_SPEC.md). Changes: [CHANGELOG.md](CHANGELOG.md). Audit: [docs/COMPLETE_AUDIT.md](docs/COMPLETE_AUDIT.md). Security: [docs/SECURITY_REPORT.md](docs/SECURITY_REPORT.md).
 
-Kaam karne ka flow: `source.hl` → **lexer** (tokens) → **parser** (AST) → **interpreter** (run).
+Kaam karne ka flow: `source.hl` → **lexer** (tokens) → **parser** (AST) → **interpreter** (default) ya **bytecode VM** (`--vm` / `BOLI_VM=1`).
 
 ---
 
@@ -438,7 +441,7 @@ Kaam karne ka flow: `source.hl` → **lexer** (tokens) → **parser** (AST) → 
 
 User-defined kaam in naam se shadow kar sakta hai — user kaam ki priority zyada hai.
 
-## Safety limits (BOLI v0.6.0)
+## Safety limits (BOLI v0.6.2)
 
 Sab limits env variable se override ho sakti hain — har violation Hinglish Galti error hai, kabhi crash nahi:
 
@@ -456,6 +459,7 @@ Sab limits env variable se override ho sakti hain — har violation Hinglish Gal
 | REPL input line bytes | 64 KiB | `BOLI_MAX_REPL_LINE_BYTES` |
 | Live scope bytes (memory budget) | 64 MiB | `BOLI_MAX_TOTAL_BYTES` |
 | Import nesting depth | 32 | `BOLI_MAX_IMPORT_DEPTH` |
+| Import root (optional) | unset (any local path) | `BOLI_IMPORT_ROOT` |
 
 ## Feature list
 
@@ -465,7 +469,7 @@ Sab limits env variable se override ho sakti hain — har violation Hinglish Gal
 - `se ... tak` range loop, `jab tak` while loop
 - `kaam` definitions, calls, `wapas do`, recursion
 - `mapa` maps (word-based, no symbols): `mapa rakho map "naam" "Vilas" "umar" 28`
-- Modules: `laao "math.hl"` (current environment import, circular-safe)
+- Modules: `laao "math.hl"` (current environment import, circular-safe, bounded reads; optional `BOLI_IMPORT_ROOT` confinement)
 - Bytecode VM (experimental): `boli --vm run x.hl` ya `BOLI_VM=1`
 - Did-you-mean suggestions for unknown names
 - Built-in kaams: `lambayi`, `upar`, `neeche`, `text`, `sankhya`, `chaabiyan`
@@ -474,10 +478,10 @@ Sab limits env variable se override ho sakti hain — har violation Hinglish Gal
 
 ## Aage kya aa sakta hai
 
-- list/array type
 - string formatting kaam
 - kaam ke saath default arguments
-- dictionaries with more ops (`has`, `miti` / delete)
+- maps ke liye `has` / `miti` ops
+- optional sandboxed file I/O capabilities (each with its own `BOLI_MAX_*` limit)
 
 ---
 

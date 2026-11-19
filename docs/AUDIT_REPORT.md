@@ -1,5 +1,7 @@
 # BOLI Audit Report (v0.1.0 → v0.2.0)
 
+> Historical snapshot — kept for traceability. Current status: [TEST_RESULTS.md](TEST_RESULTS.md) and [COMPLETE_AUDIT.md](COMPLETE_AUDIT.md).
+
 **Auditor:** BOLI maintainer audit (staff engineer review)
 **Scope:** Full repository — `Cargo.toml`, `src/*.rs`, `examples/`, `install.sh`, `README.md`
 **Date:** 2026-11-18

@@ -3,22 +3,30 @@
 ## How to run the tests
 
 ```bash
-cargo test          # everything (unit + integration)
+cargo test                  # everything (unit + integration)
+cargo test --lib            # bounded-input unit tests (2 tests)
 cargo test --test boli      # library-level semantics (108 tests)
-cargo test --test cli       # CLI/binary end-to-end (19 tests)
+cargo test --test cli       # CLI/binary end-to-end (28 tests)
+cargo test --test vm        # bytecode VM + parity (29 tests)
 ```
 
 Full verification matrix (run before a release):
 
 ```bash
 cargo fmt --check                          # formatting gate
-cargo check                                # compile gate
-cargo test                                 # 159 tests (108 library + 27 CLI + 24 VM)
+cargo check --all-targets                  # compile gate (all targets)
+cargo test                                 # 167 tests (2 unit + 108 library + 28 CLI + 29 VM)
 cargo clippy --all-targets --all-features -- -D warnings   # lint gate
 cargo build --release                      # release artifact gate
 ```
 
 No extra tooling is required — only `cargo` and the BOLI binary (which `cargo test` builds automatically). The CLI tests use the `CARGO_BIN_EXE_boli` path cargo provides; the library tests use the `Environment`/`parse_source` API directly and capture `likho` output via `Environment::collect_output`.
+
+Test counts can be regenerated from the current tree with:
+
+```bash
+cargo test -- --list | grep ': test$' | wc -l
+```
 
 ## What is tested
 
@@ -43,6 +51,13 @@ No extra tooling is required — only `cargo` and the BOLI binary (which `cargo 
 - condition `ya` chain parse-time cap (`Parser::with_limits`) and eval-time cap
 - expression/`hissa` chain depth guard
 - fuzz-ish test: deterministic xorshift generator feeds random byte soup into the lexer and parser; neither may panic (no third-party fuzzer needed)
+
+### v0.6.2 audit regressions
+- `src/limits.rs` unit: over-limit lines with the newline in the same chunk and across chunks are drained; the next line is readable.
+- `cli_import_root_confines_laao`: allowed import plus `../` and absolute escapes are checked for both interpreter and `BOLI_VM=1`.
+- `vm_error_resets_stack_to_baseline`, `vm_steps_reset_between_programs`, `vm_failing_range_program_then_reuse_same_vm`: a reused VM is clean after errors and step counters restart.
+- `vm_list_and_map_assignment_compiles_rhs_once_and_clears_stack`: list/map index assignment single-evaluation and stack cleanup.
+- `vm_matches_interpreter_on_core_corpus`, `vm_and_interpreter_agree_on_runtime_errors`: both backends agree on output and error text for a shared corpus.
 
 ### v0.5.0 tests
 - `traceback_shows_full_call_chain`, `traceback_innermost_first`, `traceback_absent_for_top_level_errors`, `traceback_preserved_through_nested_propagation`
@@ -84,7 +99,7 @@ No extra tooling is required — only `cargo` and the BOLI binary (which `cargo 
 
 ## Adding a test
 
-Put assertion-style tests in `tests/boli.rs` (use `run_out(src) -> Result<Vec<String>, BoliError>` to get captured output), or black-box CLI tests in `tests/cli.rs` (`run_with_stdin("file_name.hl", src, stdin) -> (status, stdout, stderr)`). Prefix temp files with the test's purpose to avoid collisions.
+Put assertion-style tests in `tests/boli.rs` (use `run_out(src) -> Result<Vec<String>, BoliError>` to get captured output), VM/parity tests in `tests/vm.rs` (`run_vm(src)` / `interp_out(src)`), black-box CLI tests in `tests/cli.rs` (`run_with_stdin("file_name.hl", src, stdin) -> (status, stdout, stderr)`), or pure helper tests beside the code in `src/limits.rs`. Prefix temp files with the test's purpose to avoid collisions.
 
 ## Manual regression
 

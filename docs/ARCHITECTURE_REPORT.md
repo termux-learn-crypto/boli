@@ -1,5 +1,7 @@
 # BOLI — Architecture Report (v0.3.0)
 
+> Historical snapshot — kept for traceability. Current status: [TEST_RESULTS.md](TEST_RESULTS.md) and [CHANGELOG.md](../CHANGELOG.md).
+
 ## Current structure
 
 ```

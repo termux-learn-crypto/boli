@@ -586,3 +586,62 @@ fn cli_pucho_oversized_line_with_same_buffer_newline_is_caught() {
         stderr
     );
 }
+
+#[test]
+fn cli_import_root_confines_laao() {
+    let base = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("import_root_test");
+    let root = base.join("root");
+    let outside = base.join("outside.hl");
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(root.join("inside.hl"), "VALUE rakho 42\n").unwrap();
+    std::fs::write(&outside, "VALUE rakho 99\n").unwrap();
+    let main_path = root.join("main.hl");
+    std::fs::write(&main_path, "laao \"inside.hl\"\nlikho VALUE\n").unwrap();
+    let escape_path = root.join("escape.hl");
+    std::fs::write(&escape_path, "laao \"../outside.hl\"\nlikho VALUE\n").unwrap();
+    let abs_path = root.join("abs.hl");
+    std::fs::write(
+        &abs_path,
+        format!("laao \"{}\"\nlikho VALUE\n", outside.display()),
+    )
+    .unwrap();
+
+    for vm in [false, true] {
+        let mut cmd = Command::new(boli_bin());
+        cmd.arg("run")
+            .arg(&main_path)
+            .current_dir(&root)
+            .env("BOLI_IMPORT_ROOT", &root)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        if vm {
+            cmd.env("BOLI_VM", "1");
+        }
+        let output = cmd.output().unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            output.status.success(),
+            "allowed import failed (vm={}): {}",
+            vm,
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(stdout.contains("42"), "stdout: {}", stdout);
+
+        for bad in [&escape_path, &abs_path] {
+            let mut cmd = Command::new(boli_bin());
+            cmd.arg("run")
+                .arg(bad)
+                .current_dir(&root)
+                .env("BOLI_IMPORT_ROOT", &root)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped());
+            if vm {
+                cmd.env("BOLI_VM", "1");
+            }
+            let output = cmd.output().unwrap();
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(!output.status.success(), "escape should fail (vm={})", vm);
+            assert!(stderr.contains("root se bahar"), "stderr: {}", stderr);
+        }
+    }
+}

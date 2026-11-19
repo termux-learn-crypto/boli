@@ -455,14 +455,7 @@ impl Compiler {
                 let resolve_base = self.source_dir.clone().unwrap_or_else(|| {
                     std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
                 });
-                let joined = if std::path::Path::new(path).is_absolute() {
-                    std::path::PathBuf::from(path)
-                } else {
-                    resolve_base.join(path)
-                };
-                let canonical = std::fs::canonicalize(&joined).map_err(|e| {
-                    BoliError::line(*line, format!("file '{}' nahi mili: {}", path, e))
-                })?;
+                let canonical = limits::resolve_import_path(path, &resolve_base, *line)?;
                 if !self.loaded.insert(canonical.clone()) {
                     return Ok(()); // pehle hi include ho chuka hai
                 }
@@ -550,6 +543,10 @@ impl Vm {
         self.captured.take().unwrap_or_default()
     }
 
+    pub fn stack_depth(&self) -> usize {
+        self.stack.len()
+    }
+
     pub fn with_total_budget_bytes(mut self, max_total_bytes: u64) -> Self {
         self.max_total_bytes = max_total_bytes;
         self
@@ -565,8 +562,9 @@ impl Vm {
     }
 
     pub fn run_program(&mut self, program: &[Stmt]) -> Result<(), BoliError> {
-        // compile phase
-        // compile phase
+        self.steps = 0;
+        let baseline_scopes = self.scopes.len();
+        let baseline_stack = self.stack.len();
         let mut compiler = Compiler::new();
         if let Some(dir) = &self.source_dir {
             compiler = Compiler::with_dir(Some(dir.clone()));
@@ -574,12 +572,15 @@ impl Vm {
         let mut code = Vec::new();
         let mut lines = Vec::new();
         compiler.compile_block(program, &mut code, &mut lines)?;
-        // move compiled artifacts into VM
         self.constants = compiler.constants;
         self.names = compiler.names;
         self.kaams = compiler.kaams;
-        self.exec(&code, &lines)?;
-        Ok(())
+        let result = self.exec(&code, &lines);
+        while self.scopes.len() > baseline_scopes {
+            self.pop_scope();
+        }
+        self.stack.truncate(baseline_stack);
+        result.map(|_| ())
     }
 
     fn push_scope(&mut self) {
@@ -910,7 +911,9 @@ impl Vm {
             self.call_depth -= 1;
             return Err(e);
         }
+        let stack_baseline = self.stack.len();
         let result = self.exec(&code, &klines);
+        self.stack.truncate(stack_baseline);
         let snapshot = self.trace.clone();
         self.trace.pop();
         self.pop_scope();

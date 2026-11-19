@@ -1,5 +1,7 @@
 # BOLI — Complete Source-Code Audit (v0.3.0)
 
+> Historical base report — kept for traceability. Current status: [TEST_RESULTS.md](TEST_RESULTS.md) and the addenda below.
+
 **Date:** 2026-11-18 · **Auditor:** staff-engineer review (this session) · **Base:** v0.2.0 + fix `5d9609e` → **Result:** 6 issues verified & fixed (see BUG_FIXES.md), all green gates, v0.3.0 released.
 
 Scope: `Cargo.toml`, `src/*.rs`, `tests/*.rs`, `examples/`, `install.sh`, all docs, and the README claims.
@@ -179,4 +181,27 @@ Verified: 147/147 tests green; examples run identically under both backends (`--
 | A8 | Built-ins could exceed string cap (Medium) | `upar`/`neeche`/`text`/`chaabiyan` built text unchecked | `checked_text` caps all built-in outputs; key bytes/list cap enforced in `chaabiyan`; `builtins_respect_string_cap*`, `chaabiyan_caps_keys_bytes` |
 | A9 | Docs stale (Low) | test counts/tree drifted | README/TESTING/SPEC/ARCHITECTURE refreshed |
 
-Full verification: see `TEST_RESULTS.md` — 159/159 tests green; all gates pass; both backends (interpreter + VM) verified for every fix.
+Full verification for that release: 159/159 tests green; all gates pass; both backends (interpreter + VM) verified for every fix. Current status: [TEST_RESULTS.md](TEST_RESULTS.md).
+
+---
+
+# Appendix — v0.6.2 addendum (second audit pass, 2026-11-19)
+
+Source reviewed: `/data/data/com.termux/files/home/boli-audit-report.md` (`BOLI v0.6.0 — Full Static Audit Report`). Several report items were already fixed by v0.6.1; the remainder were fixed or explicitly documented here.
+
+| # | Report finding | Status | Resolution |
+|---|---|---|---|
+| H-01 | `pucho` line cap bypass | Fixed in v0.6.1, re-verified | `cli_pucho_oversized_line_with_same_buffer_newline_is_caught` still green. |
+| H-02 | Imported source reads not bounded | Fixed in v0.6.1, re-verified | Shared `limits::read_source_capped`; `cli_laao_import_read_is_bounded` still green. |
+| H-03 | VM list assignment compiles RHS twice | Not reproducible in current tree | `Stmt::ListAssign` compiles index, value and target once; locked in by `vm_list_and_map_assignment_compiles_rhs_once_and_clears_stack`. |
+| M-04 | `drain()` only consumed the current chunk | Fixed in v0.6.2 | `read_input_line_from` + `drain_through_newline`; two unit tests cover same-chunk and cross-chunk newlines. |
+| M-05 | VM stack not reset between programs / on error | Fixed in v0.6.2 | `run_program` resets steps/scopes/stack to baseline; `call_kaam` restores stack; `stack_depth()` assertions added. |
+| M-06 | Optional import confinement missing | Fixed in v0.6.2 | `limits::resolve_import_path` enforces `BOLI_IMPORT_ROOT` with canonicalized prefix checks in both engines; CLI test covers allow/deny. |
+| L-01 | Security report scope stale (v0.3.0) | Fixed in v0.6.2 | SECURITY_REPORT rewritten for v0.6.2 scope, threat model and limits matrix. |
+| L-02 | Roadmap stale (post-v0.3.0) | Fixed in v0.6.2 | UPGRADE_ROADMAP rebased on v0.6.2; done items moved out of planning. |
+| L-03 | Historical report labels missing | Fixed in v0.6.2 | Added historical notes to AUDIT_REPORT, ARCHITECTURE_REPORT, BUG_FIXES, COMPLETE_AUDIT and V0.3.0_CHANGELOG. |
+| L-04 | TEST_RESULTS mixed versions | Fixed in v0.6.2 | Rewritten as the current v0.6.2 status page with actual command output. |
+| L-05 | VM step semantics not disclosed | Fixed in v0.6.2 | Documented as backend-specific in LANGUAGE_SPEC, SECURITY_REPORT, TEST_RESULTS and UPGRADE_ROADMAP. |
+| Coverage | No differential interpreter/VM corpus | Fixed in v0.6.2 | `vm_matches_interpreter_on_core_corpus` and `vm_and_interpreter_agree_on_runtime_errors`. |
+
+Verification: 167/167 tests green (2 unit + 108 library + 28 CLI + 29 VM); fmt, check, clippy -D warnings and release build all pass. See [TEST_RESULTS.md](TEST_RESULTS.md).

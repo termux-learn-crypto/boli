@@ -27,6 +27,7 @@ use std::io::BufRead;
 
 // Bounded stdin line read: max_bytes tak hi padhta hai (invalid UTF-8 -> lossy)
 // EOF par Khaali milta hai (caller handle kare)
+#[derive(Debug, PartialEq)]
 pub(crate) enum InputLine {
     Line(String),
     TooLarge,
@@ -34,10 +35,17 @@ pub(crate) enum InputLine {
 }
 
 pub(crate) fn read_input_line(max_bytes: u64) -> std::io::Result<InputLine> {
-    let mut buf: Vec<u8> = Vec::new();
     let mut stdin = std::io::stdin().lock();
+    read_input_line_from(&mut stdin, max_bytes)
+}
+
+pub(crate) fn read_input_line_from<R: BufRead>(
+    reader: &mut R,
+    max_bytes: u64,
+) -> std::io::Result<InputLine> {
+    let mut buf: Vec<u8> = Vec::new();
     loop {
-        let chunk = match stdin.fill_buf() {
+        let chunk = match reader.fill_buf() {
             Ok(c) => c,
             Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
             Err(e) => return Err(e),
@@ -51,27 +59,47 @@ pub(crate) fn read_input_line(max_bytes: u64) -> std::io::Result<InputLine> {
         }
         match chunk.iter().position(|&b| b == b'\n') {
             Some(pos) => {
-                // newline usi buffer me bhi ho sakta hai - poora content check karo
-                // (content = buf + pos bytes; newline count nahi hota)
                 if buf.len() as u64 + pos as u64 > max_bytes {
                     let len = pos + 1;
-                    stdin.consume(len);
+                    reader.consume(len);
                     return Ok(InputLine::TooLarge);
                 }
                 buf.extend_from_slice(&chunk[..pos]);
-                stdin.consume(pos + 1);
+                reader.consume(pos + 1);
                 return Ok(InputLine::Line(String::from_utf8_lossy(&buf).into_owned()));
             }
             None => {
-                if buf.len() as u64 + chunk.len() as u64 > max_bytes {
-                    let len = chunk.len();
-                    stdin.consume(len);
+                let len = chunk.len();
+                if buf.len() as u64 + len as u64 > max_bytes {
+                    reader.consume(len);
+                    drain_through_newline(reader)?;
                     return Ok(InputLine::TooLarge);
                 }
                 buf.extend_from_slice(chunk);
-                let len = chunk.len();
-                stdin.consume(len);
+                reader.consume(len);
             }
+        }
+    }
+}
+
+fn drain_through_newline<R: BufRead>(reader: &mut R) -> std::io::Result<()> {
+    loop {
+        let chunk = match reader.fill_buf() {
+            Ok(c) => c,
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(e) => return Err(e),
+        };
+        if chunk.is_empty() {
+            return Ok(());
+        }
+        let len = chunk
+            .iter()
+            .position(|&b| b == b'\n')
+            .map_or(chunk.len(), |pos| pos + 1);
+        let hit_newline = chunk[len - 1] == b'\n';
+        reader.consume(len);
+        if hit_newline {
+            return Ok(());
         }
     }
 }
@@ -112,4 +140,78 @@ pub(crate) fn read_source_capped(
     }
     String::from_utf8(buf)
         .map_err(|_| BoliError::line(line, format!("file '{}' UTF-8 nahi hai", path.display())))
+}
+
+pub(crate) fn resolve_import_path(
+    raw_path: &str,
+    base: &Path,
+    line: usize,
+) -> Result<std::path::PathBuf, BoliError> {
+    let joined = if std::path::Path::new(raw_path).is_absolute() {
+        std::path::PathBuf::from(raw_path)
+    } else {
+        base.join(raw_path)
+    };
+    let canonical = std::fs::canonicalize(&joined)
+        .map_err(|e| BoliError::line(line, format!("file '{}' nahi mili: {}", raw_path, e)))?;
+    if let Some(root_raw) = std::env::var_os("BOLI_IMPORT_ROOT").filter(|v| !v.is_empty()) {
+        let root = std::fs::canonicalize(&root_raw).map_err(|e| {
+            BoliError::line(
+                line,
+                format!(
+                    "import root '{}' nahi mila: {}",
+                    root_raw.to_string_lossy(),
+                    e
+                ),
+            )
+        })?;
+        if !root.is_dir() {
+            return Err(BoliError::line(
+                line,
+                format!(
+                    "import root '{}' directory nahi hai",
+                    root_raw.to_string_lossy()
+                ),
+            ));
+        }
+        if !canonical.starts_with(&root) {
+            return Err(BoliError::line(
+                line,
+                format!("import '{}' root se bahar hai (BOLI_IMPORT_ROOT)", raw_path),
+            ));
+        }
+    }
+    Ok(canonical)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{BufReader, Cursor};
+
+    #[test]
+    fn oversized_line_with_newline_in_same_chunk_is_drained() {
+        let mut reader = BufReader::new(Cursor::new(b"abcdef\nnext\n".to_vec()));
+        assert!(matches!(
+            read_input_line_from(&mut reader, 5).unwrap(),
+            InputLine::TooLarge
+        ));
+        match read_input_line_from(&mut reader, 5).unwrap() {
+            InputLine::Line(line) => assert_eq!(line, "next"),
+            other => panic!("unexpected: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn oversized_line_across_chunks_is_drained() {
+        let mut reader = BufReader::with_capacity(4, Cursor::new(b"abcdefgh\nnext\n".to_vec()));
+        assert!(matches!(
+            read_input_line_from(&mut reader, 5).unwrap(),
+            InputLine::TooLarge
+        ));
+        match read_input_line_from(&mut reader, 5).unwrap() {
+            InputLine::Line(line) => assert_eq!(line, "next"),
+            other => panic!("unexpected: {:?}", other),
+        }
+    }
 }

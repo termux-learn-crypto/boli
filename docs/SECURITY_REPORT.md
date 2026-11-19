@@ -1,10 +1,10 @@
-# BOLI — Security Report (v0.6.1)
+# BOLI — Security Report (v0.6.2)
 
-**Scope:** the interpreter and CLI as shipped in `boli` v0.3.0. **Threat model:** BOLI programs may come from untrusted authors (a user running someone else's `.hl`). The host process must not crash, hang forever, exhaust memory without bound, or misreport safety guarantees. **Not in scope:** confidentiality (a run program can legitimately print anything it is given), sandboxing of the target machine (BOLI cannot execute shell, files, or network — by design there is no such capability).
+**Scope:** the tree-walking interpreter, experimental bytecode VM, CLI and REPL as shipped in `boli` v0.6.2. **Threat model:** BOLI programs may come from untrusted authors (a user running someone else's `.hl`). The host process must not crash, hang forever, exhaust memory without bound, leak state into a later program, or misreport safety guarantees. **Not in scope:** confidentiality (a running program can print what it is given), full OS sandboxing (BOLI has no shell/network/write/FFI capability), and the security of the host filesystem outside files the user chose to expose through `laao`.
 
 ## Resource-limit matrix (all enforced, all documented, all env-overridable)
 
-| Resource | Limit | Env var | Default | Enforced at |
+| Resource | Default limit | Env var | Applies to | Enforced at |
 |---|---|---|---|---|
 | Program steps | 100,000 | `BOLI_MAX_STEPS` | per program run | `run_stmt` + range loop |
 | Kaam (call) depth | 64 | `BOLI_MAX_CALL_DEPTH` | nested calls | `call_kaam` |
@@ -15,8 +15,10 @@
 | List items | 10,000 | `BOLI_MAX_LIST_ITEMS` | creation & `jodo` concat | `Expr::List`, `eval_arith` |
 | Source file bytes | 10 MiB | `BOLI_MAX_SOURCE_BYTES` | `boli run x.hl` + `laao` imports | `main.rs` / `limits.rs::read_source_capped` — metadata fast-path + bounded `take(max+1)` read (growth-safe, shared) |
 | Module import depth | 32 | `BOLI_MAX_IMPORT_DEPTH` | both engines | interpreter + VM compiler recursive import guard |
+| Module import root | unset (any local path) | `BOLI_IMPORT_ROOT` | interpreter + VM `laao` | canonicalized prefix check in `limits::resolve_import_path` |
 | Program tokens | 1,000,000 | `BOLI_MAX_TOKENS` | lex time | lexer (`push_token`) |
 | REPL input line bytes | 64 KiB | `BOLI_MAX_REPL_LINE_BYTES` | chunked read | `read_repl_line` (line drained + rejected) |
+| `pucho` input line bytes | 1 MiB | `BOLI_MAX_STRING_BYTES` | stdin | `read_input_line_from` (drains through newline on rejection) |
 | Live scope bytes (memory budget) | 64 MiB | `BOLI_MAX_TOTAL_BYTES` | set/pop scope accounting (replace-safe) | interpreter |
 
 Every violation is a deterministic Hinglish `Galti: line N me …` error. **No violation is a panic, SIGSEGV, SIGABRT, or (in tests) an unwind.**
@@ -40,7 +42,7 @@ Fuzz test (deterministic, no dependencies) confirms lexer+parser do not panic on
 - Numbers: f64, NaN/±∞ rejected at every entry point; arithmetic overflow → error, not silent inf.
 
 ### 3. Command/code injection
-None possible: no shell, no `exec`, no file/network/FFI capability exists anywhere in the language. The only I/O primitives are `likho` (stdout) and `pucho` (stdin). `install.sh` copies a prebuilt binary; it does not pipe to a shell.
+No shell, `exec`, network, write, or FFI capability exists anywhere in the language. The I/O primitives are `likho` (stdout), `pucho` (stdin) and read-only local module loading through `laao`. `BOLI_IMPORT_ROOT` can confine module reads to a canonicalized directory; when unset, any readable local path is allowed. `install.sh` copies a prebuilt binary; it does not pipe to a shell.
 
 ### 4. Broken pipe / SIGPIPE
 `boli … | head` exits 0 cleanly instead of panicking (tested in CLI suite).
@@ -49,7 +51,7 @@ None possible: no shell, no `exec`, no file/network/FFI capability exists anywhe
 `pucho` parses only finite numbers; `nan`/`inf` remain text. Literals validated. `f64::INFINITY` via overflow → Galti.
 
 ### 6. File-system handling
-`boli run` only *reads* the named file (no writes, no include/append primitives). Refusal before read on oversize.
+`boli run` only *reads* the named file (no writes, no include/append primitives). Main files and `laao` imports use one bounded `take(max+1)` read, so a file that grows during the read is still rejected. Import paths are canonicalized and depth-capped; `BOLI_IMPORT_ROOT` adds an optional prefix check for both engines.
 
 ### 7. Dependency supply chain
 Zero third-party dependencies (`[dependencies]` is empty). `cargo build` fetches nothing from crates.io. Dev tooling (rustfmt/clippy) is part of the toolchain only.
@@ -59,9 +61,9 @@ Remaining `unwrap`s are internal invariants (scope stack never empty; last token
 
 ## Known limitations / honest residual risks
 
-- `pucho`'s remaining unread bytes of an over-cap line are not drained (irrelevant once the program errors out; a REPL-style wrapper must drain before the next `pucho`).
+- `pucho` drains an over-cap line through the next newline before returning the Galti; this protects the REPL but does not make an unbounded stream cheap — the bytes are still read and discarded.
 - REPL depth detection is quote/comment-aware text matching, not real parsing — pathological multiline quoting can fool it; `nikalo` at depth 0 always exits.
-- Steps limit counts statements, not bytes of work inside `jodo` on huge strings — bounded anyway by string cap.
+- Steps limit counts high-level statements/bytecode instructions, not bytes of work inside one builtin (e.g. `jodo` on a large string) — bounded separately by string/list caps and the live-scope budget. VM and interpreter step counters are independent; the VM's `BOLI_MAX_STEPS` value is not required to match the tree-walker's statement count for the same program.
 - No Unicode NFC normalization (documented; affects identifier lookup only, not memory safety).
 - Limits are defaults chosen for a teaching language; raise them deliberately (`BOLI_MAX_*`) for batch workloads.
 - Not a sandbox for the CPU: `jab tak sahi to likho 1 khatam` burns CPU until the steps limit (~instant at 100k).
@@ -69,13 +71,24 @@ Remaining `unwrap`s are internal invariants (scope stack never empty; last token
 
 ## Verification performed (not claims — actual commands)
 
-- `cargo test` — 159/159 pass (108 library + 27 CLI + 24 VM)
+- `cargo test` — 167/167 pass (2 unit + 108 library + 28 CLI + 29 VM)
+- `cargo clippy --all-targets --all-features -- -D warnings` — clean
+- `BOLI_IMPORT_ROOT` confinement verified for interpreter and `BOLI_VM=1` (`cli_import_root_confines_laao`)
+- Over-limit input drainage verified in `src/limits.rs` unit tests and CLI REPL regression
 
 ## VM (v0.6.0)
-The experimental bytecode VM (`--vm`, `BOLI_VM=1`) enforces the same limits: step budget, call depth 64, eval/parse depth, list item cap, string budget, live-scope bytes budget, token cap. `laao` is resolved at compile time (bounded file read, cap `BOLI_MAX_SOURCE_BYTES`, canonical-path cycle protection). Default remains the tree-walking interpreter.
+The experimental bytecode VM (`--vm`, `BOLI_VM=1`) enforces the same limits: step budget, call depth 64, eval/parse depth, list item cap, string budget, live-scope bytes budget, token cap. `laao` is resolved at compile time (bounded file read, cap `BOLI_MAX_SOURCE_BYTES`, canonical-path cycle protection, optional `BOLI_IMPORT_ROOT`). Steps, scopes and the value stack reset before each program and unwind after an error, so a reused `Machine` is clean. Default remains the tree-walking interpreter.
 
 ## Runtime tracebacks (v0.5.0)
 `BoliError.trace` exposes the kaam call stack on runtime errors (innermost-first, name + call line). This discloses internal kaam names and call line numbers to whoever reads stderr — acceptable for a local interpreter (the program source is visible anyway), but worth noting for CI log hygiene. No new memory risk: frames are small and popped on every exit path (tested).
+
+## Audit fixes (v0.6.2)
+
+- Over-limit `pucho` lines are drained through the next newline; the REPL/CLI cannot re-read the rejected line (`oversized_line_*` unit tests).
+- VM `steps`, scopes and value stack reset on `run_program` and unwind on error paths; `stack_depth()` is exposed for regression assertions.
+- `BOLI_IMPORT_ROOT` confines `laao` to a canonicalized directory in both engines; `../` and absolute escapes are Hinglish Galti errors when set.
+- Differential tests compare interpreter and VM on a shared corpus and on matching runtime errors; list/map assignment tests assert single-evaluation and clean stacks.
+- Current report status: `boli-audit-report.md` findings are resolved or explicitly documented in [COMPLETE_AUDIT.md](COMPLETE_AUDIT.md).
 
 ## Audit fixes (v0.6.1)
 
@@ -95,4 +108,5 @@ The experimental bytecode VM (`--vm`, `BOLI_VM=1`) enforces the same limits: ste
 ## Recommendations
 1. Keep `[dependencies]` empty; vet any addition hard.
 2. If BOLI gains file/network primitives later (see UPGRADE_ROADMAP), every one needs its own `BOLI_MAX_*` limit and an entry here.
-3. Publish this matrix in the security section of the README/website once v0.4 features land.
+3. Keep `BOLI_IMPORT_ROOT` documented wherever `laao` is documented; any future file capability must reuse the same canonicalized-root pattern or get its own confinement variable.
+4. Publish this matrix in the security section of the README/website; the current authoritative status page is [TEST_RESULTS.md](TEST_RESULTS.md).

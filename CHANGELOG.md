@@ -2,6 +2,18 @@
 
 All notable changes to BOLI. BOLI follows [Semantic Versioning](https://semver.org/): breaking changes bump the minor digit (pre-1.0).
 
+## [0.6.2] — 2026-11-19
+
+### Audit hardening (second pass)
+- **Oversized `pucho` input is drained:** after an over-limit line is rejected, input through the next newline is consumed so the REPL/CLI cannot re-read the same bad line forever.
+- **VM state is reset between programs and after errors:** `steps`, scope stack, scopes and value stack are returned to their baseline; a failed program no longer poisons a reused `Machine`.
+- **Optional import confinement:** `BOLI_IMPORT_ROOT` confines `laao` to one canonicalized directory in both the interpreter and the VM; paths outside the root fail with a Hinglish Galti.
+- **Differential coverage:** interpreter and VM are now compared on a shared corpus and on matching runtime errors; list/map index assignment regressions assert single-evaluation and clean stacks.
+- **Docs refreshed:** security scope, limits matrix, roadmap, status page, test counts and historical-report labels brought up to date.
+
+### Internal
+- 167 tests (2 unit + 108 library + 28 CLI + 29 VM). Gates: fmt/check/test/clippy -D warnings/release build.
+
 ## [0.6.1] — 2026-11-18
 
 ### Security / audit hardening

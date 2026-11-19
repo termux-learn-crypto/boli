@@ -2,6 +2,7 @@
 // Har test VM pe snippet chala kar expected output verify karta hai
 
 use boli::ast::BoliError;
+use boli::interpreter::Environment;
 use boli::parser::parse_source;
 use boli::vm::Vm;
 
@@ -11,6 +12,14 @@ fn vm_out(src: &str) -> Result<Vec<String>, BoliError> {
     vm.collect_output();
     vm.run_program(&program)?;
     Ok(vm.take_output())
+}
+
+fn interp_out(src: &str) -> Result<Vec<String>, BoliError> {
+    let program = parse_source(src)?;
+    let mut env = Environment::new();
+    env.collect_output();
+    env.run_program(&program)?;
+    Ok(env.take_output())
 }
 
 // ---------- basic arithmetic ----------
@@ -189,8 +198,10 @@ fn vm_failing_range_program_then_reuse_same_vm() {
     let mut vm = Vm::new();
     vm.collect_output();
     assert!(vm.run_program(&failing).is_err());
+    assert_eq!(vm.stack_depth(), 0);
     vm.run_program(&good).unwrap();
     assert_eq!(vm.take_output(), vec!["reuse ok"]);
+    assert_eq!(vm.stack_depth(), 0);
 }
 
 #[test]
@@ -223,4 +234,71 @@ fn vm_constants_over_u16_boundary_work() {
     let out = vm.take_output();
     assert_eq!(out.len(), 70000);
     assert_eq!(out[69999], "69999");
+}
+
+#[test]
+fn vm_list_and_map_assignment_compiles_rhs_once_and_clears_stack() {
+    let src = "cheezein rakho 1 2 3\ncheezein hissa 2 rakho 99\ncheezein hissa 2 rakho 100\nmapa rakho map \"a\" 1\nmapa hissa \"b\" rakho 2\nmapa hissa \"a\" rakho 7\nlikho cheezein\nlikho mapa";
+    let program = parse_source(src).unwrap();
+    let mut vm = Vm::new();
+    vm.collect_output();
+    vm.run_program(&program).unwrap();
+    assert_eq!(vm.take_output(), vec!["1, 100, 3", "a: 7, b: 2"]);
+    assert_eq!(vm.stack_depth(), 0);
+}
+
+#[test]
+fn vm_error_resets_stack_to_baseline() {
+    let bad = parse_source("mapa hissa \"x\" rakho 1").unwrap();
+    let mut vm = Vm::new();
+    vm.collect_output();
+    assert!(vm.run_program(&bad).is_err());
+    assert_eq!(vm.stack_depth(), 0);
+    let good = parse_source("likho \"ok\"").unwrap();
+    vm.run_program(&good).unwrap();
+    assert_eq!(vm.take_output(), vec!["ok"]);
+    assert_eq!(vm.stack_depth(), 0);
+}
+
+#[test]
+fn vm_steps_reset_between_programs() {
+    let program = parse_source("likho 1\nlikho 2").unwrap();
+    let mut vm = Vm::new().with_max_steps(4);
+    vm.collect_output();
+    vm.run_program(&program).unwrap();
+    vm.run_program(&program).unwrap();
+    assert_eq!(vm.take_output(), vec!["1", "2", "1", "2"]);
+}
+
+#[test]
+fn vm_matches_interpreter_on_core_corpus() {
+    let corpus = [
+        "likho jodo 6 aur 7",
+        "x rakho 5\nlikho x",
+        "cheezein rakho 1 2 3\ncheezein hissa 1 rakho 9\nlikho cheezein",
+        "mapa rakho map \"a\" 1\nmapa hissa \"b\" rakho 2\nlikho chaabiyan mapa",
+        "kaam f a\n    wapas do jodo a aur 1\nkhatam\nlikho f 4",
+        "1 se 3 tak\nlikho ginti\nkhatam",
+        "agar 2 1 se bada hai to\nlikho \"haan\"\nwarna\nlikho \"nahin\"\nkhatam",
+    ];
+    for src in corpus {
+        match (interp_out(src), vm_out(src)) {
+            (Ok(a), Ok(b)) => assert_eq!(a, b, "backend output mismatch: {}", src),
+            (Err(_), Err(_)) => {}
+            (a, b) => panic!("backend mismatch for {}: {:?} vs {:?}", src, a, b),
+        }
+    }
+}
+
+#[test]
+fn vm_and_interpreter_agree_on_runtime_errors() {
+    let corpus = [
+        "likho bhaag 1 ko 0 se",
+        "likho undefined_cheez",
+        "likho cheezein hissa 2",
+    ];
+    for src in corpus {
+        assert!(interp_out(src).is_err(), "interpreter should fail: {}", src);
+        assert!(vm_out(src).is_err(), "VM should fail: {}", src);
+    }
 }

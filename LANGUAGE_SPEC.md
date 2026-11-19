@@ -1,6 +1,6 @@
-# BOLI Language Specification (v0.6.1)
+# BOLI Language Specification (v0.6.2)
 
-**Version:** 0.6.1 · **File extension:** `.hl` · **Implementation:** Rust (`cargo run -- run x.hl`, REPL via `cargo run`)
+**Version:** 0.6.2 · **File extension:** `.hl` · **Implementation:** Rust (`cargo run -- run x.hl`, REPL via `cargo run`)
 
 BOLI is a Hinglish-based programming language: Python-like simplicity, Hindi/English keywords, no symbols like `; { } ( ) = :`. Statements are one per line. Only words, numbers, quoted text and whitespace appear in a program.
 
@@ -148,10 +148,11 @@ namaste "Rahul"
 | REPL input line bytes | 64 KiB | `BOLI_MAX_REPL_LINE_BYTES` |
 | Live scope bytes (memory budget) | 64 MiB | `BOLI_MAX_TOTAL_BYTES` |
 | Module import nesting | 32 | `BOLI_MAX_IMPORT_DEPTH` |
+| Module import root (optional) | unset (any local path) | `BOLI_IMPORT_ROOT` |
 
 All violations are Hinglish Galti errors, never panics/SIGSEGV/SIGKILL. Violations are deterministic. `std::process::exit(0)` on closed stdout pipe.
 
-Input from `pucho` is read in bounded chunks (at most `BOLI_MAX_STRING_BYTES` + one buffer) — an unbounded-length stdin line cannot be buffered. Invalid UTF-8 from stdin is decoded lossy (U+FFFD) instead of crashing.
+Input from `pucho` is read in bounded chunks (at most `BOLI_MAX_STRING_BYTES` + one buffer) — an unbounded-length stdin line cannot be buffered. When a line is too long, bytes through the next newline are drained before the Galti is returned, so the same bad line is never re-read. Invalid UTF-8 from stdin is decoded lossy (U+FFFD) instead of crashing.
 
 ## 9. Errors
 
@@ -197,6 +198,13 @@ Pure Rust, koi external dependency nahi. User-defined kaam in naam se shadow ho 
 
 Arity mismatch ek Hinglish Galti hai with exact expected count. Arguments eagerly evaluate hote hain (existing call rules).
 
+### v0.6.2 vs v0.6.1
+
+- Over-limit `pucho` lines are drained through the next newline before the Hinglish Galti is returned.
+- Reusing a bytecode VM resets steps, scopes and value stack; an error in one program cannot leak state into the next.
+- `BOLI_IMPORT_ROOT` optionally confines `laao` to a canonicalized directory in both engines; escapes (`../` or absolute paths) are Hinglish Galti errors when set.
+- VM and interpreter are parity-tested on a shared corpus and on matching runtime errors.
+
 ### v0.6.1 vs v0.6.0
 
 - Import reads are growth-safe bounded reads (not metadata-only); import depth cap 32.
@@ -208,7 +216,7 @@ Arity mismatch ek Hinglish Galti hai with exact expected count. Arguments eagerl
 ### v0.6.0 vs v0.5.0
 
 - **Maps:** `mapa rakho map "naam" "Vilas" "umar" 28` — word-based (no `{}`/`[]`). `mapa hissa "naam"` read, `mapa hissa "umar" rakho 29` assign, `lambayi mapa` key count, `chaabiyan mapa` sorted keys. Missing key → Galti. Map keys are text; maps support `barabar` equality and nesting.
-- **Modules:** `laao "math.hl"` — executes the file once in the current environment (import-time inlining); circular imports are silently skipped; relative paths resolve against the `.hl` file's directory; file size bound by `BOLI_MAX_SOURCE_BYTES`.
+- **Modules:** `laao "math.hl"` — executes the file once in the current environment (import-time inlining); circular imports are silently skipped; relative paths resolve against the `.hl` file's directory; file size bound by `BOLI_MAX_SOURCE_BYTES`; optional `BOLI_IMPORT_ROOT` confines imports to one canonicalized directory (interpreter and VM).
 - **Bytecode VM (experimental):** `boli --vm run x.hl` or `BOLI_VM=1 boli run x.hl` — same program semantics, stack-machine execution; tree-walking remains the default and the fallback.
 - **Diagnostics:** did-you-mean hints for unknown names (edit distance); traceback frames on runtime errors.
 - Parser bug fixed: `hissa` indexing is left-associative now (`a hissa 1 hissa 2` = `(a[1])[2]`).
@@ -239,7 +247,7 @@ Arity mismatch ek Hinglish Galti hai with exact expected count. Arguments eagerl
 
 - Initial string literals are now size-checked against `BOLI_MAX_STRING_BYTES` (concatenation was already checked).
 - Lists are capped at 10,000 items (creation and `jodo` concatenation); overflow is a Galti error.
-- `boli run file.hl` refuses files larger than `BOLI_MAX_SOURCE_BYTES` (10 MiB) before reading.
+- `boli run file.hl` reads at most `BOLI_MAX_SOURCE_BYTES` + 1 bytes and refuses larger files (10 MiB by default).
 - Condition chains (`aur`/`ya`) are capped at 128 terms at both parse time and evaluation time.
 - Expression evaluation is depth-capped at 256 (covers deep `hissa` chains).
 - Statement/expression nesting during parsing is capped at 64 (`BOLI_MAX_PARSE_DEPTH`).
