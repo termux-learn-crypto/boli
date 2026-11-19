@@ -5,6 +5,7 @@ use boli::ast::BoliError;
 use boli::interpreter::Environment;
 use boli::parser::parse_source;
 use boli::vm::Vm;
+use std::path::PathBuf;
 
 fn vm_out(src: &str) -> Result<Vec<String>, BoliError> {
     let program = parse_source(src)?;
@@ -20,6 +21,12 @@ fn interp_out(src: &str) -> Result<Vec<String>, BoliError> {
     env.collect_output();
     env.run_program(&program)?;
     Ok(env.take_output())
+}
+
+fn vm_test_dir(name: &str) -> PathBuf {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(name);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
 }
 
 // ---------- basic arithmetic ----------
@@ -301,4 +308,189 @@ fn vm_and_interpreter_agree_on_runtime_errors() {
         assert!(interp_out(src).is_err(), "interpreter should fail: {}", src);
         assert!(vm_out(src).is_err(), "VM should fail: {}", src);
     }
+}
+
+#[test]
+fn entry_file_self_import_runs_once_in_interpreter_and_vm() {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("vm_entry_self_import.hl");
+    std::fs::write(
+        &path,
+        "likho \"ENTRY_ONCE\"\nlaao \"vm_entry_self_import.hl\"\n",
+    )
+    .unwrap();
+    let source = std::fs::read_to_string(&path).unwrap();
+    let program = parse_source(&source).unwrap();
+
+    let mut env = Environment::new();
+    env.set_source_dir(dir.clone());
+    env.register_source_file(&path).unwrap();
+    env.collect_output();
+    env.run_program(&program).unwrap();
+    let env_output = env.take_output();
+    assert_eq!(
+        env_output
+            .iter()
+            .filter(|line| line.contains("ENTRY_ONCE"))
+            .count(),
+        1
+    );
+
+    let mut vm = Vm::new();
+    vm.set_source_dir(dir);
+    vm.register_source_file(&path).unwrap();
+    vm.collect_output();
+    vm.run_program(&program).unwrap();
+    let vm_output = vm.take_output();
+    assert_eq!(
+        vm_output
+            .iter()
+            .filter(|line| line.contains("ENTRY_ONCE"))
+            .count(),
+        1
+    );
+}
+
+fn run_in_dir(
+    src: &str,
+    dir: PathBuf,
+) -> (
+    Result<Vec<String>, BoliError>,
+    Result<Vec<String>, BoliError>,
+) {
+    let program = parse_source(src).unwrap();
+
+    let mut env = Environment::new();
+    env.set_source_dir(dir.clone());
+    env.collect_output();
+    let interp = env.run_program(&program).map(|_| env.take_output());
+
+    let mut vm = Vm::new();
+    vm.set_source_dir(dir);
+    vm.collect_output();
+    let vm = vm.run_program(&program).map(|_| vm.take_output());
+
+    (interp, vm)
+}
+
+#[test]
+fn vm_range_body_ginti_shrink_does_not_panic() {
+    let src = "1 se 3 tak\n    ginti rakho khaali\n    ruk\nkhatam\nlikho \"done\"";
+    assert_eq!(vm_out(src).unwrap(), vec!["done"]);
+    assert_eq!(interp_out(src).unwrap(), vec!["done"]);
+}
+
+#[test]
+fn vm_dead_branch_kaam_and_import_parity() {
+    let dir = vm_test_dir("vm_dead_branch");
+    std::fs::write(
+        dir.join("vm_dead_module.hl"),
+        "kaam dead_imported\naap 1\nkhatam\n",
+    )
+    .unwrap();
+
+    let kaam_src = "agar galat sahi barabar hai to\n    kaam dead_kaam\n        wapas do 1\n    khatam\nkhatam\nlikho dead_kaam";
+    assert!(interp_out(kaam_src).is_err());
+    assert!(vm_out(kaam_src).is_err());
+
+    let import_src = "agar galat sahi barabar hai to\n    laao \"vm_dead_module.hl\"\nkhatam\nlikho dead_imported";
+    let (interp, vm) = run_in_dir(import_src, dir);
+    assert!(interp.is_err(), "interpreter should fail: {:?}", interp);
+    assert!(vm.is_err(), "VM should fail: {:?}", vm);
+}
+
+#[test]
+fn vm_deep_value_errors_instead_of_stack_overflow() {
+    let mut src = String::from("cheezein rakho 1\n");
+    for _ in 0..80 {
+        src.push_str("cheezein rakho 1 cheezein\n");
+    }
+    let err = vm_out(&src).unwrap_err();
+    let msg = err.to_string();
+    assert!(
+        msg.contains("value bahut gehra hai") && msg.contains("BOLI_MAX_VALUE_DEPTH"),
+        "unexpected error: {}",
+        msg
+    );
+}
+
+#[test]
+fn vm_top_level_return_matches_interpreter() {
+    let src = "wapas do 7";
+    let interp = interp_out(src).unwrap_err();
+    let vm = vm_out(src).unwrap_err();
+    assert_eq!(interp.to_string(), vm.to_string());
+    assert!(
+        vm.to_string()
+            .contains("'wapas do' sirf kaam ke andar use hota hai")
+    );
+}
+
+#[test]
+fn vm_uncalled_kaam_with_flow_statement_compiles() {
+    let src = "kaam f\n    ruk\nkhatam\nlikho \"ok\"";
+    assert_eq!(interp_out(src).unwrap(), vec!["ok"]);
+    assert_eq!(vm_out(src).unwrap(), vec!["ok"]);
+
+    let called = "kaam f\n    ruk\nkhatam\nf";
+    assert!(interp_out(called).is_err());
+    assert!(vm_out(called).is_err());
+}
+
+#[test]
+fn vm_condition_error_line_matches_interpreter() {
+    let src = "likho \"start\"\nagar \"abc\" 5 se bada hai to\n    likho \"x\"\nkhatam";
+    let interp = interp_out(src).unwrap_err();
+    let vm = vm_out(src).unwrap_err();
+    assert_eq!(interp.line, Some(2), "interp: {}", interp);
+    assert_eq!(vm.line, Some(2), "vm: {}", vm);
+    assert_eq!(interp.to_string(), vm.to_string());
+}
+
+#[test]
+fn vm_missing_name_hint_matches_interpreter() {
+    let src = "naam rakho 1\nlikho nam";
+    let interp = interp_out(src).unwrap_err();
+    let vm = vm_out(src).unwrap_err();
+    let msg = vm.to_string();
+    assert!(
+        msg.contains("naam 'nam' nahi mila. Shayad 'naam' likhna tha?"),
+        "unexpected error: {}",
+        msg
+    );
+    assert_eq!(interp.to_string(), msg);
+}
+
+#[test]
+fn vm_param_kaam_as_value_matches_interpreter() {
+    let src = "kaam f x\n    wapas do x\nkhatam\nlikho f";
+    let interp = interp_out(src).unwrap_err();
+    let vm = vm_out(src).unwrap_err();
+    assert_eq!(interp.to_string(), vm.to_string());
+    assert!(vm.to_string().contains("seedha call karo"));
+}
+
+#[test]
+fn vm_import_runs_once_defines_kaams_and_wraps_errors() {
+    let dir = vm_test_dir("vm_import_runtime");
+    std::fs::write(
+        dir.join("vm_runtime_module.hl"),
+        "likho \"MODULE_ONCE\"\nkaam imported_kaam\n    wapas do 42\nkhatam\n",
+    )
+    .unwrap();
+
+    let src = "laao \"vm_runtime_module.hl\"\nlaao \"vm_runtime_module.hl\"\nlikho imported_kaam";
+    let (interp, vm) = run_in_dir(src, dir.clone());
+    assert_eq!(interp.unwrap(), vec!["MODULE_ONCE", "42"]);
+    assert_eq!(vm.unwrap(), vec!["MODULE_ONCE", "42"]);
+
+    std::fs::write(dir.join("vm_inner_bad.hl"), "likho undefined_cheez\n").unwrap();
+    std::fs::write(dir.join("vm_outer_bad.hl"), "laao \"vm_inner_bad.hl\"\n").unwrap();
+    let (interp_err, vm_err) = run_in_dir("laao \"vm_outer_bad.hl\"", dir);
+    assert!(interp_err.is_err());
+    assert!(vm_err.is_err());
+    let msg = vm_err.unwrap_err().to_string();
+    assert!(msg.contains("file 'vm_outer_bad.hl' me error:"), "{}", msg);
+    assert!(msg.contains("file 'vm_inner_bad.hl' me error:"), "{}", msg);
 }

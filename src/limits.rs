@@ -12,7 +12,9 @@ pub const DEFAULT_MAX_EVAL_DEPTH: u64 = 256; // nested expression evaluation
 pub const DEFAULT_MAX_IMPORT_DEPTH: u64 = 32; // module import nesting (laao)
 pub const DEFAULT_MAX_TOKENS: u64 = 1_000_000; // max tokens ek program me
 pub const DEFAULT_MAX_REPL_LINE_BYTES: u64 = 64 * 1024; // REPL input line
+pub const DEFAULT_MAX_REPL_BUFFER_BYTES: u64 = 1024 * 1024;
 pub const DEFAULT_MAX_TOTAL_BYTES: u64 = 64 * 1024 * 1024; // live scope value bytes budget
+pub const DEFAULT_MAX_VALUE_DEPTH: u64 = 64; // nested list/map depth
 
 // env var ko u64 me padho; 0 ya galat value par default
 pub fn env_limit(name: &str, default: u64) -> u64 {
@@ -119,7 +121,7 @@ pub(crate) fn read_source_capped(
         BoliError::line(line, format!("file '{}' nahi khuli: {}", path.display(), e))
     })?;
     let mut buf: Vec<u8> = Vec::new();
-    file.take(max_source + 1)
+    file.take(max_source.saturating_add(1))
         .read_to_end(&mut buf)
         .map_err(|e| {
             BoliError::line(
@@ -182,6 +184,34 @@ pub(crate) fn resolve_import_path(
         }
     }
     Ok(canonical)
+}
+
+// Nested list/map depth, iterative (recursive helpers se stack overflow na ho)
+pub(crate) fn value_depth(value: &crate::interpreter::value::Value) -> usize {
+    use crate::interpreter::value::Value;
+
+    let mut stack = vec![(value, 0usize)];
+    let mut deepest = 0usize;
+    while let Some((current, depth)) = stack.pop() {
+        match current {
+            Value::List(items) => {
+                let next = depth + 1;
+                deepest = deepest.max(next);
+                for item in items {
+                    stack.push((item, next));
+                }
+            }
+            Value::Map(map) => {
+                let next = depth + 1;
+                deepest = deepest.max(next);
+                for item in map.values() {
+                    stack.push((item, next));
+                }
+            }
+            _ => {}
+        }
+    }
+    deepest
 }
 
 #[cfg(test)]

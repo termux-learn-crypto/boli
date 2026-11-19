@@ -251,11 +251,13 @@ pub fn lex_with_limits(
     let mut cursor = Cursor::new(source);
     let mut tokens: Vec<Token> = Vec::new();
     let mut line = 1usize;
+    let mut separated = true;
 
     while let Some(c) = cursor.peek() {
         // Spaces aur tabs - inhe chhod do
         if c == ' ' || c == '\t' || c == '\r' {
             cursor.bump();
+            separated = true;
             continue;
         }
 
@@ -265,6 +267,7 @@ pub fn lex_with_limits(
             push_token(&mut tokens, Tok::Newline, line, tok_col, max_tokens)?;
             line += 1;
             cursor.bump();
+            separated = true;
             continue;
         }
 
@@ -276,6 +279,7 @@ pub fn lex_with_limits(
                 }
                 cursor.bump();
             }
+            separated = true;
             continue;
         }
 
@@ -347,16 +351,24 @@ pub fn lex_with_limits(
                 tok_col,
                 max_tokens,
             )?;
+            separated = false;
             continue;
         }
 
         // Number - ankh laage hue, ek dot ho sakti hai (jaise 99.50 ya -7)
-        // '-' sirf tab number ka hissa jab uske baad digit ho (BOLI me minus symbol allowed nahi)
+        // '-' number ka hissa tabhi jab digit ho aur koi atom usse chipka na ho
         if c.is_ascii_digit()
             || (c == '-' && cursor.peek_next().is_some_and(|n| n.is_ascii_digit()))
         {
             let start_line = line;
             let tok_col = cursor.peek_col();
+            if c == '-' && !separated {
+                return Err(BoliError::line_col(
+                    start_line,
+                    tok_col,
+                    "'-' number ke saath chipka hai, space do ya 'ghatao' likho",
+                ));
+            }
             let mut num = String::new();
             if c == '-' {
                 num.push('-');
@@ -406,6 +418,7 @@ pub fn lex_with_limits(
                 tok_col,
                 max_tokens,
             )?;
+            separated = false;
             continue;
         }
 
@@ -439,6 +452,7 @@ pub fn lex_with_limits(
                     max_tokens,
                 )?,
             }
+            separated = false;
             continue;
         }
 

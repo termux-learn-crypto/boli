@@ -1,6 +1,6 @@
-# BOLI v0.6.2 — Test Results (actual commands, actual output)
+# BOLI v0.6.4 — Test Results (actual commands, actual output)
 
-**Host:** Termux on Android (aarch64), rustc/cargo 1.100.0 via the system Termux package. **Date:** 2026-11-19. **Version:** `BOLI version 0.6.2`. **Note:** `~/.cargo/bin/cargo` is a broken rustup shim; commands below use `/data/data/com.termux/files/usr/bin/cargo` (exported via `PATH`).
+**Host:** Termux on Android (aarch64), rustc/cargo 1.100.0 via the system Termux package. **Date:** 2026-11-19. **Version:** `BOLI version 0.6.4`. **Note:** `~/.cargo/bin/cargo` is a broken rustup shim; commands below use `/data/data/com.termux/files/usr/bin/cargo` (exported via `PATH`).
 
 This is the current status page. Older reports remain as historical snapshots: [COMPLETE_AUDIT.md](COMPLETE_AUDIT.md), [SECURITY_REPORT.md](SECURITY_REPORT.md), [UPGRADE_ROADMAP.md](UPGRADE_ROADMAP.md).
 
@@ -13,41 +13,43 @@ This is the current status page. Older reports remain as historical snapshots: [
 
 ### 2. `cargo check --all-targets`
 ```
-    Checking boli v0.6.2 (/data/data/com.termux/files/home/boli)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.70s
+    Checking boli v0.6.4 (/data/data/com.termux/files/home/boli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.05s
 ```
 
-### 3. `cargo clippy --all-targets --all-features -- -D warnings`
+### 3. `cargo clippy --all-targets -- -D warnings`
 ```
-    Checking boli v0.6.2 (/data/data/com.termux/files/home/boli)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.11s
+    Checking boli v0.6.4 (/data/data/com.termux/files/home/boli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.24s
 ```
 Zero warnings.
 
 ### 4. `cargo test`
 ```
-running 2 tests
+running 4 tests
 test limits::tests::oversized_line_across_chunks_is_drained ... ok
 test limits::tests::oversized_line_with_newline_in_same_chunk_is_drained ... ok
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+test interpreter::tests::bounded_distance_respects_limit ... ok
+test interpreter::tests::nearest_name_skips_oversized_identifiers ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 
 running 0 tests
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 
-running 108 tests
-test result: ok. 108 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+running 114 tests
+test result: ok. 114 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 
-running 28 tests
-test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+running 33 tests
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 
-running 29 tests
-test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+running 39 tests
+test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 
 running 0 tests
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 ```
 
-**167 passed / 0 failed** (2 unit + 108 `tests/boli.rs` library + 28 `tests/cli.rs` end-to-end + 29 `tests/vm.rs` VM/parity).
+**190 passed / 0 failed** (4 unit + 114 `tests/boli.rs` library + 33 `tests/cli.rs` end-to-end + 39 `tests/vm.rs` VM/parity).
 
 Regenerate the count with:
 ```bash
@@ -56,22 +58,27 @@ cargo test -- --list | grep ': test$' | wc -l
 
 ### 5. `cargo build --release`
 ```
-   Compiling boli v0.6.2 (/data/data/com.termux/files/home/boli)
-    Finished `release` profile [optimized] target(s) in 10.19s
+   Compiling boli v0.6.4 (/data/data/com.termux/files/home/boli)
+    Finished `release` profile [optimized] target(s) in 11.53s
 ```
 
 ### 6. `./target/release/boli version`
 ```
-BOLI version 0.6.2
+BOLI version 0.6.4
 ```
 
-## What v0.6.2 added to verification
+## What v0.6.4 added to verification
 
-- `src/limits.rs` unit: over-limit `pucho` lines are drained both when the newline is in the same buffer and when it arrives in a later chunk; the following line is readable.
-- `cli_import_root_confines_laao`: `BOLI_IMPORT_ROOT` permits an in-root import and rejects `../` and absolute escapes for both the interpreter and `BOLI_VM=1`.
-- `vm_error_resets_stack_to_baseline`, `vm_steps_reset_between_programs`, `vm_failing_range_program_then_reuse_same_vm`: reused VMs start clean and step counters restart.
-- `vm_list_and_map_assignment_compiles_rhs_once_and_clears_stack`: list/map index assignment evaluates the RHS once and leaves no stack residue.
-- `vm_matches_interpreter_on_core_corpus`, `vm_and_interpreter_agree_on_runtime_errors`: interpreter and VM produce the same output and error text for a shared corpus.
+- Deep nested map programs fail with a bounded-depth Galti in both engines instead of SIGSEGV.
+- CLI regressions cover `u64::MAX` source limits, escaped REPL quotes, content-only line caps and a real closed stdout pipe.
+- Parser/lexer regressions cover shared `aur`/`ya` depth, `hissa` depth, panic-free public parser input, stuck `5-3`, and map error columns.
+- VM regressions cover range `ginti` accounting, runtime-only `kaam`/`laao` effects, top-level return, condition lines, hints and uncalled `ruk`/`agla`.
+
+## What v0.6.3 added to verification
+
+- `interpreter::tests::bounded_distance_respects_limit` and `nearest_name_skips_oversized_identifiers`: suggestions are cutoff-bounded and oversized names are ignored.
+- `cli_repl_oversized_multiline_buffer_is_dropped_and_repl_survives`: aggregate REPL overflow clears the partial block and the next command still runs.
+- `cli_entry_file_self_import_runs_once_in_both_engines` and `entry_file_self_import_runs_once_in_interpreter_and_vm`: canonical entry registration prevents duplicate top-level execution.
 
 ## Manual verification (examples & CLI)
 
@@ -93,4 +100,4 @@ BOLI version 0.6.2
 
 ## Conclusion
 
-All configured gates are green, 167/167 tests pass, and the release binary reports v0.6.2. No regressions detected.
+All configured gates are green, 190/190 tests pass, and the release binary reports v0.6.4. No regressions detected.

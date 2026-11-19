@@ -1,6 +1,6 @@
-# BOLI Language Specification (v0.6.2)
+# BOLI Language Specification (v0.6.4)
 
-**Version:** 0.6.2 · **File extension:** `.hl` · **Implementation:** Rust (`cargo run -- run x.hl`, REPL via `cargo run`)
+**Version:** 0.6.4 · **File extension:** `.hl` · **Implementation:** Rust (`cargo run -- run x.hl`, REPL via `cargo run`)
 
 BOLI is a Hinglish-based programming language: Python-like simplicity, Hindi/English keywords, no symbols like `; { } ( ) = :`. Statements are one per line. Only words, numbers, quoted text and whitespace appear in a program.
 
@@ -197,6 +197,19 @@ Pure Rust, koi external dependency nahi. User-defined kaam in naam se shadow ho 
 | `sankhya` | `sankhya <text\|number>` | strict parse; galat text / overflow → Galti |
 
 Arity mismatch ek Hinglish Galti hai with exact expected count. Arguments eagerly evaluate hote hain (existing call rules).
+
+### v0.6.4 vs v0.6.3
+
+- Nested list/map values are capped by `BOLI_MAX_VALUE_DEPTH` (default 64); deeper values are a Hinglish Galti in both engines, not a native-stack crash. Display and byte accounting are iterative.
+- Imports share the caller's step budget in the interpreter (as in the VM), and file/read limits use saturating arithmetic for `u64::MAX`.
+- VM `kaam` definitions and `laao` effects occur only when execution reaches them; top-level `wapas do`, condition lines, hints and uncalled `ruk`/`agla` bodies now match the interpreter.
+- The REPL scanner understands escaped quotes and `#` inside strings; line caps count content bytes. Parser depth is shared across `aur`/`ya` and counts `hissa`; `5-3` is a lex error; map-literal errors carry columns.
+
+### v0.6.3 vs v0.6.2
+
+- Did-you-mean suggestions are bounded: identifiers over 64 characters are ignored, at most 512 deduplicated candidates are checked, and edit distance stops at the relevant threshold with two rows of memory.
+- REPL multiline blocks are capped by `BOLI_MAX_REPL_BUFFER_BYTES` (default 1 MiB); an over-limit block is discarded with a Hinglish Galti and the REPL continues.
+- The main entry file is registered as an already-loaded module in both engines, so a self-`laao` is a no-op instead of a second top-level execution.
 
 ### v0.6.2 vs v0.6.1
 

@@ -2,8 +2,8 @@
 
 use boli::ast::{BoliError, Expr, Stmt};
 use boli::interpreter::Environment;
-use boli::lexer::{Tok, lex};
-use boli::parser::parse_source;
+use boli::lexer::{Tok, Token, lex};
+use boli::parser::{Parser, parse_source};
 
 // helper: source chalao aur captured lines lo
 fn run_out(src: &str) -> Result<Vec<String>, BoliError> {
@@ -529,6 +529,21 @@ fn deeply_nested_expression_errors_not_crashes() {
 }
 
 #[test]
+fn deeply_nested_values_error_before_stack_overflow() {
+    let mut src = String::from("m rakho map \"seed\" 1\n");
+    for _ in 0..5000 {
+        src.push_str("m rakho map \"k\" m\n");
+    }
+    src.push_str("likho m\n");
+    let err = run_out(&src).unwrap_err();
+    assert!(
+        err.to_string().contains("value bahut gehra hai"),
+        "msg: {}",
+        err
+    );
+}
+
+#[test]
 fn deeply_nested_hissa_chain_errors_not_crashes() {
     let src = {
         let mut s = String::from("naam rakho \"Vilas\"\nlikho naam");
@@ -537,10 +552,16 @@ fn deeply_nested_hissa_chain_errors_not_crashes() {
         }
         s
     };
+    // Ab chain ki length bhi parse depth me count hoti hai
+    assert!(parse_source(&src).is_err());
+
+    // Badha hua parse depth dekar runtime depth limit ka coverage bachi rakho
+    let program = Parser::with_limits(lex(&src).unwrap(), 1_000, 128)
+        .parse_program()
+        .unwrap();
     std::thread::Builder::new()
         .stack_size(64 * 1024 * 1024)
         .spawn(move || {
-            let program = parse_source(&src).unwrap();
             let mut env = Environment::new();
             env.collect_output();
             assert!(env.run_program(&program).is_err());
@@ -1122,4 +1143,134 @@ fn chaabiyan_caps_keys_bytes() {
     )
     .unwrap_err();
     assert!(err.to_string().contains("bahut bada"));
+}
+
+// ---------- parse/lex audit fixes ----------
+
+#[test]
+fn condition_depth_is_shared_between_aur_and_ya() {
+    let c = "a a barabar hai";
+    // Paanch comparisons, par 'ya' alag se 2 aur 'aur' alag se 2 - purane code me ye chal jata tha
+    let src = format!("agar {c} ya {c} aur {c} ya {c} aur {c} to\nlikho 1\nkhatam");
+    let err = Parser::with_limits(lex(&src).unwrap(), 64, 4)
+        .parse_program()
+        .unwrap_err();
+    assert!(err.to_string().contains("condition bahut lambi"), "{err}");
+
+    // Chaar comparisons (3 links) ab bhi allowed hain
+    let src = format!("agar {c} ya {c} aur {c} ya {c} to\nlikho 1\nkhatam");
+    assert!(
+        Parser::with_limits(lex(&src).unwrap(), 64, 4)
+            .parse_program()
+            .is_ok()
+    );
+}
+
+#[test]
+fn hissa_postfix_chain_respects_parse_depth() {
+    let src = "likho a hissa 1 hissa 2 hissa 3";
+    let err = Parser::with_limits(lex(src).unwrap(), 3, 64)
+        .parse_program()
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("expression bahut zyada gehra"),
+        "{err}"
+    );
+    assert!(
+        Parser::with_limits(lex(src).unwrap(), 8, 64)
+            .parse_program()
+            .is_ok()
+    );
+}
+
+#[test]
+fn public_parser_handles_empty_and_eofless_tokens() {
+    assert!(Parser::new(vec![]).parse_program().unwrap().is_empty());
+    assert!(
+        Parser::with_limits(vec![], 8, 8)
+            .parse_program()
+            .unwrap()
+            .is_empty()
+    );
+
+    let tokens = vec![
+        Token {
+            tok: Tok::Likho,
+            line: 1,
+            col: 1,
+        },
+        Token {
+            tok: Tok::Number(5.0),
+            line: 1,
+            col: 7,
+        },
+    ];
+    let program = Parser::new(tokens).parse_program().unwrap();
+    assert!(matches!(&program[0], Stmt::Likho(Expr::Number(5.0, _), _)));
+
+    let tokens = vec![Token {
+        tok: Tok::Agar,
+        line: 1,
+        col: 1,
+    }];
+    assert!(Parser::new(tokens).parse_program().is_err());
+
+    let tokens = vec![Token {
+        tok: Tok::Newline,
+        line: 1,
+        col: 1,
+    }];
+    assert!(Parser::new(tokens).parse_program().unwrap().is_empty());
+}
+
+#[test]
+fn stuck_negative_number_is_error_but_spaced_one_is_a_list_item() {
+    let err = parse_source("x rakho 5-3").unwrap_err();
+    assert!(
+        err.to_string().contains("'-' number ke saath chipka"),
+        "{err}"
+    );
+    assert_eq!(err.line, Some(1));
+    assert_eq!(err.col, Some(10));
+
+    for src in ["x rakho abc-2", "x rakho \"a\"-2", "x rakho 5-3.5"] {
+        assert!(parse_source(src).is_err(), "{src} chal gaya");
+    }
+
+    // Space diya to alag tokens - list ke do valid items
+    let stmts = parse_source("x rakho 5 -3").unwrap();
+    match &stmts[0] {
+        Stmt::Rakho {
+            value: Expr::List(items, _),
+            ..
+        } => {
+            assert!(matches!(&items[0], Expr::Number(5.0, _)));
+            assert!(matches!(&items[1], Expr::Number(-3.0, _)));
+        }
+        other => panic!("List expect kiya tha, mila {:?}", other),
+    }
+    // Shuruwat ka negative number aur space wala negative operand pehle ki tarah chalte hain
+    assert!(parse_source("x rakho -3").is_ok());
+    assert_eq!(run_out("likho jodo -5 aur 3").unwrap(), vec!["-2"]);
+}
+
+#[test]
+fn map_literal_errors_have_columns() {
+    let err = parse_source("m rakho map \"k\" \"v\" map \"k2\"").unwrap_err();
+    assert_eq!(err.line, Some(1));
+    assert_eq!(err.col, Some(21));
+    assert!(err.to_string().contains("col 21"));
+    assert!(err.to_string().contains("dubara"), "{err}");
+
+    let err = parse_source("m rakho map \"k\" map \"v\"").unwrap_err();
+    assert_eq!(err.col, Some(17));
+    assert!(err.to_string().contains("value deni hogi"), "{err}");
+
+    let err = parse_source("m rakho map \"k\"").unwrap_err();
+    assert_eq!(err.col, Some(16));
+    assert!(err.to_string().contains("value deni hogi"));
+
+    let err = parse_source("m rakho map\n").unwrap_err();
+    assert_eq!(err.col, Some(12));
+    assert!(err.to_string().contains("chaabi-value pair"));
 }

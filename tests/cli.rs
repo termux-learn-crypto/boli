@@ -226,15 +226,16 @@ fn cli_reken_overflow_is_hinglish_error_not_inf() {
 
 #[test]
 fn cli_broken_pipe_exits_cleanly() {
-    // stdout consume na karke seedha close karo: boli panic nahi karna chahiye
-    let stdout_pipe = Command::new(boli_bin())
+    // stdout ka read-end turant band karo (wait_with_output drain karta hai, EPIPE nahi aata)
+    let mut child = Command::new(boli_bin())
         .args(["run", "examples/loop.hl"])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .expect("boli spawn nahi hua");
-    let output = stdout_pipe.wait_with_output().unwrap();
-    assert_eq!(output.status.code(), Some(0));
+    drop(child.stdout.take());
+    let status = child.wait().expect("wait nahi hua");
+    assert_eq!(status.code(), Some(0));
 }
 
 #[test]
@@ -344,6 +345,37 @@ fn cli_repl_oversized_line_is_rejected_and_repl_survives() {
 }
 
 #[test]
+fn cli_repl_oversized_multiline_buffer_is_dropped_and_repl_survives() {
+    let input = format!(
+        "agar sahi\n{}\n{}\nlikho 42\nnikalo\n",
+        "x".repeat(40),
+        "x".repeat(40)
+    );
+    let output = Command::new(boli_bin())
+        .env("BOLI_MAX_REPL_LINE_BYTES", "100")
+        .env("BOLI_MAX_REPL_BUFFER_BYTES", "80")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .and_then(|mut child| {
+            use std::io::Write as _;
+            child.stdin.as_mut().unwrap().write_all(input.as_bytes())?;
+            child.wait_with_output()
+        })
+        .expect("REPL spawn/write nahi hua");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("REPL buffer bahut bada"),
+        "stderr: {}",
+        stderr
+    );
+    assert!(stdout.contains("42"), "stdout: {}", stdout);
+    assert!(stdout.contains("Alvida"), "stdout: {}", stdout);
+}
+
+#[test]
 fn cli_syntax_error_shows_line_and_caret() {
     let path = write_program("caret_error.hl", "nam;aste\n");
     let output = Command::new(boli_bin())
@@ -429,6 +461,38 @@ fn cli_laao_circular_import_does_not_hang() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert!(String::from_utf8_lossy(&output.stdout).contains('2'));
+}
+
+#[test]
+fn cli_entry_file_self_import_runs_once_in_both_engines() {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"));
+    std::fs::create_dir_all(&dir).unwrap();
+    let main_path = write_program(
+        "entry_self_import.hl",
+        "likho \"ENTRY_ONCE\"\nlaao \"entry_self_import.hl\"\n",
+    );
+    for vm in [false, true] {
+        let mut cmd = Command::new(boli_bin());
+        cmd.arg("run").arg(&main_path).current_dir(&dir);
+        if vm {
+            cmd.arg("--vm");
+        }
+        let output = cmd.output().expect("boli binary chala nahi");
+        assert!(
+            output.status.success(),
+            "engine vm={} stderr: {}",
+            vm,
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert_eq!(
+            stdout.matches("ENTRY_ONCE").count(),
+            1,
+            "engine vm={} stdout: {}",
+            vm,
+            stdout
+        );
+    }
 }
 
 #[test]
@@ -644,4 +708,90 @@ fn cli_import_root_confines_laao() {
             assert!(stderr.contains("root se bahar"), "stderr: {}", stderr);
         }
     }
+}
+
+// ---------- audit fixes: cap overflow / REPL heuristics ----------
+
+#[test]
+fn cli_source_bytes_u64_max_does_not_overflow() {
+    // BOLI_MAX_SOURCE_BYTES=u64::MAX par read_capped me max+1 overflow nahi hona chahiye
+    let path = write_program("source_bytes_u64_max.hl", "likho 42\n");
+    let output = Command::new(boli_bin())
+        .arg("run")
+        .arg(&path)
+        .env("BOLI_MAX_SOURCE_BYTES", "18446744073709551615")
+        .output()
+        .expect("boli binary chala nahi");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("42"), "stdout: {}", stdout);
+}
+
+#[test]
+fn cli_repl_escaped_quote_in_text_is_not_khatam() {
+    // text ke andar \" quote escape hai - usse depth toggle nahi hona chahiye
+    let mut child = Command::new(boli_bin())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("REPL spawn nahi hua");
+    {
+        let stdin = child.stdin.as_mut().unwrap();
+        stdin
+            .write_all(
+                r#"likho "he said \"khatam \"ok"
+likho 42
+nikalo
+"#
+                .as_bytes(),
+            )
+            .unwrap();
+    }
+    let output = child.wait_with_output().unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !stderr.contains("bina kuch shuru kiye"),
+        "stray khatam error aaya: {}",
+        stderr
+    );
+    assert!(
+        stdout.contains("he said \"khatam \"ok"),
+        "text sahi nahi chapa: {}",
+        stdout
+    );
+    assert!(stdout.contains("42"), "stdout: {}", stdout);
+}
+
+#[test]
+fn cli_repl_line_cap_counts_content_not_newline() {
+    // 5 content bytes wali line ('abcde') reject nahi honi chahiye; REPL zinda rahe
+    let output = Command::new(boli_bin())
+        .env("BOLI_MAX_REPL_LINE_BYTES", "5")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .and_then(|mut child| {
+            use std::io::Write as _;
+            child
+                .stdin
+                .as_mut()
+                .unwrap()
+                .write_all(b"abcde\nlikho 42\nnikalo\n")?;
+            child.wait_with_output()
+        })
+        .expect("REPL spawn/write nahi hua");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("kaam 'abcde' nahi mila"),
+        "abcde line accept honi chahiye thi: {}",
+        stderr
+    );
+    assert!(output.status.success());
 }

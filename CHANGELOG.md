@@ -2,6 +2,30 @@
 
 All notable changes to BOLI. BOLI follows [Semantic Versioning](https://semver.org/): breaking changes bump the minor digit (pre-1.0).
 
+## [0.6.4] — 2026-11-19
+
+### Full-audit fix pass (15 findings)
+- **Nested values are bounded:** `BOLI_MAX_VALUE_DEPTH` (default 64) rejects deep list/map values; display and byte accounting are iterative, so 5,000-deep input is a Hinglish Galti in both engines instead of a debug/release SIGSEGV.
+- **Step budget is per program:** imports no longer reset `steps` in the interpreter; an imported module shares the caller's step budget, matching the VM.
+- **Limit arithmetic is overflow-safe:** `u64::MAX` source/read limits use `saturating_add(1)` in CLI and file readers, so debug builds do not panic and release builds do not silently read nothing.
+- **VM runtime semantics match the interpreter:** range loops use normal scope accounting, `kaam` definitions and `laao` effects happen only when execution reaches them, top-level `wapas do` errors, condition lines/hints/errors match, and uncalled `ruk`/`agla` bodies compile.
+- **REPL and parser hardening:** escaped quotes and `#` inside strings no longer confuse the multiline scanner; line caps count content bytes; parse depth is shared across `aur`/`ya` and counts `hissa`; public `Parser::new` cannot panic; stuck `5-3` is a lex error; map-literal errors carry columns.
+- **Installer/docs hygiene:** `install.sh` handles an unset `HOME`; the broken-pipe test now actually forces EPIPE; the security report no longer claims that no violation can ever be a panic.
+
+### Internal
+- 190 tests (4 unit + 114 library + 33 CLI + 39 VM). Gates: fmt/check/test/clippy -D warnings/release build.
+
+## [0.6.3] — 2026-11-19
+
+### Deep-audit hardening (third pass)
+- **Bounded did-you-mean hints:** `nearest_name()` now uses `HashSet` dedup, identifier-length and candidate-count caps, length-difference pruning and a two-row bounded Levenshtein with early cutoff. Oversized names no longer allocate an unbounded matrix.
+- **REPL multiline buffer cap:** `BOLI_MAX_REPL_BUFFER_BYTES` (default 1 MiB) bounds the whole incomplete block, not just each line. Overflow clears the partial block so the REPL stays usable.
+- **Entry file is a loaded module:** `boli run x.hl` registers the canonical entry path in both the interpreter and VM module registries before execution; `laao "x.hl"` from the entry file is skipped instead of running top-level statements twice.
+- **Coverage:** new unit tests for bounded distance/oversized identifiers, a CLI REPL buffer regression, and self-import tests for both engines.
+
+### Internal
+- 172 tests (4 unit + 108 library + 30 CLI + 30 VM). Gates: fmt/check/test/clippy -D warnings/release build.
+
 ## [0.6.2] — 2026-11-19
 
 ### Audit hardening (second pass)

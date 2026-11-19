@@ -7,8 +7,10 @@ use std::collections::HashMap;
 use crate::ast::{ArithOp, BoliError, CmpOp, Cond, Expr, Stmt};
 use crate::builtins;
 use crate::interpreter::value::{Value, value_size};
-use crate::limits::{self, env_limit};
+use crate::limits::{self, DEFAULT_MAX_VALUE_DEPTH, env_limit, value_depth};
 use crate::scope::Scope;
+use std::collections::HashSet;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 enum Op {
@@ -27,7 +29,10 @@ enum Op {
     Index,
     StoreIndex, // target, index, value on stack -> target updated in current scope? needs name
     Call(usize, usize), // name idx, argc
-    Return,
+    DefineKaam(usize), // runtime kaam registration (index into Vm::kaam_defs)
+    Import { id: usize, path: String }, // runtime import (index into Vm::imports)
+    Return(usize),
+    FlowError(&'static str),
     PopValue,
     Pucho(usize, usize), // name idx, prompt idx
     MakeRange,
@@ -35,8 +40,18 @@ enum Op {
     JumpIfNoLeft(usize),
 }
 
+#[derive(Debug, Clone)]
 pub(crate) struct KaamDef {
+    name: String,
     params: Vec<String>,
+    code: Vec<Op>,
+    lines: Vec<usize>,
+    line: usize,
+}
+
+#[derive(Debug, Clone)]
+struct ImportChunk {
+    canonical: PathBuf,
     code: Vec<Op>,
     lines: Vec<usize>,
 }
@@ -47,16 +62,15 @@ const LEFT: &str = "\u{0}left";
 struct Compiler {
     constants: Vec<Value>,
     names: Vec<String>,
-    kaams: HashMap<String, KaamDef>,
+    kaam_defs: Vec<KaamDef>,
+    imports: Vec<ImportChunk>,
+    import_by_path: HashMap<PathBuf, usize>,
     loop_stack: Vec<(usize, Vec<usize>, bool)>, // (loop_start_addr, break sites, is_range)
-    loaded: HashSet<std::path::PathBuf>,
-    source_dir: Option<std::path::PathBuf>,
+    source_dir: Option<PathBuf>,
     import_depth: usize,
     max_import_depth: usize,
     max_string_bytes: usize,
 }
-
-use std::collections::HashSet;
 
 impl Compiler {
     fn new() -> Self {
@@ -65,9 +79,10 @@ impl Compiler {
         Compiler {
             constants: Vec::new(),
             names: Vec::new(),
-            kaams: HashMap::new(),
+            kaam_defs: Vec::new(),
+            imports: Vec::new(),
+            import_by_path: HashMap::new(),
             loop_stack: Vec::new(),
-            loaded: HashSet::new(),
             source_dir: None,
             import_depth: 0,
             max_import_depth: env_limit("BOLI_MAX_IMPORT_DEPTH", limits::DEFAULT_MAX_IMPORT_DEPTH)
@@ -166,6 +181,7 @@ impl Compiler {
         code: &mut Vec<Op>,
         lines: &mut Vec<usize>,
     ) -> Result<(), BoliError> {
+        let line = cond_line(cond);
         match cond {
             Cond::Cmp {
                 left, op, right, ..
@@ -173,20 +189,20 @@ impl Compiler {
                 self.compile_expr(left, code, lines)?;
                 self.compile_expr(right, code, lines)?;
                 code.push(Op::Compare(*op));
-                lines.push(0);
+                lines.push(line);
             }
             Cond::Aur(left, right, _) => {
                 self.compile_cond(left, code, lines)?;
                 let jump_false = code.len();
                 code.push(Op::JumpIfFalse(0));
-                lines.push(0);
+                lines.push(line);
                 self.compile_cond(right, code, lines)?;
                 let jump_end = code.len();
                 code.push(Op::Jump(0));
-                lines.push(0);
+                lines.push(line);
                 let false_start = code.len();
                 code.push(Op::Const(self.const_value(Value::Bool(false))));
-                lines.push(0);
+                lines.push(line);
                 let end = code.len();
                 code[jump_false] = Op::JumpIfFalse(false_start);
                 code[jump_end] = Op::Jump(end);
@@ -195,14 +211,14 @@ impl Compiler {
                 self.compile_cond(left, code, lines)?;
                 let jump_true = code.len();
                 code.push(Op::JumpIfTrue(0));
-                lines.push(0);
+                lines.push(line);
                 self.compile_cond(right, code, lines)?;
                 let jump_end = code.len();
                 code.push(Op::Jump(0));
-                lines.push(0);
+                lines.push(line);
                 let true_start = code.len();
                 code.push(Op::Const(self.const_value(Value::Bool(true))));
-                lines.push(0);
+                lines.push(line);
                 let end = code.len();
                 code[jump_true] = Op::JumpIfTrue(true_start);
                 code[jump_end] = Op::Jump(end);
@@ -354,22 +370,18 @@ impl Compiler {
                 let khaali = self.const_value(Value::Khaali);
                 body_code.push(Op::Const(khaali));
                 body_lines.push(*line);
-                body_code.push(Op::Return);
+                body_code.push(Op::Return(*line));
                 body_lines.push(*line);
-                if self.kaams.contains_key(name) {
-                    return Err(BoliError::line(
-                        *line,
-                        format!("kaam '{}' pehle se bana hua hai", name),
-                    ));
-                }
-                self.kaams.insert(
-                    name.clone(),
-                    KaamDef {
-                        params: params.clone(),
-                        code: body_code,
-                        lines: body_lines,
-                    },
-                );
+                let id = self.kaam_defs.len();
+                self.kaam_defs.push(KaamDef {
+                    name: name.clone(),
+                    params: params.clone(),
+                    code: body_code,
+                    lines: body_lines,
+                    line: *line,
+                });
+                code.push(Op::DefineKaam(id));
+                lines.push(*line);
             }
             Stmt::KaamCall { name, args, line } => {
                 for a in args {
@@ -390,7 +402,7 @@ impl Compiler {
                         lines.push(*line);
                     }
                 }
-                code.push(Op::Return);
+                code.push(Op::Return(*line));
                 lines.push(*line);
             }
             Stmt::Ruk(line) => match self.loop_stack.last_mut() {
@@ -401,10 +413,8 @@ impl Compiler {
                     breaks.push(at);
                 }
                 None => {
-                    return Err(BoliError::line(
-                        *line,
-                        "'ruk' sirf loop ke andar use hota hai",
-                    ));
+                    code.push(Op::FlowError("'ruk' sirf loop ke andar use hota hai"));
+                    lines.push(*line);
                 }
             },
             Stmt::Agla(line) => match self.loop_stack.last() {
@@ -419,10 +429,8 @@ impl Compiler {
                     lines.push(*line);
                 }
                 None => {
-                    return Err(BoliError::line(
-                        *line,
-                        "'agla' sirf loop ke andar use hota hai",
-                    ));
+                    code.push(Op::FlowError("'agla' sirf loop ke andar use hota hai"));
+                    lines.push(*line);
                 }
             },
             Stmt::ListAssign {
@@ -441,7 +449,7 @@ impl Compiler {
                 lines.push(*line);
             }
             Stmt::Laao { path, line } => {
-                // import nesting depth limit (compile recursion protection)
+                // compile recursion protection (execution abhi runtime par hoti hai)
                 if self.import_depth >= self.max_import_depth {
                     return Err(BoliError::line(
                         *line,
@@ -451,29 +459,49 @@ impl Compiler {
                         ),
                     ));
                 }
-                // compile-time import: doosri .hl file ko inline compile karo
                 let resolve_base = self.source_dir.clone().unwrap_or_else(|| {
-                    std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
+                    std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
                 });
                 let canonical = limits::resolve_import_path(path, &resolve_base, *line)?;
-                if !self.loaded.insert(canonical.clone()) {
-                    return Ok(()); // pehle hi include ho chuka hai
-                }
-                let max_source =
-                    limits::env_limit("BOLI_MAX_SOURCE_BYTES", limits::DEFAULT_MAX_SOURCE_BYTES);
-                // bounded read (growth-safe)
-                let source = limits::read_source_capped(&canonical, max_source, *line)?;
-                let program = crate::parser::parse_source(&source).map_err(|e| {
-                    BoliError::line(*line, format!("file '{}' me error: {}", path, e))
-                })?;
-                // nested relative paths is file ke directory ke relative honge; restore after
-                let prev_dir = self.source_dir.take();
-                self.source_dir = canonical.parent().map(|p| p.to_path_buf());
-                self.import_depth += 1;
-                let result = self.compile_block(&program, code, lines);
-                self.import_depth -= 1;
-                self.source_dir = prev_dir;
-                result?;
+                let id = match self.import_by_path.get(&canonical) {
+                    Some(&id) => id, // cycle / duplicate: same chunk, runtime ek baar chalayega
+                    None => {
+                        let id = self.imports.len();
+                        self.imports.push(ImportChunk {
+                            canonical: canonical.clone(),
+                            code: Vec::new(),
+                            lines: Vec::new(),
+                        });
+                        self.import_by_path.insert(canonical.clone(), id);
+                        let max_source = limits::env_limit(
+                            "BOLI_MAX_SOURCE_BYTES",
+                            limits::DEFAULT_MAX_SOURCE_BYTES,
+                        );
+                        let source = limits::read_source_capped(&canonical, max_source, *line)?;
+                        let program = crate::parser::parse_source(&source).map_err(|e| {
+                            BoliError::line(*line, format!("file '{}' me error: {}", path, e))
+                        })?;
+                        let prev_dir = self.source_dir.take();
+                        self.source_dir = canonical.parent().map(|p| p.to_path_buf());
+                        self.import_depth += 1;
+                        let mut chunk_code = Vec::new();
+                        let mut chunk_lines = Vec::new();
+                        let result =
+                            self.compile_block(&program, &mut chunk_code, &mut chunk_lines);
+                        self.import_depth -= 1;
+                        self.source_dir = prev_dir;
+                        result?;
+                        self.imports[id].code = chunk_code;
+                        self.imports[id].lines = chunk_lines;
+                        id
+                    }
+                };
+                // The compiled chunk is inert until execution reaches this instruction.
+                code.push(Op::Import {
+                    id,
+                    path: path.clone(),
+                });
+                lines.push(*line);
             }
         }
         Ok(())
@@ -481,7 +509,8 @@ impl Compiler {
 }
 
 pub struct Vm {
-    source_dir: Option<std::path::PathBuf>,
+    source_dir: Option<PathBuf>,
+    entry_path: Option<PathBuf>,
     scopes: Vec<Scope>,
     total_bytes: u64,
     max_total_bytes: u64,
@@ -491,9 +520,15 @@ pub struct Vm {
     max_call_depth: usize,
     max_string_bytes: usize,
     max_list_items: usize,
+    max_value_depth: usize,
     constants: Vec<Value>,
     names: Vec<String>,
     kaams: HashMap<String, KaamDef>,
+    kaam_defs: Vec<KaamDef>,
+    imports: Vec<ImportChunk>,
+    executed_imports: HashSet<PathBuf>,
+    import_depth: usize,
+    max_import_depth: usize,
     trace: Vec<(String, usize)>,
     captured: Option<Vec<String>>,
     stack: Vec<Value>,
@@ -515,8 +550,10 @@ impl Vm {
         let max_list_items =
             env_limit("BOLI_MAX_LIST_ITEMS", limits::DEFAULT_MAX_LIST_ITEMS) as usize;
         let max_total_bytes = env_limit("BOLI_MAX_TOTAL_BYTES", limits::DEFAULT_MAX_TOTAL_BYTES);
+        let max_value_depth = env_limit("BOLI_MAX_VALUE_DEPTH", DEFAULT_MAX_VALUE_DEPTH) as usize;
         Vm {
             source_dir: None,
+            entry_path: None,
             scopes: vec![Scope::new()],
             total_bytes: 0,
             max_total_bytes,
@@ -526,9 +563,16 @@ impl Vm {
             max_call_depth,
             max_string_bytes,
             max_list_items,
+            max_value_depth,
             constants: Vec::new(),
             names: Vec::new(),
             kaams: HashMap::new(),
+            kaam_defs: Vec::new(),
+            imports: Vec::new(),
+            executed_imports: HashSet::new(),
+            import_depth: 0,
+            max_import_depth: env_limit("BOLI_MAX_IMPORT_DEPTH", limits::DEFAULT_MAX_IMPORT_DEPTH)
+                as usize,
             trace: Vec::new(),
             captured: None,
             stack: Vec::new(),
@@ -561,6 +605,25 @@ impl Vm {
         self.source_dir = Some(dir);
     }
 
+    pub fn register_source_file<P: AsRef<std::path::Path>>(
+        &mut self,
+        path: P,
+    ) -> Result<(), BoliError> {
+        let path = path.as_ref();
+        let canonical = std::fs::canonicalize(path).map_err(|e| BoliError {
+            line: None,
+            col: None,
+            message: format!(
+                "source file '{}' canonicalize nahi hua: {}",
+                path.display(),
+                e
+            ),
+            trace: Vec::new(),
+        })?;
+        self.entry_path = Some(canonical);
+        Ok(())
+    }
+
     pub fn run_program(&mut self, program: &[Stmt]) -> Result<(), BoliError> {
         self.steps = 0;
         let baseline_scopes = self.scopes.len();
@@ -569,18 +632,37 @@ impl Vm {
         if let Some(dir) = &self.source_dir {
             compiler = Compiler::with_dir(Some(dir.clone()));
         }
+        if let Some(path) = &self.entry_path {
+            // Entry khud already chal raha hai: uska self-import ek empty chunk hai.
+            let id = compiler.imports.len();
+            compiler.imports.push(ImportChunk {
+                canonical: path.clone(),
+                code: Vec::new(),
+                lines: Vec::new(),
+            });
+            compiler.import_by_path.insert(path.clone(), id);
+            self.executed_imports.insert(path.clone());
+        }
         let mut code = Vec::new();
         let mut lines = Vec::new();
         compiler.compile_block(program, &mut code, &mut lines)?;
         self.constants = compiler.constants;
         self.names = compiler.names;
-        self.kaams = compiler.kaams;
-        let result = self.exec(&code, &lines);
+        self.kaams.clear();
+        self.kaam_defs = compiler.kaam_defs;
+        self.imports = compiler.imports;
+        let result = self.exec(&code, &lines).and_then(|flow| match flow {
+            ExecResult::Normal => Ok(()),
+            ExecResult::Return(_, line) => Err(BoliError::line(
+                line,
+                "'wapas do' sirf kaam ke andar use hota hai",
+            )),
+        });
         while self.scopes.len() > baseline_scopes {
             self.pop_scope();
         }
         self.stack.truncate(baseline_stack);
-        result.map(|_| ())
+        result
     }
 
     fn push_scope(&mut self) {
@@ -603,11 +685,29 @@ impl Vm {
         None
     }
 
+    fn check_depth(&self, value: &Value, line: usize) -> Result<(), BoliError> {
+        let depth = value_depth(value);
+        if depth > self.max_value_depth {
+            return Err(BoliError::line(
+                line,
+                format!(
+                    "value bahut gehra hai (max {} levels, BOLI_MAX_VALUE_DEPTH)",
+                    self.max_value_depth
+                ),
+            ));
+        }
+        Ok(())
+    }
+
     fn set_local(&mut self, name: &str, value: Value, line: usize) -> Result<(), BoliError> {
+        self.check_depth(&value, line)?;
         let size = value_size(&value);
         let scope = self.scopes.last_mut().expect("global hamesha rahega");
         let old_size = scope.map.get(name).map(value_size).unwrap_or(0);
-        let new_total = self.total_bytes + size - old_size;
+        let new_total = self
+            .total_bytes
+            .saturating_add(size)
+            .saturating_sub(old_size);
         if new_total > self.max_total_bytes {
             return Err(BoliError::line(
                 line,
@@ -662,18 +762,31 @@ impl Vm {
                     let name = self.names[*idx].clone();
                     match self.get_local(&name) {
                         Some(v) => self.stack.push(v),
-                        None => {
-                            // zero-arg kaam fallback (interpreter jaisa)
-                            if self.kaams.get(&name).is_some_and(|k| k.params.is_empty()) {
+                        None => match self.kaams.get(&name).map(|k| k.params.len()) {
+                            Some(0) => {
                                 let v = self.call_kaam(&name, Vec::new(), line)?;
                                 self.stack.push(v);
-                            } else {
+                            }
+                            Some(n) => {
                                 return Err(BoliError::line(
                                     line,
-                                    format!("naam '{}' nahi mila", name),
+                                    format!(
+                                        "kaam '{}' ko {} cheezein chahiye, seedha call karo",
+                                        name, n
+                                    ),
                                 ));
                             }
-                        }
+                            None => {
+                                let hint = self
+                                    .nearest_name(&name)
+                                    .map(|n| format!(" Shayad '{}' likhna tha?", n))
+                                    .unwrap_or_default();
+                                return Err(BoliError::line(
+                                    line,
+                                    format!("naam '{}' nahi mila.{}", name, hint),
+                                ));
+                            }
+                        },
                     }
                 }
                 Op::StoreName(idx) => {
@@ -744,7 +857,9 @@ impl Vm {
                             ),
                         ));
                     }
-                    self.stack.push(Value::List(items));
+                    let value = Value::List(items);
+                    self.check_depth(&value, line)?;
+                    self.stack.push(value);
                 }
                 Op::MakeMap(n) => {
                     let n = *n;
@@ -771,7 +886,9 @@ impl Vm {
                         };
                         map.insert(key, v);
                     }
-                    self.stack.push(Value::Map(map));
+                    let value = Value::Map(map);
+                    self.check_depth(&value, line)?;
+                    self.stack.push(value);
                 }
                 Op::Index => {
                     let index = self.stack.pop().expect("stack underflow");
@@ -786,6 +903,7 @@ impl Vm {
                     let index = self.stack.pop().expect("stack underflow");
                     let updated =
                         crate::interpreter::eval::index_set_pub(target, &index, value, line)?;
+                    self.check_depth(&updated, line)?;
                     self.stack.push(updated);
                 }
                 Op::Call(name_idx, argc) => {
@@ -799,9 +917,25 @@ impl Vm {
                     let result = self.call_kaam(&name, args, line)?;
                     self.stack.push(result);
                 }
-                Op::Return => {
+                Op::DefineKaam(id) => {
+                    let def = self.kaam_defs[*id].clone();
+                    if self.kaams.contains_key(&def.name) {
+                        return Err(BoliError::line(
+                            def.line,
+                            format!("kaam '{}' pehle se bana hua hai", def.name),
+                        ));
+                    }
+                    self.kaams.insert(def.name.clone(), def);
+                }
+                Op::Import { id, path } => {
+                    self.run_import(*id, path, line)?;
+                }
+                Op::FlowError(msg) => {
+                    return Err(BoliError::line(line, *msg));
+                }
+                Op::Return(return_line) => {
                     let v = self.stack.pop().expect("stack underflow");
-                    return Ok(ExecResult::Return(v));
+                    return Ok(ExecResult::Return(v, *return_line));
                 }
                 Op::PopValue => {
                     self.stack.pop().expect("stack underflow");
@@ -822,16 +956,8 @@ impl Vm {
                     let to_n = as_number_pub(&to, "se ke baad", line)?;
                     self.push_scope();
                     let count = range_count_pub(from_n, to_n, line)?;
-                    self.scopes
-                        .last_mut()
-                        .expect("scope")
-                        .map
-                        .insert("ginti".to_string(), Value::Number(from_n));
-                    self.scopes
-                        .last_mut()
-                        .expect("scope")
-                        .map
-                        .insert(LEFT.to_string(), Value::Number(count));
+                    self.set_local("ginti", Value::Number(from_n), line)?;
+                    self.set_local(LEFT, Value::Number(count), line)?;
                 }
                 Op::GintiNext => {
                     let ginti = self.get_local("ginti").unwrap_or(Value::Number(1.0));
@@ -873,7 +999,14 @@ impl Vm {
                     self.max_list_items,
                 );
             }
-            return Err(BoliError::line(line, format!("kaam '{}' nahi mila", name)));
+            let hint = self
+                .nearest_name(name)
+                .map(|n| format!(" Shayad '{}' likhna tha?", n))
+                .unwrap_or_default();
+            return Err(BoliError::line(
+                line,
+                format!("kaam '{}' nahi mila.{}", name, hint),
+            ));
         };
         if params.len() != args.len() {
             return Err(BoliError::line(
@@ -925,9 +1058,84 @@ impl Vm {
             e
         });
         match result? {
-            ExecResult::Return(v) => Ok(v),
+            ExecResult::Return(v, _) => Ok(v),
             ExecResult::Normal => Ok(Value::Khaali),
         }
+    }
+
+    fn run_import(&mut self, id: usize, path: &str, line: usize) -> Result<(), BoliError> {
+        if self.import_depth >= self.max_import_depth {
+            return Err(BoliError::line(
+                line,
+                format!(
+                    "module import bahut gehra ho gaya (max depth {}, BOLI_MAX_IMPORT_DEPTH)",
+                    self.max_import_depth
+                ),
+            ));
+        }
+        let canonical = self.imports[id].canonical.clone();
+        if !self.executed_imports.insert(canonical.clone()) {
+            return Ok(());
+        }
+        let prev_dir = self.source_dir.take();
+        self.source_dir = canonical.parent().map(|p| p.to_path_buf());
+        self.import_depth += 1;
+        let code = self.imports[id].code.clone();
+        let lines = self.imports[id].lines.clone();
+        let result = self.exec(&code, &lines);
+        self.import_depth -= 1;
+        self.source_dir = prev_dir;
+        let result = match result {
+            Ok(ExecResult::Normal) => Ok(()),
+            Ok(ExecResult::Return(_, return_line)) => Err(BoliError::line(
+                return_line,
+                "'wapas do' sirf kaam ke andar use hota hai",
+            )),
+            Err(e) => Err(e),
+        };
+        result.map_err(|e| BoliError::line(line, format!("file '{}' me error: {}", path, e)))
+    }
+
+    fn nearest_name(&self, wanted: &str) -> Option<String> {
+        const MAX_CHARS: usize = 64;
+        const MAX_CANDIDATES: usize = 512;
+        let wanted_len = wanted.chars().count();
+        if wanted_len == 0 || wanted_len > MAX_CHARS {
+            return None;
+        }
+        let mut candidates: HashSet<String> = HashSet::with_capacity(MAX_CANDIDATES);
+        let mut add = |name: &str| {
+            if candidates.len() < MAX_CANDIDATES
+                && !name.is_empty()
+                && name.chars().count() <= MAX_CHARS
+            {
+                candidates.insert(name.to_string());
+            }
+        };
+        for name in self.kaams.keys() {
+            add(name);
+        }
+        for builtin in builtins::BUILTINS {
+            add(builtin);
+        }
+        for scope in &self.scopes {
+            for name in scope.map.keys() {
+                add(name);
+            }
+        }
+        let mut candidates: Vec<String> = candidates.into_iter().collect();
+        candidates.sort_unstable();
+        let mut best: Option<(usize, String)> = None;
+        for candidate in candidates {
+            let candidate_len = candidate.chars().count();
+            let threshold = wanted_len.max(candidate_len) / 2 + 1;
+            if let Some(distance) = bounded_edit_distance(wanted, &candidate, threshold)
+                && best.as_ref().is_none_or(|b| distance < b.0)
+            {
+                best = Some((distance, candidate));
+            }
+        }
+        best.map(|(_, name)| name)
     }
 
     fn pucho(&mut self, prompt: &str, line: usize) -> Result<Value, BoliError> {
@@ -975,7 +1183,42 @@ impl Vm {
 
 enum ExecResult {
     Normal,
-    Return(Value),
+    Return(Value, usize),
+}
+
+fn cond_line(cond: &Cond) -> usize {
+    match cond {
+        Cond::Cmp { line, .. } => *line,
+        Cond::Aur(_, _, line) | Cond::Ya(_, _, line) => *line,
+    }
+}
+
+fn bounded_edit_distance(a: &str, b: &str, max_distance: usize) -> Option<usize> {
+    let a: Vec<char> = a.chars().collect();
+    let b: Vec<char> = b.chars().collect();
+    let (m, n) = (a.len(), b.len());
+    if m.abs_diff(n) > max_distance {
+        return None;
+    }
+    if m == 0 || n == 0 {
+        return Some(m.max(n));
+    }
+    let mut prev: Vec<usize> = (0..=n).collect();
+    let mut curr = vec![0usize; n + 1];
+    for i in 1..=m {
+        curr[0] = i;
+        let mut row_min = curr[0];
+        for j in 1..=n {
+            let cost = usize::from(a[i - 1] != b[j - 1]);
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
+            row_min = row_min.min(curr[j]);
+        }
+        if row_min > max_distance {
+            return None;
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    (prev[n] <= max_distance).then_some(prev[n])
 }
 
 fn writeln_stdout(text: &str) -> std::io::Result<()> {

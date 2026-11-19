@@ -5,6 +5,12 @@ use crate::ast::{ArithOp, BoliError, CmpOp, Cond, Expr, Program, Stmt};
 use crate::lexer::{Tok, Token, lex};
 use crate::limits::{DEFAULT_MAX_CONDITION_DEPTH, DEFAULT_MAX_PARSE_DEPTH, env_limit};
 
+const SYNTHETIC_EOF: Token = Token {
+    tok: Tok::Eof,
+    line: 1,
+    col: 1,
+};
+
 pub struct Parser {
     tokens: Vec<Token>,
     pos: usize,
@@ -31,21 +37,21 @@ impl Parser {
         }
     }
 
-    // Abhi ka token (bina aage badhe)
+    // Abhi ka token (bina aage badhe). Token vector khatam ho jaye to synthetic Eof.
     fn peek(&self) -> &Token {
-        &self.tokens[self.pos]
+        self.tokens.get(self.pos).unwrap_or(&SYNTHETIC_EOF)
     }
 
-    // Agle n tokens aage dekhne ka (bina aage badhe)
+    // Agle n tokens aage dekhne ka (bina aage badhe). Out-of-range = synthetic Eof.
     fn peek_at(&self, offset: usize) -> &Token {
-        let idx = (self.pos + offset).min(self.tokens.len() - 1);
-        &self.tokens[idx]
+        let idx = self.pos.saturating_add(offset);
+        self.tokens.get(idx).unwrap_or(&SYNTHETIC_EOF)
     }
 
-    // Abhi ka token le aur aage badh
+    // Abhi ka token le aur aage badh. Eof ke baad baar-baar yahi token milta hai.
     fn next(&mut self) -> Token {
-        let tok = self.tokens[self.pos].clone();
-        if self.pos < self.tokens.len() - 1 {
+        let tok = self.peek().clone();
+        if self.pos < self.tokens.len() {
             self.pos += 1;
         }
         tok
@@ -54,7 +60,7 @@ impl Parser {
     // Saare newline chhod do
     fn skip_newlines(&mut self) {
         while self.peek().tok == Tok::Newline {
-            self.pos += 1;
+            self.next();
         }
     }
 
@@ -420,16 +426,19 @@ impl Parser {
                         let mut pairs = Vec::new();
                         while Self::atom_start(&self.peek().tok) || self.peek().tok == Tok::Map {
                             if self.peek().tok == Tok::Map {
-                                return Err(BoliError::line(
-                                    self.peek().line,
+                                let tok = self.peek();
+                                return Err(BoliError::line_col(
+                                    tok.line,
+                                    tok.col,
                                     "map literal ke andar 'map' dubara nahi aa sakta",
                                 ));
                             }
                             let key = self.atom(false)?;
                             if !Self::atom_start(&self.peek().tok) {
                                 let tok = self.peek().clone();
-                                return Err(BoliError::line(
+                                return Err(BoliError::line_col(
                                     tok.line,
+                                    tok.col,
                                     format!(
                                         "map ki har chaabi ke saath value deni hogi, '{}' mila",
                                         tok.describe()
@@ -441,8 +450,9 @@ impl Parser {
                         }
                         if pairs.is_empty() {
                             let tok = self.peek().clone();
-                            return Err(BoliError::line(
+                            return Err(BoliError::line_col(
                                 tok.line,
+                                tok.col,
                                 "map me kam se kam ek chaabi-value pair chahiye",
                             ));
                         }
@@ -559,13 +569,34 @@ impl Parser {
 
     fn atom(&mut self, allow_call: bool) -> Result<Expr, BoliError> {
         let mut expr = self.atom_base(allow_call)?;
+        let mut held_depth = 0usize;
         // hissa (index) postfix: cheezein hissa 1  =>  cheezein ka pehla hissa
         while self.peek().tok == Tok::Hissa {
             let hissa_tok = self.next();
+            held_depth += 1;
+            self.depth += 1;
+            if self.depth > self.max_depth {
+                self.depth -= held_depth;
+                return Err(BoliError::line_col(
+                    hissa_tok.line,
+                    hissa_tok.col,
+                    format!(
+                        "expression bahut zyada gehra hai (max nesting {})",
+                        self.max_depth
+                    ),
+                ));
+            }
             // index sirf atom_base - postfix chains left-associate (a hissa 1 hissa 2 = (a[1])[2])
-            let index = self.atom_base(false)?;
+            let index = match self.atom_base(false) {
+                Ok(index) => index,
+                Err(err) => {
+                    self.depth -= held_depth;
+                    return Err(err);
+                }
+            };
             expr = Expr::Index(Box::new(expr), Box::new(index), hissa_tok.line);
         }
+        self.depth -= held_depth;
         Ok(expr)
     }
 
@@ -672,58 +703,54 @@ impl Parser {
     // Condition: ya (low precedence) upar aur (high precedence) neeche
     // "a ya b aur c" ka matlab hai: a ya (b aur c)
     fn parse_cond(&mut self) -> Result<Cond, BoliError> {
-        let mut cond = self.parse_aur()?;
-        let mut chain = 1usize;
+        let mut nodes = 1usize;
+        let mut cond = self.parse_aur(&mut nodes)?;
         loop {
             let tok = self.peek().clone();
-            if tok.tok == Tok::Ya {
-                self.next();
-                let line = tok.line;
-                let right = self.parse_aur()?;
-                chain += 1;
-                if chain > self.max_condition_depth {
-                    return Err(BoliError::line_col(
-                        line,
-                        tok.col,
-                        format!(
-                            "condition bahut lambi ho gayi (max {} 'ya')",
-                            self.max_condition_depth
-                        ),
-                    ));
-                }
-                cond = Cond::Ya(Box::new(cond), Box::new(right), line);
-            } else {
+            if tok.tok != Tok::Ya {
                 break;
             }
+            self.next();
+            let right = self.parse_aur(&mut nodes)?;
+            Self::count_cond_node(&mut nodes, self.max_condition_depth, &tok, "ya")?;
+            cond = Cond::Ya(Box::new(cond), Box::new(right), tok.line);
         }
         Ok(cond)
     }
 
+    fn count_cond_node(
+        nodes: &mut usize,
+        max: usize,
+        tok: &Token,
+        word: &str,
+    ) -> Result<(), BoliError> {
+        *nodes += 1;
+        if *nodes > max {
+            Err(BoliError::line_col(
+                tok.line,
+                tok.col,
+                format!(
+                    "condition bahut lambi ho gayi (max {} 'aur'/'ya', yahan '{}')",
+                    max, word
+                ),
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
     // aur (AND) bind karta hai: comparison (aur comparison)*
-    fn parse_aur(&mut self) -> Result<Cond, BoliError> {
+    fn parse_aur(&mut self, nodes: &mut usize) -> Result<Cond, BoliError> {
         let mut cond = self.parse_comparison()?;
-        let mut chain = 1usize;
         loop {
             let tok = self.peek().clone();
-            if tok.tok == Tok::Aur {
-                self.next();
-                let line = tok.line;
-                let right = self.parse_comparison()?;
-                chain += 1;
-                if chain > self.max_condition_depth {
-                    return Err(BoliError::line_col(
-                        line,
-                        tok.col,
-                        format!(
-                            "condition bahut lambi ho gayi (max {} 'aur')",
-                            self.max_condition_depth
-                        ),
-                    ));
-                }
-                cond = Cond::Aur(Box::new(cond), Box::new(right), line);
-            } else {
+            if tok.tok != Tok::Aur {
                 break;
             }
+            self.next();
+            let right = self.parse_comparison()?;
+            Self::count_cond_node(nodes, self.max_condition_depth, &tok, "aur")?;
+            cond = Cond::Aur(Box::new(cond), Box::new(right), tok.line);
         }
         Ok(cond)
     }

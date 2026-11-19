@@ -7,12 +7,12 @@ pub(crate) mod value;
 use crate::scope::Scope;
 use eval::{F64ToI64Checked, as_number, eval_arith};
 pub use value::Value;
-use value::value_size;
+use value::{check_value_depth, value_size};
 
 use crate::ast::{BoliError, Expr, Stmt};
 use crate::limits::{
     DEFAULT_MAX_CALL_DEPTH, DEFAULT_MAX_EVAL_DEPTH, DEFAULT_MAX_LIST_ITEMS, DEFAULT_MAX_STEPS,
-    DEFAULT_MAX_STRING_BYTES, env_limit,
+    DEFAULT_MAX_STRING_BYTES, DEFAULT_MAX_VALUE_DEPTH, env_limit,
 };
 use std::collections::HashMap;
 use std::io::{self, Write};
@@ -41,6 +41,7 @@ pub struct Environment {
     max_eval_depth: usize,
     max_condition_depth: usize,
     max_total_bytes: u64,
+    max_value_depth: usize,
     total_bytes: u64,
     call_depth: usize,
     eval_depth: usize,
@@ -71,10 +72,12 @@ impl Environment {
             "BOLI_MAX_TOTAL_BYTES",
             crate::limits::DEFAULT_MAX_TOTAL_BYTES,
         );
+        let max_value_depth = env_limit("BOLI_MAX_VALUE_DEPTH", DEFAULT_MAX_VALUE_DEPTH) as usize;
         Environment {
             scopes: vec![Scope::new()],
             total_bytes: 0,
             max_total_bytes,
+            max_value_depth,
             kaam: HashMap::new(),
             steps: 0,
             max_steps,
@@ -136,8 +139,32 @@ impl Environment {
         self
     }
 
+    pub fn with_value_depth_limit(mut self, max_value_depth: usize) -> Self {
+        self.max_value_depth = max_value_depth;
+        self
+    }
+
     pub fn set_source_dir(&mut self, dir: std::path::PathBuf) {
         self.source_dir = Some(dir);
+    }
+
+    pub fn register_source_file<P: AsRef<std::path::Path>>(
+        &mut self,
+        path: P,
+    ) -> Result<(), BoliError> {
+        let path = path.as_ref();
+        let canonical = std::fs::canonicalize(path).map_err(|e| BoliError {
+            line: None,
+            col: None,
+            message: format!(
+                "source file '{}' canonicalize nahi hua: {}",
+                path.display(),
+                e
+            ),
+            trace: Vec::new(),
+        })?;
+        self.loaded_modules.insert(canonical);
+        Ok(())
     }
 
     // `<dir>/file.hl` ko current environment me ek baar execute karo (cycles safe)
@@ -172,7 +199,7 @@ impl Environment {
         let prev_dir = self.source_dir.take();
         self.source_dir = canonical.parent().map(|p| p.to_path_buf());
         self.import_depth += 1;
-        let result = self.run_program(&program);
+        let result = self.run_program_inner(&program);
         self.import_depth -= 1;
         self.source_dir = prev_dir;
         result.map_err(|e| BoliError::line(line, format!("file '{}' me error: {}", raw_path, e)))
@@ -204,6 +231,7 @@ impl Environment {
 
     // Live scope bytes ka hisaab: insert/replace par budget check
     fn set(&mut self, name: &str, value: Value, line: usize) -> Result<(), BoliError> {
+        check_value_depth(&value, self.max_value_depth, line)?;
         let size = value_size(&value);
         let scope = self.scopes.last_mut().expect("global scope hamesha rahega");
         let old_size = scope.map.get(name).map(value_size).unwrap_or(0);
@@ -225,6 +253,10 @@ impl Environment {
 
     pub fn run_program(&mut self, stmts: &[Stmt]) -> Result<(), BoliError> {
         self.reset_steps();
+        self.run_program_inner(stmts)
+    }
+
+    pub(crate) fn run_program_inner(&mut self, stmts: &[Stmt]) -> Result<(), BoliError> {
         match self.run_block(stmts)? {
             Flow::Normal => Ok(()),
             Flow::Wapas(_, line) => Err(BoliError::line(
@@ -655,61 +687,111 @@ impl Environment {
     }
 }
 
-// "Did you mean...?" - simple Damerau-Levenshtein over known names
-fn edit_distance(a: &str, b: &str) -> usize {
+const MAX_SUGGESTION_IDENTIFIER_CHARS: usize = 64;
+const MAX_SUGGESTION_CANDIDATES: usize = 512;
+
+fn bounded_edit_distance(a: &str, b: &str, max_distance: usize) -> Option<usize> {
     let a: Vec<char> = a.chars().collect();
     let b: Vec<char> = b.chars().collect();
     let (m, n) = (a.len(), b.len());
-    let mut dp = vec![vec![0usize; n + 1]; m + 1];
-    for (i, row) in dp.iter_mut().enumerate().take(m + 1) {
-        row[0] = i;
+    if m.abs_diff(n) > max_distance {
+        return None;
     }
-    for (j, cell) in dp[0].iter_mut().enumerate().take(n + 1) {
-        *cell = j;
+    if m == 0 || n == 0 {
+        return Some(m.max(n));
     }
+    let mut prev: Vec<usize> = (0..=n).collect();
+    let mut curr = vec![0usize; n + 1];
     for i in 1..=m {
+        curr[0] = i;
+        let mut row_min = curr[0];
         for j in 1..=n {
-            let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };
-            dp[i][j] = (dp[i - 1][j] + 1)
-                .min(dp[i][j - 1] + 1)
-                .min(dp[i - 1][j - 1] + cost);
+            let cost = usize::from(a[i - 1] != b[j - 1]);
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
+            row_min = row_min.min(curr[j]);
         }
+        if row_min > max_distance {
+            return None;
+        }
+        std::mem::swap(&mut prev, &mut curr);
     }
-    dp[m][n]
+    (prev[n] <= max_distance).then_some(prev[n])
 }
 
 impl Environment {
-    // sabhi known names (scope + kaam table) se sabse chhota edit distance wala return karo
     fn nearest_name(&self, wanted: &str) -> Option<String> {
-        if wanted.is_empty() {
+        let wanted_len = wanted.chars().count();
+        if wanted_len == 0 || wanted_len > MAX_SUGGESTION_IDENTIFIER_CHARS {
             return None;
         }
-        let mut candidates: Vec<String> = self.kaam.keys().cloned().collect();
-        for scope in &self.scopes {
-            for k in scope.map.keys() {
-                if !candidates.contains(k) {
-                    candidates.push(k.clone());
-                }
+        let mut candidates: std::collections::HashSet<String> =
+            std::collections::HashSet::with_capacity(MAX_SUGGESTION_CANDIDATES);
+        let mut add = |name: &str| {
+            if candidates.len() < MAX_SUGGESTION_CANDIDATES
+                && !name.is_empty()
+                && name.chars().count() <= MAX_SUGGESTION_IDENTIFIER_CHARS
+            {
+                candidates.insert(name.to_string());
             }
+        };
+        for name in self.kaam.keys() {
+            add(name);
         }
         for builtin in crate::builtins::BUILTINS {
-            candidates.push((*builtin).to_string());
+            add(builtin);
         }
-        let mut best: Option<(usize, String)> = None;
-        for c in candidates {
-            let d = edit_distance(wanted, &c);
-            if d <= wanted.chars().count().max(c.chars().count()) / 2 + 1
-                && best.as_ref().map(|b| d < b.0).unwrap_or(true)
-            {
-                best = Some((d, c));
+        for scope in &self.scopes {
+            for name in scope.map.keys() {
+                add(name);
             }
         }
-        best.map(|(_, c)| c)
+        let mut candidates: Vec<String> = candidates.into_iter().collect();
+        candidates.sort_unstable();
+        let mut best: Option<(usize, String)> = None;
+        let mut checked = 0usize;
+        for candidate in candidates {
+            let candidate_len = candidate.chars().count();
+            let threshold = wanted_len.max(candidate_len) / 2 + 1;
+            if wanted_len.abs_diff(candidate_len) > threshold {
+                continue;
+            }
+            if let Some(distance) = bounded_edit_distance(wanted, &candidate, threshold)
+                && best.as_ref().map(|b| distance < b.0).unwrap_or(true)
+            {
+                best = Some((distance, candidate));
+            }
+            checked += 1;
+            if checked >= MAX_SUGGESTION_CANDIDATES {
+                break;
+            }
+        }
+        best.map(|(_, name)| name)
     }
 }
 
 impl Default for Environment {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bounded_distance_respects_limit() {
+        assert_eq!(bounded_edit_distance("naam", "nam", 2), Some(1));
+        assert_eq!(bounded_edit_distance("naam", "xyz", 1), None);
+        assert_eq!(bounded_edit_distance("", "abc", 0), None);
+    }
+
+    #[test]
+    fn nearest_name_skips_oversized_identifiers() {
+        let mut env = Environment::new();
+        env.set("naam", Value::Khaali, 1).unwrap();
+        let oversized = "x".repeat(MAX_SUGGESTION_IDENTIFIER_CHARS + 1);
+        assert_eq!(env.nearest_name(&oversized), None);
+        assert_eq!(env.nearest_name("nam").as_deref(), Some("naam"));
     }
 }

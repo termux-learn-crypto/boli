@@ -28,9 +28,13 @@ elif [ -n "${PREFIX:-}" ] && [ -d "$PREFIX/bin" ] && [ -w "$PREFIX/bin" ]; then
 elif [ -d /usr/local/bin ] && [ -w /usr/local/bin ]; then
     # Linux system-wide
     INSTALL_DIR=/usr/local/bin
-else
+elif [ -n "${HOME:-}" ]; then
     # User-local fallback
     INSTALL_DIR="$HOME/.local/bin"
+else
+    echo "Galti: install karne ke liye koi directory nahi mili."
+    echo "       BOLI_INSTALL_DIR set karo, ya PREFIX/bin, /usr/local/bin, HOME available karo."
+    exit 1
 fi
 
 mkdir -p "$INSTALL_DIR"

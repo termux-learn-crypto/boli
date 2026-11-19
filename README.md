@@ -4,7 +4,7 @@ BOLI - Bina + - * / ke, sirf shabdon se programming
 Yahan `+ - * / { } ( ) = :` jaise symbols ki jagah shabd use hote hain. Poor poora program sirf shabdon, number aur text se likha jata hai.
 Interpreter **Rust** me bana hai. File extension: **`.hl`**.
 
-**Current status:** v0.6.2 — zero dependencies, 167 tests green, tree-walking interpreter (default) + experimental bytecode VM, read-only local modules via `laao`. Current verification: [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md).
+**Current status:** v0.6.4 — zero dependencies, 190 tests green, tree-walking interpreter (default) + experimental bytecode VM, read-only local modules via `laao`. Current verification: [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md).
 
 ```boli
 likho "Namaste Duniya"
@@ -384,17 +384,17 @@ boli/
 ├── README.md
 ├── LANGUAGE_SPEC.md    # poora grammar/semantics reference
 ├── ARCHITECTURE.md     # code flow aur module design
-├── CHANGELOG.md        # v0.1.0 → v0.3.0 changes
+├── CHANGELOG.md        # v0.1.0 → v0.6.4 changes
 ├── TESTING.md          # tests kaise chalayein, kaise likhein
 ├── docs/
 │   ├── AUDIT_REPORT.md     # audit + "how verified" notes
-│   ├── COMPLETE_AUDIT.md   # v0.3.x: complete source-code audit
+│   ├── COMPLETE_AUDIT.md   # complete source-code audit + v0.6.4 addendum
 │   ├── BUG_FIXES.md        # har fix ka symptom→root cause→verification
 │   ├── SECURITY_REPORT.md  # resource-limit matrix + threat model
 │   ├── ARCHITECTURE_REPORT.md  # module decisions
 │   ├── TEST_RESULTS.md     # actual command outputs
 │   ├── V0.3.0_CHANGELOG.md # v0.3.0 full changelog
-│   └── UPGRADE_ROADMAP.md  # future plans (dictionary, modules, VM)
+│   └── UPGRADE_ROADMAP.md  # current status + future plans
 ├── examples/
 │   ├── namaste.hl
 │   ├── calculator.hl
@@ -420,7 +420,7 @@ boli/
 ## Testing
 
 ```bash
-cargo test          # 167 tests chalenge (2 unit + 108 library + 28 CLI + 29 VM)
+cargo test          # 190 tests chalenge (4 unit + 114 library + 33 CLI + 39 VM)
 ```
 
 Details aur test-adding guide: [TESTING.md](TESTING.md). Spec: [LANGUAGE_SPEC.md](LANGUAGE_SPEC.md). Changes: [CHANGELOG.md](CHANGELOG.md). Audit: [docs/COMPLETE_AUDIT.md](docs/COMPLETE_AUDIT.md). Security: [docs/SECURITY_REPORT.md](docs/SECURITY_REPORT.md).
@@ -441,7 +441,7 @@ Kaam karne ka flow: `source.hl` → **lexer** (tokens) → **parser** (AST) → 
 
 User-defined kaam in naam se shadow kar sakta hai — user kaam ki priority zyada hai.
 
-## Safety limits (BOLI v0.6.2)
+## Safety limits (BOLI v0.6.4)
 
 Sab limits env variable se override ho sakti hain — har violation Hinglish Galti error hai, kabhi crash nahi:
 
@@ -457,7 +457,9 @@ Sab limits env variable se override ho sakti hain — har violation Hinglish Gal
 | Expression eval depth | 256 | `BOLI_MAX_EVAL_DEPTH` |
 | Program tokens (lexer) | 1,000,000 | `BOLI_MAX_TOKENS` |
 | REPL input line bytes | 64 KiB | `BOLI_MAX_REPL_LINE_BYTES` |
+| REPL multiline buffer bytes | 1 MiB | `BOLI_MAX_REPL_BUFFER_BYTES` |
 | Live scope bytes (memory budget) | 64 MiB | `BOLI_MAX_TOTAL_BYTES` |
+| Nested list/map value depth | 64 | `BOLI_MAX_VALUE_DEPTH` |
 | Import nesting depth | 32 | `BOLI_MAX_IMPORT_DEPTH` |
 | Import root (optional) | unset (any local path) | `BOLI_IMPORT_ROOT` |
 

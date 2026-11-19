@@ -2,7 +2,7 @@
 // eval_expr / eval_cond aur unke free helper functions
 
 use super::Environment;
-use super::value::Value;
+use super::value::{Value, check_value_depth};
 use crate::ast::{ArithOp, BoliError, CmpOp, Cond, Expr};
 
 impl Environment {
@@ -86,7 +86,9 @@ impl Environment {
                     .iter()
                     .map(|e| self.eval_expr(e))
                     .collect::<Result<Vec<_>, _>>()?;
-                Ok(Value::List(values))
+                let value = Value::List(values);
+                check_value_depth(&value, self.max_value_depth, *line)?;
+                Ok(value)
             }
             Expr::Index(target, index, line) => {
                 let target_v = self.eval_expr(target)?;

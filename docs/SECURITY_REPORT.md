@@ -1,6 +1,6 @@
-# BOLI — Security Report (v0.6.2)
+# BOLI — Security Report (v0.6.4)
 
-**Scope:** the tree-walking interpreter, experimental bytecode VM, CLI and REPL as shipped in `boli` v0.6.2. **Threat model:** BOLI programs may come from untrusted authors (a user running someone else's `.hl`). The host process must not crash, hang forever, exhaust memory without bound, leak state into a later program, or misreport safety guarantees. **Not in scope:** confidentiality (a running program can print what it is given), full OS sandboxing (BOLI has no shell/network/write/FFI capability), and the security of the host filesystem outside files the user chose to expose through `laao`.
+**Scope:** the tree-walking interpreter, experimental bytecode VM, CLI and REPL as shipped in `boli` v0.6.4. **Threat model:** BOLI programs may come from untrusted authors (a user running someone else's `.hl`). The host process must not crash, hang forever, exhaust memory without bound, leak state into a later program, or misreport safety guarantees. **Not in scope:** confidentiality (a running program can print what it is given), full OS sandboxing (BOLI has no shell/network/write/FFI capability), and the security of the host filesystem outside files the user chose to expose through `laao`.
 
 ## Resource-limit matrix (all enforced, all documented, all env-overridable)
 
@@ -18,10 +18,12 @@
 | Module import root | unset (any local path) | `BOLI_IMPORT_ROOT` | interpreter + VM `laao` | canonicalized prefix check in `limits::resolve_import_path` |
 | Program tokens | 1,000,000 | `BOLI_MAX_TOKENS` | lex time | lexer (`push_token`) |
 | REPL input line bytes | 64 KiB | `BOLI_MAX_REPL_LINE_BYTES` | chunked read | `read_repl_line` (line drained + rejected) |
+| REPL multiline buffer bytes | 1 MiB | `BOLI_MAX_REPL_BUFFER_BYTES` | incomplete block | `repl()` clears the partial block on overflow |
 | `pucho` input line bytes | 1 MiB | `BOLI_MAX_STRING_BYTES` | stdin | `read_input_line_from` (drains through newline on rejection) |
-| Live scope bytes (memory budget) | 64 MiB | `BOLI_MAX_TOTAL_BYTES` | set/pop scope accounting (replace-safe) | interpreter |
+| Live scope bytes (memory budget) | 64 MiB | `BOLI_MAX_TOTAL_BYTES` | set/pop scope accounting (replace-safe) | interpreter and VM |
+| Nested list/map value depth | 64 | `BOLI_MAX_VALUE_DEPTH` | constructed/stored values | interpreter and VM |
 
-Every violation is a deterministic Hinglish `Galti: line N me …` error. **No violation is a panic, SIGSEGV, SIGABRT, or (in tests) an unwind.**
+Every known violation is a deterministic Hinglish `Galti: line N me …` error. Security fixes are regression-tested; a future untested path may still be a bug, so this report does not claim that no violation can ever be a panic.
 
 ## Attack-surface review
 
@@ -29,7 +31,7 @@ Every violation is a deterministic Hinglish `Galti: line N me …` error. **No v
 Before v0.3.0, three independent axes overflowed the native stack:
 1. Nesting depth (parser/eval recursion) — fixed in v0.2.0 (const) → v0.3.0 (env `BOLI_MAX_PARSE_DEPTH`/`BOLI_MAX_EVAL_DEPTH`).
 2. Condition `aur`/`ya` chains (up to 200k terms reproduced SIGSEGV) — fixed v0.3.0 (chain counters at parse and eval).
-3. `hissa` postfix chains 1,000s deep (parser loop builds left-heavy AST; eval recursion) — capped by eval depth 256.
+3. `hissa` postfix chains 1,000s deep (parser loop builds left-heavy AST; eval recursion) — counted in parse depth 64 and capped by eval depth 256.
 Fuzz test (deterministic, no dependencies) confirms lexer+parser do not panic on random inputs.
 
 ### 2. Memory exhaustion
@@ -37,7 +39,8 @@ Fuzz test (deterministic, no dependencies) confirms lexer+parser do not panic on
 - String literals: checked at lex AND at eval (`checked_text`); concat checked; `pucho` capped with bounded chunked reads.
 - Lists: capped at 10,000 items (creation + concat).
 - Source file: metadata check AND bounded `take(max+1)` read — a file that grows during read is still stopped at the cap (no metadata TOCTOU).
-- Live scope bytes budget (`BOLI_MAX_TOTAL_BYTES`, default 64 MiB): every value entering a scope is weighed (text bytes, list cells×40B, scalars); replacing a name releases the old weight; scope pops decrement. Exceeding the budget is a deterministic Galti error — no partial-run corruption, no OOM.
+- Live scope bytes budget (`BOLI_MAX_TOTAL_BYTES`, default 64 MiB): every value entering a scope is weighed (text bytes, list cells×40B, scalars); replacing a name releases the old weight; scope pops decrement. Both engines account for range-loop `ginti` through the normal `set` path. Exceeding the budget is a deterministic Galti error — no partial-run corruption, no OOM.
+- Nested value depth (`BOLI_MAX_VALUE_DEPTH`, default 64): list/map construction and storage are checked in both engines; `value_size` and display are iterative, so deep input is rejected before native-stack exhaustion.
 - Steps: 100k global budget terminates loop-bombs (range `1 se 999999999 tak`, `jab tak sahi to …`).
 - Numbers: f64, NaN/±∞ rejected at every entry point; arithmetic overflow → error, not silent inf.
 
@@ -71,7 +74,7 @@ Remaining `unwrap`s are internal invariants (scope stack never empty; last token
 
 ## Verification performed (not claims — actual commands)
 
-- `cargo test` — 167/167 pass (2 unit + 108 library + 28 CLI + 29 VM)
+- `cargo test` — 172/172 pass (4 unit + 108 library + 30 CLI + 30 VM)
 - `cargo clippy --all-targets --all-features -- -D warnings` — clean
 - `BOLI_IMPORT_ROOT` confinement verified for interpreter and `BOLI_VM=1` (`cli_import_root_confines_laao`)
 - Over-limit input drainage verified in `src/limits.rs` unit tests and CLI REPL regression
@@ -81,6 +84,22 @@ The experimental bytecode VM (`--vm`, `BOLI_VM=1`) enforces the same limits: ste
 
 ## Runtime tracebacks (v0.5.0)
 `BoliError.trace` exposes the kaam call stack on runtime errors (innermost-first, name + call line). This discloses internal kaam names and call line numbers to whoever reads stderr — acceptable for a local interpreter (the program source is visible anyway), but worth noting for CI log hygiene. No new memory risk: frames are small and popped on every exit path (tested).
+
+## Audit fixes (v0.6.4)
+
+- Full-audit fix pass closed 15 confirmed findings across interpreter, VM, lexer/parser, CLI and installer.
+- Nested values are depth-capped in both engines; value display/accounting are iterative; a 5,000-deep map program is a Galti, not a SIGSEGV.
+- Imports no longer reset the interpreter step budget; `u64::MAX` read limits are overflow-safe via `saturating_add(1)`.
+- VM range counters use normal scope accounting; `kaam`/`laao` take effect at execution time, not compile time; top-level return, condition lines/hints, uncalled `ruk`/`agla` and nested import errors match the interpreter.
+- REPL quote/comment scanning and line caps are correct; parser depth is shared for `aur`/`ya` and counts `hissa`; public parser cannot panic; `5-3` errors; map errors carry columns.
+- `install.sh` handles unset `HOME`; the broken-pipe test now forces EPIPE, and the panic-free guarantee above is stated only for tested paths.
+
+## Audit fixes (v0.6.3)
+
+- Did-you-mean hints no longer allocate an unbounded edit-distance matrix: 64-char identifier cap, 512-candidate cap, length pruning, dedup and a two-row bounded Levenshtein with early cutoff.
+- REPL multiline input has an aggregate 1 MiB cap (`BOLI_MAX_REPL_BUFFER_BYTES`); an unfinished block that exceeds it is discarded so the REPL remains responsive.
+- The canonical entry path is registered in the interpreter/VM module registries before execution, so entry self-import is a no-op and top-level statements run once.
+- New tests cover bounded hints, aggregate REPL overflow and self-import parity across both engines.
 
 ## Audit fixes (v0.6.2)
 

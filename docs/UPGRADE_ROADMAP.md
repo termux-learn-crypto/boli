@@ -1,8 +1,8 @@
-# BOLI — Upgrade Roadmap (post-v0.6.2)
+# BOLI — Upgrade Roadmap (post-v0.6.4)
 
 Prioritized by fit with BOLI's philosophy: **Hinglish syntax, no symbols, learning-friendly, zero-dependency Rust, predictable behavior.** Every item below must keep existing `.hl` programs valid. Estimates assume one experienced Rust engineer.
 
-**Current status:** v0.6.2. Maps, modules, built-ins, tracebacks, diagnostics, the experimental VM, bounded reads, import depth/cycle checks, optional `BOLI_IMPORT_ROOT` confinement, and the second audit pass are done. Authoritative test/status page: [TEST_RESULTS.md](TEST_RESULTS.md). Security scope: [SECURITY_REPORT.md](SECURITY_REPORT.md).
+**Current status:** v0.6.4. Maps, modules, built-ins, tracebacks, diagnostics, the experimental VM, bounded reads, import depth/cycle checks, optional `BOLI_IMPORT_ROOT` confinement, bounded hints/REPL buffers, nested-value depth caps, runtime-accurate VM registration, and four audit passes are done. Authoritative test/status page: [TEST_RESULTS.md](TEST_RESULTS.md). Security scope: [SECURITY_REPORT.md](SECURITY_REPORT.md).
 
 ## Guiding constraints
 1. No new symbols (`{ } ( ) = :` stay illegal) — only keywords/words.
@@ -18,6 +18,8 @@ Prioritized by fit with BOLI's philosophy: **Hinglish syntax, no symbols, learni
 - v0.6.0: maps (`mapa`), modules (`laao`), experimental bytecode VM, did-you-mean hints.
 - v0.6.1: bounded import reads, `BOLI_MAX_IMPORT_DEPTH`, nested relative imports, 64-bit VM operands, error-path unwinding, built-in caps.
 - v0.6.2: drained over-limit input, VM stack/step reset, `BOLI_IMPORT_ROOT`, differential corpus tests, refreshed audit/docs status.
+- v0.6.3: bounded did-you-mean hints, aggregate REPL buffer cap, canonical entry-file module registration, third audit pass.
+- v0.6.4: full-audit fix pass (15 findings), nested value depth cap, overflow-safe limits, runtime-accurate VM kaam/import effects, parser/REPL hardening, fourth audit pass.
 
 ## v0.7.0 (next — tooling and predictability)
 | Feature | Sketch | Why / risk |
@@ -44,7 +46,7 @@ Prioritized by fit with BOLI's philosophy: **Hinglish syntax, no symbols, learni
 - **Language server** — `boli lsp` for editor integration after the AST/symbol table stabilizes.
 
 ## Versioning policy
-- Patch: crash → error fixes, docs, tests, hardening with no syntax change (v0.6.1, v0.6.2).
+- Patch: crash → error fixes, docs, tests, hardening with no syntax change (v0.6.1, v0.6.2, v0.6.3, v0.6.4).
 - Minor (0.x): new syntax, new limits, new capabilities, or behavior old programs may notice — all called out in CHANGELOG.
 - 1.0.0 when: modules + stdlib stable, VM parity suite green, no known correctness bugs, and ≥1 external contributor.
 

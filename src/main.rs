@@ -11,7 +11,7 @@ fn out_line(text: &str) -> bool {
 fn out(text: &str) -> bool {
     write!(io::stdout(), "{}", text).is_ok() && io::stdout().flush().is_ok()
 }
-use boli::limits::{DEFAULT_MAX_SOURCE_BYTES, env_limit};
+use boli::limits::{DEFAULT_MAX_REPL_BUFFER_BYTES, DEFAULT_MAX_SOURCE_BYTES, env_limit};
 use boli::parser;
 
 use std::env;
@@ -127,6 +127,10 @@ fn run_file(path: &str) {
             {
                 env.set_source_dir(parent.to_path_buf());
             }
+            if let Err(e) = env.register_source_file(path) {
+                eprintln!("{}", e);
+                process::exit(1);
+            }
             if let Err(e) = env.run_program(&program) {
                 show_boli_error(&source, &e);
                 process::exit(1);
@@ -145,7 +149,7 @@ fn read_capped(path: &str, max_source: u64) -> Result<String, String> {
     let file =
         fs::File::open(path).map_err(|e| format!("Galti: file '{}' nahi khuli: {}", path, e))?;
     let mut buf: Vec<u8> = Vec::new();
-    file.take(max_source + 1)
+    file.take(max_source.saturating_add(1))
         .read_to_end(&mut buf)
         .map_err(|e| format!("Galti: file '{}' padh nahi paye: {}", path, e))?;
     if buf.len() as u64 > max_source {
@@ -213,6 +217,10 @@ fn run_file_vm(path: &str) {
             {
                 vm.set_source_dir(parent.to_path_buf());
             }
+            if let Err(e) = vm.register_source_file(path) {
+                eprintln!("{}", e);
+                process::exit(1);
+            }
             if let Err(e) = vm.run_program(&program) {
                 show_boli_error(&source, &e);
                 process::exit(1);
@@ -251,7 +259,7 @@ fn read_repl_line(stdin: &mut io::StdinLock, max_bytes: u64) -> io::Result<LineR
         }
         match chunk.iter().position(|&b| b == b'\n') {
             Some(pos) => {
-                if buf.len() as u64 + (pos + 1) as u64 > max_bytes {
+                if buf.len() as u64 + pos as u64 > max_bytes {
                     stdin.consume(pos + 1); // poori line drain, reject karo
                     return Ok(LineRead::TooLong);
                 }
@@ -299,6 +307,11 @@ fn repl() {
     let mut buffer = String::new();
     let mut depth = 0i32; // kitne block khule hain (agar/jab tak/kaam/tak vs khatam)
     let stdin = io::stdin();
+    let max_repl_line = env_limit(
+        "BOLI_MAX_REPL_LINE_BYTES",
+        boli::limits::DEFAULT_MAX_REPL_LINE_BYTES,
+    );
+    let max_repl_buffer = env_limit("BOLI_MAX_REPL_BUFFER_BYTES", DEFAULT_MAX_REPL_BUFFER_BYTES);
 
     loop {
         // Prompt: normal ya continuation
@@ -311,10 +324,6 @@ fn repl() {
             return; // stdout band hai
         }
 
-        let max_repl_line = env_limit(
-            "BOLI_MAX_REPL_LINE_BYTES",
-            boli::limits::DEFAULT_MAX_REPL_LINE_BYTES,
-        );
         let mut stdin_lock = stdin.lock();
         let line = match read_repl_line(&mut stdin_lock, max_repl_line) {
             Ok(LineRead::Eof) => break, // EOF (Ctrl-D)
@@ -333,6 +342,16 @@ fn repl() {
         };
         drop(stdin_lock);
 
+        if buffer.len().saturating_add(line.len()).saturating_add(1) > max_repl_buffer as usize {
+            eprintln!(
+                "Galti: REPL buffer bahut bada ho gaya (max {} bytes) - incomplete block chhod diya",
+                max_repl_buffer
+            );
+            buffer.clear();
+            depth = 0;
+            continue;
+        }
+
         let trimmed = line.trim();
 
         // Block ke andar blank line chhod do
@@ -346,15 +365,26 @@ fn repl() {
         }
 
         // Block depth badlo: agar/jab/tak/kaam-definition kholte hain, khatam band karta hai
-        // comment (#) aur quoted text nikaal ke dekho
-        let code_part = trimmed.split('#').next().unwrap_or("");
-        let mut stripped = String::with_capacity(code_part.len());
+        // comment (#) aur quoted text nikaal ke dekho; text ke andar \" quote nahi todta
+        let mut stripped = String::with_capacity(trimmed.len());
         let mut in_text = false;
-        for c in code_part.chars() {
-            if c == '"' {
-                in_text = !in_text;
+        let mut escaped = false;
+        for c in trimmed.chars() {
+            if in_text {
                 stripped.push(' ');
-            } else if !in_text {
+                if escaped {
+                    escaped = false;
+                } else if c == '\\' {
+                    escaped = true;
+                } else if c == '"' {
+                    in_text = false;
+                }
+            } else if c == '"' {
+                in_text = true;
+                stripped.push(' ');
+            } else if c == '#' {
+                break;
+            } else {
                 stripped.push(c);
             }
         }

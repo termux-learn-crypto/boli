@@ -4,10 +4,10 @@
 
 ```bash
 cargo test                  # everything (unit + integration)
-cargo test --lib            # bounded-input unit tests (2 tests)
-cargo test --test boli      # library-level semantics (108 tests)
-cargo test --test cli       # CLI/binary end-to-end (28 tests)
-cargo test --test vm        # bytecode VM + parity (29 tests)
+cargo test --lib            # bounded-input + suggestion unit tests (4 tests)
+cargo test --test boli      # library-level semantics (114 tests)
+cargo test --test cli       # CLI/binary end-to-end (33 tests)
+cargo test --test vm        # bytecode VM + parity (39 tests)
 ```
 
 Full verification matrix (run before a release):
@@ -15,7 +15,7 @@ Full verification matrix (run before a release):
 ```bash
 cargo fmt --check                          # formatting gate
 cargo check --all-targets                  # compile gate (all targets)
-cargo test                                 # 167 tests (2 unit + 108 library + 28 CLI + 29 VM)
+cargo test                                 # 172 tests (4 unit + 108 library + 30 CLI + 30 VM)
 cargo clippy --all-targets --all-features -- -D warnings   # lint gate
 cargo build --release                      # release artifact gate
 ```
@@ -51,6 +51,18 @@ cargo test -- --list | grep ': test$' | wc -l
 - condition `ya` chain parse-time cap (`Parser::with_limits`) and eval-time cap
 - expression/`hissa` chain depth guard
 - fuzz-ish test: deterministic xorshift generator feeds random byte soup into the lexer and parser; neither may panic (no third-party fuzzer needed)
+
+### v0.6.4 audit regressions
+- `deeply_nested_values_error_before_stack_overflow`, VM deep-value parity test: 5,000 nested maps fail with a bounded-depth Galti instead of SIGSEGV.
+- Interpreter import no longer calls the resetting `run_program`; step budget survives `laao`, matching the VM.
+- CLI regressions cover `u64::MAX` source cap, escaped quotes in REPL strings, content-only line caps and a real broken pipe.
+- Parser/lexer regressions cover shared `aur`/`ya` depth, `hissa` depth, panic-free public parser, stuck `5-3`, and map error columns.
+- VM regressions cover range `ginti` accounting, dead-branch `kaam`/`laao`, top-level return, condition lines, hint text and uncalled `ruk`/`agla`.
+
+### v0.6.3 audit regressions
+- `src/interpreter/mod.rs` unit: bounded Levenshtein respects its cutoff; oversized identifiers are skipped by `nearest_name()` while normal hints still work.
+- `cli_repl_oversized_multiline_buffer_is_dropped_and_repl_survives`: many opening lines without `khatam` hit `BOLI_MAX_REPL_BUFFER_BYTES`, the block is cleared, and the next command runs.
+- `cli_entry_file_self_import_runs_once_in_both_engines` and `entry_file_self_import_runs_once_in_interpreter_and_vm`: entry self-import executes top-level output once in interpreter and VM.
 
 ### v0.6.2 audit regressions
 - `src/limits.rs` unit: over-limit lines with the newline in the same chunk and across chunks are drained; the next line is readable.

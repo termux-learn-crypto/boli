@@ -204,4 +204,40 @@ Source reviewed: `/data/data/com.termux/files/home/boli-audit-report.md` (`BOLI 
 | L-05 | VM step semantics not disclosed | Fixed in v0.6.2 | Documented as backend-specific in LANGUAGE_SPEC, SECURITY_REPORT, TEST_RESULTS and UPGRADE_ROADMAP. |
 | Coverage | No differential interpreter/VM corpus | Fixed in v0.6.2 | `vm_matches_interpreter_on_core_corpus` and `vm_and_interpreter_agree_on_runtime_errors`. |
 
-Verification: 167/167 tests green (2 unit + 108 library + 28 CLI + 29 VM); fmt, check, clippy -D warnings and release build all pass. See [TEST_RESULTS.md](TEST_RESULTS.md).
+Verification at v0.6.2: 167/167 tests green (2 unit + 108 library + 28 CLI + 29 VM); fmt, check, clippy -D warnings and release build all pass. See [TEST_RESULTS.md](TEST_RESULTS.md).
+
+---
+
+# Appendix — v0.6.3 addendum (deep audit, 2026-11-19)
+
+| # | Finding | Status | Resolution |
+|---|---|---|---|
+| BUG-01 | `nearest_name()` built a full `m×n` matrix, deduplicated with linear `contains()`, and compared an unbounded candidate list | Fixed in v0.6.3 | `HashSet` dedup; 64-char identifier and 512-candidate caps; length-difference pruning; two-row bounded Levenshtein with early cutoff. Unit tests cover cutoff and oversized identifiers. |
+| BUG-02 | REPL capped each line via `BOLI_MAX_REPL_LINE_BYTES` but not the accumulated multiline buffer | Fixed in v0.6.3 | `BOLI_MAX_REPL_BUFFER_BYTES` (1 MiB) checks `buffer + current line`; overflow clears `buffer` and `depth`; CLI test proves recovery. |
+| BUG-03 | Entry file was not in the loaded-module set, so `main.hl` could `laao` itself and rerun top-level statements | Fixed in v0.6.3 | `register_source_file()` canonicalizes and registers the entry path in both `Environment` and `Vm` before any execution/compilation; CLI and direct engine tests assert one execution. |
+
+Verification at v0.6.3: 172/172 tests green (4 unit + 108 library + 30 CLI + 30 VM); fmt, check, clippy -D warnings and release build all pass.
+
+---
+
+# Appendix — v0.6.4 addendum (full audit fix pass, 2026-11-19)
+
+| # | Finding | Status | Resolution |
+|---|---|---|---|
+| 01 | Recursive `Value` display/size overflowed the native stack on deeply nested maps/lists | Fixed in v0.6.4 | Iterative `dikhane_laayak()` and `value_size()` plus `BOLI_MAX_VALUE_DEPTH` (default 64) checked on construction/storage in both engines. |
+| 02 | Interpreter imports called `run_program()` and reset the global step budget | Fixed in v0.6.4 | Added `run_program_inner()`; imports share the caller's budget, matching the VM. |
+| 03 | `max_source + 1` panicked in debug / read nothing in release at `u64::MAX` | Fixed in v0.6.4 | `saturating_add(1)` in CLI and bounded file reader; CLI regression covers `18446744073709551615`. |
+| 04 | VM range loops bypassed `set_local()` and panicked on `ginti` reuse | Fixed in v0.6.4 | `MakeRange` now inserts `ginti`/LEFT through normal scope accounting. |
+| 05 | VM registered `kaam` and imported modules at compile time, including dead branches | Fixed in v0.6.4 | New `Op::DefineKaam`/`Op::Import` execute at runtime; executed-import set keeps once-only semantics. |
+| 06 | REPL depth scanner misread escaped quotes and `#` inside strings | Fixed in v0.6.4 | Single-pass scanner tracks strings and backslash escapes; `#` comments only outside strings. |
+| 07 | REPL line cap counted the newline while the reader counted content only | Fixed in v0.6.4 | Cap now counts content bytes and still drains the full line. |
+| 08 | Parser condition/hissa depth did not match eval depth | Fixed in v0.6.4 | Shared `aur`/`ya` node counter and per-`hissa` postfix depth accounting. |
+| 09 | Public `Parser::new` could panic on empty/Eofless token vectors | Fixed in v0.6.4 | Safe synthetic-EOF peek/next/skip helpers; fuzz-style regression extended. |
+| 10 | `x rakho 5-3` silently became a two-item list | Fixed in v0.6.4 | Lexer rejects a negative number stuck to a preceding atom with a column-accurate Galti. |
+| 11 | Map literal errors lacked columns | Fixed in v0.6.4 | `BoliError::line_col` used for all three map pair-shape errors. |
+| 12 | VM top-level `wapas do` returned silently | Fixed in v0.6.4 | `Op::Return` propagates to `run_program()`, producing the interpreter's Galti. |
+| 13 | VM rejected `ruk`/`agla` inside uncalled `kaam`, used line 0, and had weaker hints/errors | Fixed in v0.6.4 | Compile-time flow errors only in reachable top-level code; real lines, did-you-mean hints and matching error text added. |
+| 14 | `install.sh` aborted under `set -u` when `HOME` was unset | Fixed in v0.6.4 | Guarded `${HOME:-}` plus explicit no-install-dir Galti. |
+| 15 | Broken-pipe test drained stdout and never triggered EPIPE; security report overclaimed panic-freedom | Fixed in v0.6.4 | Test drops the stdout pipe before waiting; report now limits the guarantee to tested paths. |
+
+Verification at v0.6.4: 190/190 tests green (4 unit + 114 library + 33 CLI + 39 VM); fmt, check, clippy -D warnings and release build all pass.
