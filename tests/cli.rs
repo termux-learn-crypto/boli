@@ -447,3 +447,142 @@ fn cli_laao_oversized_import_refused() {
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("bahut badi"));
 }
+
+// ---------- audit fixes (v0.6.1) ----------
+
+#[test]
+fn cli_laao_deep_import_chain_errors_cleanly() {
+    // main -> a -> b -> c -> d ; limit 2
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"));
+    std::fs::create_dir_all(&dir).unwrap();
+    for f in [
+        "d_imp.hl",
+        "c_imp.hl",
+        "b_imp.hl",
+        "a_imp.hl",
+        "main_imp.hl",
+    ] {
+        std::fs::remove_file(dir.join(f)).ok();
+    }
+    std::fs::write(dir.join("d_imp.hl"), "D_VALUE rakho 4\n").unwrap();
+    std::fs::write(dir.join("c_imp.hl"), "laao \"d_imp.hl\"\nC_VALUE rakho 3\n").unwrap();
+    std::fs::write(dir.join("b_imp.hl"), "laao \"c_imp.hl\"\nB_VALUE rakho 2\n").unwrap();
+    std::fs::write(dir.join("a_imp.hl"), "laao \"b_imp.hl\"\nA_VALUE rakho 1\n").unwrap();
+    let main_path = write_program("laao_depth_main.hl", "laao \"a_imp.hl\"\nlikho A_VALUE\n");
+    let output = Command::new(boli_bin())
+        .arg("run")
+        .arg(&main_path)
+        .current_dir(&dir)
+        .env("BOLI_MAX_IMPORT_DEPTH", "2")
+        .output()
+        .expect("boli binary chala nahi");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !output.status.success(),
+        "should fail at depth limit: {}",
+        stderr
+    );
+    assert!(stderr.contains("import bahut gehra"), "stderr: {}", stderr);
+}
+
+#[test]
+fn cli_laao_nested_relative_path_resolves_against_importing_file() {
+    // main.hl -> sub/child.hl -> sibling.hl
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"));
+    std::fs::create_dir_all(dir.join("sub")).unwrap();
+    std::fs::write(dir.join("sub/sibling.hl"), "SIB rakho 7\n").unwrap();
+    std::fs::write(
+        dir.join("sub/child.hl"),
+        "laao \"sibling.hl\"\nCHILD rakho 8\n",
+    )
+    .unwrap();
+    let main_path = write_program(
+        "laao_nested_main.hl",
+        "laao \"sub/child.hl\"\nlikho SIB\nlikho CHILD\n",
+    );
+    let output = Command::new(boli_bin())
+        .arg("run")
+        .arg(&main_path)
+        .current_dir(&dir)
+        .output()
+        .expect("boli binary chala nahi");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains('7'), "stdout: {}", stdout);
+    assert!(stdout.contains('8'), "stdout: {}", stdout);
+
+    // VM mode bhi same behavior
+    let output = Command::new(boli_bin())
+        .arg("run")
+        .arg(&main_path)
+        .current_dir(&dir)
+        .env("BOLI_VM", "1")
+        .output()
+        .expect("boli binary chala nahi");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "VM stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains('7'), "VM stdout: {}", stdout);
+    assert!(stdout.contains('8'), "VM stdout: {}", stdout);
+}
+
+#[test]
+fn cli_laao_import_read_is_bounded() {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("laao_big.hl"), vec![b'x'; 2048]).unwrap();
+    let main_path = write_program("laao_big_main2.hl", "laao \"laao_big.hl\"\n");
+    let output = Command::new(boli_bin())
+        .arg("run")
+        .arg(&main_path)
+        .current_dir(&dir)
+        .env("BOLI_MAX_SOURCE_BYTES", "100")
+        .output()
+        .expect("boli binary chala nahi");
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("bahut badi"));
+
+    // VM mode bhi same behavior
+    let output = Command::new(boli_bin())
+        .arg("run")
+        .arg(&main_path)
+        .current_dir(&dir)
+        .env("BOLI_MAX_SOURCE_BYTES", "100")
+        .env("BOLI_VM", "1")
+        .output()
+        .expect("boli binary chala nahi");
+    assert!(!output.status.success());
+}
+
+#[test]
+fn cli_pucho_oversized_line_with_same_buffer_newline_is_caught() {
+    // "abcdef\n" piped as one chunk; newline same buffer me hai
+    let output = Command::new(boli_bin())
+        .arg("run")
+        .arg(write_program("pucho_cap.hl", "pucho x \"q\"\nlikho x\n"))
+        .env("BOLI_MAX_STRING_BYTES", "5")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .and_then(|mut child| {
+            use std::io::Write as _;
+            child.stdin.as_mut().unwrap().write_all(b"abcdef\n")?;
+            child.wait_with_output()
+        })
+        .expect("boli binary chala nahi");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!output.status.success());
+    assert!(
+        stderr.contains("input text bahut bada hai"),
+        "stderr: {}",
+        stderr
+    );
+}

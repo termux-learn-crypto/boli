@@ -1,4 +1,4 @@
-# BOLI — Security Report (v0.6.0)
+# BOLI — Security Report (v0.6.1)
 
 **Scope:** the interpreter and CLI as shipped in `boli` v0.3.0. **Threat model:** BOLI programs may come from untrusted authors (a user running someone else's `.hl`). The host process must not crash, hang forever, exhaust memory without bound, or misreport safety guarantees. **Not in scope:** confidentiality (a run program can legitimately print anything it is given), sandboxing of the target machine (BOLI cannot execute shell, files, or network — by design there is no such capability).
 
@@ -13,7 +13,8 @@
 | Condition chain | 128 | `BOLI_MAX_CONDITION_DEPTH` | `aur`/`ya` chains, parse + eval | `parse_cond`, `parse_aur`, `eval_cond` |
 | String bytes | 1 MiB | `BOLI_MAX_STRING_BYTES` | literals, pucho input, concat results, input lines | eval, lexer/parse, `pucho` |
 | List items | 10,000 | `BOLI_MAX_LIST_ITEMS` | creation & `jodo` concat | `Expr::List`, `eval_arith` |
-| Source file bytes | 10 MiB | `BOLI_MAX_SOURCE_BYTES` | `boli run x.hl` | `main.rs` metadata check + bounded `take(max+1)` read (growth-safe) |
+| Source file bytes | 10 MiB | `BOLI_MAX_SOURCE_BYTES` | `boli run x.hl` + `laao` imports | `main.rs` / `limits.rs::read_source_capped` — metadata fast-path + bounded `take(max+1)` read (growth-safe, shared) |
+| Module import depth | 32 | `BOLI_MAX_IMPORT_DEPTH` | both engines | interpreter + VM compiler recursive import guard |
 | Program tokens | 1,000,000 | `BOLI_MAX_TOKENS` | lex time | lexer (`push_token`) |
 | REPL input line bytes | 64 KiB | `BOLI_MAX_REPL_LINE_BYTES` | chunked read | `read_repl_line` (line drained + rejected) |
 | Live scope bytes (memory budget) | 64 MiB | `BOLI_MAX_TOTAL_BYTES` | set/pop scope accounting (replace-safe) | interpreter |
@@ -68,13 +69,23 @@ Remaining `unwrap`s are internal invariants (scope stack never empty; last token
 
 ## Verification performed (not claims — actual commands)
 
-- `cargo test` — 147/147 pass (103 library + 23 CLI + 21 VM)
+- `cargo test` — 159/159 pass (108 library + 27 CLI + 24 VM)
 
 ## VM (v0.6.0)
 The experimental bytecode VM (`--vm`, `BOLI_VM=1`) enforces the same limits: step budget, call depth 64, eval/parse depth, list item cap, string budget, live-scope bytes budget, token cap. `laao` is resolved at compile time (bounded file read, cap `BOLI_MAX_SOURCE_BYTES`, canonical-path cycle protection). Default remains the tree-walking interpreter.
 
 ## Runtime tracebacks (v0.5.0)
 `BoliError.trace` exposes the kaam call stack on runtime errors (innermost-first, name + call line). This discloses internal kaam names and call line numbers to whoever reads stderr — acceptable for a local interpreter (the program source is visible anyway), but worth noting for CI log hygiene. No new memory risk: frames are small and popped on every exit path (tested).
+
+## Audit fixes (v0.6.1)
+
+- Module imports now use the same growth-safe bounded read as the main file (was: metadata check + unbounded `read_to_string`).
+- Import nesting depth is capped (`BOLI_MAX_IMPORT_DEPTH`, 32) in both engines — no silent stack exhaustion from long acyclic chains.
+- Nested relative imports resolve against the importing module's directory (was: top-level file's directory).
+- VM bytecode operands are 64-bit; > 65,535 constants/names/items can no longer wrap.
+- Interpreter and VM parameter binding unwind cleanly on error paths (no scope/trace/depth leaks); VM range-loop scope unwinds on every exit (error included).
+- Built-ins enforce the configured string cap on their outputs; `pucho` enforces the cap even when the newline arrives in the same chunk.
+- Built-ins consume the configured list cap via `max_list_items` (chaabiyan) as well.
 
 ## Built-ins (v0.4.0) attack surface
 `lambayi`, `upar`, `neeche`, `text`, `sankhya` — all pure internal Rust; every allocation they make is bounded by the existing string caps (`BOLI_MAX_STRING_BYTES`), list caps (`BOLI_MAX_LIST_ITEMS`) and live-scope budget (`BOLI_MAX_TOTAL_BYTES`). No I/O, no filesystem, no network. `sankhya` rejects inf/NaN.

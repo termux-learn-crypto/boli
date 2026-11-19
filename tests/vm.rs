@@ -178,3 +178,49 @@ fn vm_steps_limit_stops_infinite_loop() {
     let err = env.run_program(&program).unwrap_err();
     assert!(err.to_string().contains("steps"));
 }
+
+// ---------- audit fixes (v0.6.1) ----------
+
+#[test]
+fn vm_failing_range_program_then_reuse_same_vm() {
+    // failing program ke baad bhi same Vm reuse hona chahiye
+    let failing = parse_source("1 se 3 tak\n    likho undefined_var\nkhatam").unwrap();
+    let good = parse_source("likho \"reuse ok\"").unwrap();
+    let mut vm = Vm::new();
+    vm.collect_output();
+    assert!(vm.run_program(&failing).is_err());
+    vm.run_program(&good).unwrap();
+    assert_eq!(vm.take_output(), vec!["reuse ok"]);
+}
+
+#[test]
+fn vm_param_bind_budget_failure_does_not_leak_scope() {
+    let big = "a".repeat(300);
+    let src = format!(
+        "kaam f a b\n    likho \"bind-ok\"\nkhatam\nf \"{}\" \"{}\"",
+        big, big
+    );
+    let program = parse_source(&src).unwrap();
+    let mut vm = Vm::new().with_total_budget_bytes(512);
+    assert!(vm.run_program(&program).is_err());
+    let program2 = parse_source("likho \"reuse ok\"").unwrap();
+    vm.collect_output();
+    vm.run_program(&program2).unwrap();
+    assert_eq!(vm.take_output(), vec!["reuse ok"]);
+}
+
+#[test]
+fn vm_constants_over_u16_boundary_work() {
+    // 70,000 distinct number literals -> const indices exceed 65,535
+    let mut src = String::new();
+    for i in 0..70000 {
+        src.push_str(&format!("likho {}\n", i));
+    }
+    let program = parse_source(&src).unwrap();
+    let mut vm = Vm::new().with_max_steps(300000);
+    vm.collect_output();
+    vm.run_program(&program).unwrap();
+    let out = vm.take_output();
+    assert_eq!(out.len(), 70000);
+    assert_eq!(out[69999], "69999");
+}

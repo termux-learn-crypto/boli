@@ -1,6 +1,6 @@
-# BOLI Language Specification (v0.6.0)
+# BOLI Language Specification (v0.6.1)
 
-**Version:** 0.6.0 · **File extension:** `.hl` · **Implementation:** Rust (`cargo run -- run x.hl`, REPL via `cargo run`)
+**Version:** 0.6.1 · **File extension:** `.hl` · **Implementation:** Rust (`cargo run -- run x.hl`, REPL via `cargo run`)
 
 BOLI is a Hinglish-based programming language: Python-like simplicity, Hindi/English keywords, no symbols like `; { } ( ) = :`. Statements are one per line. Only words, numbers, quoted text and whitespace appear in a program.
 
@@ -147,6 +147,7 @@ namaste "Rahul"
 | Program tokens | 1,000,000 | `BOLI_MAX_TOKENS` |
 | REPL input line bytes | 64 KiB | `BOLI_MAX_REPL_LINE_BYTES` |
 | Live scope bytes (memory budget) | 64 MiB | `BOLI_MAX_TOTAL_BYTES` |
+| Module import nesting | 32 | `BOLI_MAX_IMPORT_DEPTH` |
 
 All violations are Hinglish Galti errors, never panics/SIGSEGV/SIGKILL. Violations are deterministic. `std::process::exit(0)` on closed stdout pipe.
 
@@ -195,6 +196,14 @@ Pure Rust, koi external dependency nahi. User-defined kaam in naam se shadow ho 
 | `sankhya` | `sankhya <text\|number>` | strict parse; galat text / overflow → Galti |
 
 Arity mismatch ek Hinglish Galti hai with exact expected count. Arguments eagerly evaluate hote hain (existing call rules).
+
+### v0.6.1 vs v0.6.0
+
+- Import reads are growth-safe bounded reads (not metadata-only); import depth cap 32.
+- Nested `laao` inside a module resolves against that module's directory (was: top-level file's dir).
+- VM bytecode operands are 64-bit (`usize`); programs with > 65,535 constants/names/items compile correctly.
+- Interpreter/VM param binding and VM range-loop scope unwind on every exit path (budget errors included).
+- Built-ins (`upar`, `neeche`, `text`, `chaabiyan`, `sankhya`) apply the configured string cap; `pucho` cap applies when the newline is in the same buffer chunk.
 
 ### v0.6.0 vs v0.5.0
 

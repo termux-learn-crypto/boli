@@ -161,3 +161,22 @@ Galti: line 2 me naam 'naam2' nahi mila
 | F18 | REPL/help EPIPE-safe | no panics on closed stdout pipes |
 
 Verified: 147/147 tests green; examples run identically under both backends (`--vm` and tree-walker).
+
+
+---
+
+# Appendix — v0.6.1 addendum (audit fixes, 2026-11-18)
+
+| # | Issue (review severity) | Root cause | Fix |
+|---|---|---|---|
+| A1 | Module imports unbounded during reads (High) | metadata check then unbounded `read_to_string` in both engines | shared `limits::read_source_capped` (`take(max+1)`); regression: `cli_laao_import_read_is_bounded` |
+| A2 | Long acyclic import chain → stack exhaustion (High) | no import-depth limit in either engine | `BOLI_MAX_IMPORT_DEPTH` (default 32); `cli_laao_deep_import_chain_errors_cleanly` |
+| A3 | `pucho` over-limit line accepted when newline is in same buffer (High) | only the no-newline branch checked the cap | `read_input_line` checks `buf.len() + pos > max_bytes` on the newline branch too; `cli_pucho_oversized_line_with_same_buffer_newline_is_caught` |
+| A4 | Nested relative imports resolved against top-level dir, not importing module (Medium) | `source_dir` set once, never restored | save/restore around import in both engines; `cli_laao_nested_relative_path_resolves_against_importing_file` (interp + VM) |
+| A5 | VM bytecode operands truncated to 16 bits (Medium) | `as u16` casts in `const_value`/`name`/counts | operands now `usize`; `vm_constants_over_u16_boundary_work` (70,000 distinct constants) |
+| A6 | Early parameter-binding errors corrupt reusable env/VM state (Medium) | `?` early return after scope/trace/depth push | closure + unconditional cleanup; `param_bind_budget_failure_does_not_leak_scope_or_depth`, `repeated_bind_failures_do_not_block_recursion`, `vm_param_bind_budget_failure_does_not_leak_scope` |
+| A7 | VM range-loop scope leaks on body error (Medium) | range scope popped only on normal exit | exec wrapper pops to entry scope depth on any error; `vm_failing_range_program_then_reuse_same_vm` |
+| A8 | Built-ins could exceed string cap (Medium) | `upar`/`neeche`/`text`/`chaabiyan` built text unchecked | `checked_text` caps all built-in outputs; key bytes/list cap enforced in `chaabiyan`; `builtins_respect_string_cap*`, `chaabiyan_caps_keys_bytes` |
+| A9 | Docs stale (Low) | test counts/tree drifted | README/TESTING/SPEC/ARCHITECTURE refreshed |
+
+Full verification: see `TEST_RESULTS.md` — 159/159 tests green; all gates pass; both backends (interpreter + VM) verified for every fix.

@@ -417,7 +417,7 @@ boli/
 ## Testing
 
 ```bash
-cargo test          # 147 tests chalenge (103 library + 23 CLI + 21 VM)
+cargo test          # 159 tests chalenge (108 library + 27 CLI + 24 VM)
 ```
 
 Details aur test-adding guide: [TESTING.md](TESTING.md). Spec: [LANGUAGE_SPEC.md](LANGUAGE_SPEC.md). Changes: [CHANGELOG.md](CHANGELOG.md). Audit: [docs/COMPLETE_AUDIT.md](docs/COMPLETE_AUDIT.md). Security: [docs/SECURITY_REPORT.md](docs/SECURITY_REPORT.md).
@@ -455,6 +455,7 @@ Sab limits env variable se override ho sakti hain — har violation Hinglish Gal
 | Program tokens (lexer) | 1,000,000 | `BOLI_MAX_TOKENS` |
 | REPL input line bytes | 64 KiB | `BOLI_MAX_REPL_LINE_BYTES` |
 | Live scope bytes (memory budget) | 64 MiB | `BOLI_MAX_TOTAL_BYTES` |
+| Import nesting depth | 32 | `BOLI_MAX_IMPORT_DEPTH` |
 
 ## Feature list
 

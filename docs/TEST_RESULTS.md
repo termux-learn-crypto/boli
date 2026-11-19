@@ -1,4 +1,4 @@
-# BOLI v0.6.0 — Test Results (actual commands, actual output)
+# BOLI v0.6.1 — Test Results (actual commands, actual output)
 
 **Host:** Termux on Android (aarch64), rustc/cargo 1.100.0 via system Termux package (note: `~/.cargo/bin/cargo` is a broken rustup shim; `/data/data/com.termux/files/usr/bin/cargo` is used — see Environment notes). **Date:** 2026-11-18. **Commit:** v0.3.0 (release).
 
@@ -29,16 +29,16 @@ running 0 tests
 test result: ok. 0 passed; 0 failed
 running 0 tests
 test result: ok. 0 passed; 0 failed
-running 103 tests
-test result: ok. 103 passed; 0 failed; finished in 0.30s
-running 23 tests
-test result: ok. 23 passed; 0 failed; finished in 0.34s
-running 21 tests
-test result: ok. 21 passed; 0 failed; finished in 0.04s
+running 108 tests
+test result: ok. 108 passed; 0 failed; finished in 0.08s
+running 27 tests
+test result: ok. 27 passed; 0 failed; finished in 0.19s
+running 24 tests
+test result: ok. 24 passed; 0 failed; finished in 0.27s
 running 0 tests
 test result: ok. 0 passed; 0 failed
 ```
-**147 passed / 0 failed** (103 `tests/boli.rs` library + 23 `tests/cli.rs` end-to-end + 21 `tests/vm.rs` VM parity).
+**159 passed / 0 failed** (108 `tests/boli.rs` library + 27 `tests/cli.rs` end-to-end + 24 `tests/vm.rs` VM parity).
 
 New tests added in v0.3.0 (all in `tests/boli.rs` unless noted):
 - `literal_string_size_limit` — literal bypasses the string-bytes limit → error

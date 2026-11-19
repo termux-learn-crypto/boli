@@ -12,19 +12,42 @@ pub fn is_builtin(name: &str) -> bool {
 }
 
 // Built-in kaam ko chalao - Err arity/type/domain galti par, Ok(value) success par
-pub fn call_builtin(name: &str, args: Vec<Value>, line: usize) -> Result<Value, BoliError> {
+pub fn call_builtin(
+    name: &str,
+    args: Vec<Value>,
+    line: usize,
+    max_string_bytes: usize,
+    max_list_items: usize,
+) -> Result<Value, BoliError> {
     match name {
         "lambayi" => lambayi(&args, line),
-        "upar" => text_map(&args, line, |s| s.to_uppercase(), "upar"),
-        "neeche" => text_map(&args, line, |s| s.to_lowercase(), "neeche"),
-        "text" => text_cast(&args, line),
+        "upar" => text_map(&args, line, |s| s.to_uppercase(), "upar", max_string_bytes),
+        "neeche" => text_map(
+            &args,
+            line,
+            |s| s.to_lowercase(),
+            "neeche",
+            max_string_bytes,
+        ),
+        "text" => text_cast(&args, line, max_string_bytes),
         "sankhya" => sankhya(&args, line),
-        "chaabiyan" => chaabiyan(&args, line),
+        "chaabiyan" => chaabiyan(&args, line, max_string_bytes, max_list_items),
         _ => Err(BoliError::line(
             line,
             format!("built-in kaam '{}' nahi mila", name),
         )),
     }
+}
+
+// Built-in ka text output bhi configured limit ke andar rakhna hai
+fn checked_text(s: String, line: usize, max_string_bytes: usize) -> Result<Value, BoliError> {
+    if s.len() > max_string_bytes {
+        return Err(BoliError::line(
+            line,
+            format!("text bahut bada hai (max {} bytes)", max_string_bytes),
+        ));
+    }
+    Ok(Value::Text(s))
 }
 
 fn type_naam(v: &Value) -> &'static str {
@@ -38,12 +61,38 @@ fn type_naam(v: &Value) -> &'static str {
     }
 }
 
-fn chaabiyan(args: &[Value], line: usize) -> Result<Value, BoliError> {
+fn chaabiyan(
+    args: &[Value],
+    line: usize,
+    max_string_bytes: usize,
+    max_list_items: usize,
+) -> Result<Value, BoliError> {
     arity("chaabiyan", args, 1, line)?;
     match &args[0] {
-        Value::Map(m) => Ok(Value::List(
-            m.keys().map(|k| Value::Text(k.clone())).collect::<Vec<_>>(),
-        )),
+        Value::Map(m) => {
+            if m.len() > max_list_items {
+                return Err(BoliError::line(
+                    line,
+                    format!("map bahut bada hai (max {} chaabiyan)", max_list_items),
+                ));
+            }
+            let mut total = 0usize;
+            for k in m.keys() {
+                total += k.len();
+                if total > max_string_bytes {
+                    return Err(BoliError::line(
+                        line,
+                        format!(
+                            "chaabiyan text bahut bada hai (max {} bytes)",
+                            max_string_bytes
+                        ),
+                    ));
+                }
+            }
+            Ok(Value::List(
+                m.keys().map(|k| Value::Text(k.clone())).collect::<Vec<_>>(),
+            ))
+        }
         other => Err(BoliError::line(
             line,
             format!(
@@ -86,9 +135,9 @@ fn lambayi(args: &[Value], line: usize) -> Result<Value, BoliError> {
     }
 }
 
-fn text_cast(args: &[Value], line: usize) -> Result<Value, BoliError> {
+fn text_cast(args: &[Value], line: usize, max_string_bytes: usize) -> Result<Value, BoliError> {
     arity("text", args, 1, line)?;
-    Ok(Value::Text(args[0].dikhane_laayak()))
+    checked_text(args[0].dikhane_laayak(), line, max_string_bytes)
 }
 
 fn text_map(
@@ -96,10 +145,11 @@ fn text_map(
     line: usize,
     f: fn(&str) -> String,
     name: &str,
+    max_string_bytes: usize,
 ) -> Result<Value, BoliError> {
     arity(name, args, 1, line)?;
     match &args[0] {
-        Value::Text(s) => Ok(Value::Text(f(s))),
+        Value::Text(s) => checked_text(f(s), line, max_string_bytes),
         other => Err(BoliError::line(
             line,
             format!(

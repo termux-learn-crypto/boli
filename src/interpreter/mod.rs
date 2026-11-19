@@ -50,6 +50,8 @@ pub struct Environment {
     // import/module system
     loaded_modules: std::collections::HashSet<std::path::PathBuf>,
     source_dir: Option<std::path::PathBuf>,
+    import_depth: usize,
+    max_import_depth: usize,
     captured: Option<Vec<String>>,
 }
 
@@ -87,6 +89,11 @@ impl Environment {
             trace: Vec::new(),
             loaded_modules: std::collections::HashSet::new(),
             source_dir: None,
+            import_depth: 0,
+            max_import_depth: env_limit(
+                "BOLI_MAX_IMPORT_DEPTH",
+                crate::limits::DEFAULT_MAX_IMPORT_DEPTH,
+            ) as usize,
             captured: None,
         }
     }
@@ -135,16 +142,23 @@ impl Environment {
 
     // `<dir>/file.hl` ko current environment me ek baar execute karo (cycles safe)
     fn laao(&mut self, raw_path: &str, line: usize) -> Result<(), BoliError> {
-        let resolve_base = || -> Result<std::path::PathBuf, BoliError> {
-            Ok(self.source_dir.clone().unwrap_or_else(|| {
-                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
-            }))
-        };
-        let base = resolve_base()?;
+        // import nesting depth limit (stack recursion protection)
+        if self.import_depth >= self.max_import_depth {
+            return Err(BoliError::line(
+                line,
+                format!(
+                    "module import bahut gehra ho gaya (max depth {}, BOLI_MAX_IMPORT_DEPTH)",
+                    self.max_import_depth
+                ),
+            ));
+        }
+        let resolve_base = self.source_dir.clone().unwrap_or_else(|| {
+            std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
+        });
         let joined = if std::path::Path::new(raw_path).is_absolute() {
             std::path::PathBuf::from(raw_path)
         } else {
-            base.join(raw_path)
+            resolve_base.join(raw_path)
         };
         let canonical = std::fs::canonicalize(&joined)
             .map_err(|e| BoliError::line(line, format!("file '{}' nahi mili: {}", raw_path, e)))?;
@@ -152,28 +166,22 @@ impl Environment {
             // pehle hi import ho chuka hai - ek baar execute karna hai
             return Ok(());
         }
-        // bounded read (BOLI_MAX_SOURCE_BYTES)
         let max_source = crate::limits::env_limit(
             "BOLI_MAX_SOURCE_BYTES",
             crate::limits::DEFAULT_MAX_SOURCE_BYTES,
         );
-        let meta_len = std::fs::metadata(&canonical).map(|m| m.len()).unwrap_or(0);
-        if meta_len > max_source {
-            return Err(BoliError::line(
-                line,
-                format!(
-                    "file '{}' bahut badi hai ({} bytes, max {})",
-                    raw_path, meta_len, max_source
-                ),
-            ));
-        }
-        let source = std::fs::read_to_string(&canonical).map_err(|e| {
-            BoliError::line(line, format!("file '{}' padh nahi paye: {}", raw_path, e))
-        })?;
+        // bounded read (growth-safe, TOCTOU-free)
+        let source = crate::limits::read_source_capped(&canonical, max_source, line)?;
         let program = crate::parser::parse_source(&source)
             .map_err(|e| BoliError::line(line, format!("file '{}' me error: {}", raw_path, e)))?;
-        self.run_program(&program)
-            .map_err(|e| BoliError::line(line, format!("file '{}' me error: {}", raw_path, e)))
+        // nested imports is file ke directory ke relative resolve honge; restore after
+        let prev_dir = self.source_dir.take();
+        self.source_dir = canonical.parent().map(|p| p.to_path_buf());
+        self.import_depth += 1;
+        let result = self.run_program(&program);
+        self.import_depth -= 1;
+        self.source_dir = prev_dir;
+        result.map_err(|e| BoliError::line(line, format!("file '{}' me error: {}", raw_path, e)))
     }
 
     pub fn reset_steps(&mut self) {
@@ -573,7 +581,13 @@ impl Environment {
             None => {
                 // user-defined nahi hai to built-in try karo
                 if crate::builtins::is_builtin(name) {
-                    return crate::builtins::call_builtin(name, arg_values, line);
+                    return crate::builtins::call_builtin(
+                        name,
+                        arg_values,
+                        line,
+                        self.max_string_bytes,
+                        self.max_list_items,
+                    );
                 }
                 let hint = self
                     .nearest_name(name)
@@ -608,8 +622,18 @@ impl Environment {
         self.call_depth += 1;
         self.trace.push((name.to_string(), line));
         self.push_scope();
-        for (param, value) in kaam.params.iter().zip(arg_values) {
-            self.set(param, value, line)?;
+        // Param binding ek closure me - error ho to bhi scope/trace/depth clean hoga
+        let bind_result = (|| -> Result<(), BoliError> {
+            for (param, value) in kaam.params.iter().zip(arg_values) {
+                self.set(param, value, line)?;
+            }
+            Ok(())
+        })();
+        if let Err(e) = bind_result {
+            self.trace.pop();
+            self.pop_scope();
+            self.call_depth -= 1;
+            return Err(e);
         }
         let result = self.run_block(&kaam.body);
         let trace_snapshot = self.trace.clone();

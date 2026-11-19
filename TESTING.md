@@ -4,7 +4,7 @@
 
 ```bash
 cargo test          # everything (unit + integration)
-cargo test --test boli      # library-level semantics (103 tests)
+cargo test --test boli      # library-level semantics (108 tests)
 cargo test --test cli       # CLI/binary end-to-end (19 tests)
 ```
 
@@ -13,7 +13,7 @@ Full verification matrix (run before a release):
 ```bash
 cargo fmt --check                          # formatting gate
 cargo check                                # compile gate
-cargo test                                 # 147 tests (103 library + 23 CLI + 21 VM)
+cargo test                                 # 159 tests (108 library + 27 CLI + 24 VM)
 cargo clippy --all-targets --all-features -- -D warnings   # lint gate
 cargo build --release                      # release artifact gate
 ```

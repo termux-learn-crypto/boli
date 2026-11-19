@@ -2,6 +2,20 @@
 
 All notable changes to BOLI. BOLI follows [Semantic Versioning](https://semver.org/): breaking changes bump the minor digit (pre-1.0).
 
+## [0.6.1] — 2026-11-18
+
+### Security / audit hardening
+- **Module import reads are growth-safe:** `laao` now uses the same bounded `take(max+1)` read as the main file (no metadata TOCTOU).
+- **Import depth cap:** `BOLI_MAX_IMPORT_DEPTH` (default 32) in both engines — long acyclic chains fail with a Hinglish Galti instead of exhausting the stack.
+- **Nested relative imports resolve against the importing module's directory** (interpreter and VM `laao`).
+- **VM bytecode operands are 64-bit:** constants/names/list-sizes/call counts no longer wrap at 65,535.
+- **Unwind-on-error:** interpreter and VM parameter binding both unwind scope/trace/call-depth on budget failure; the VM restores entry scope depth on any error (range loops included).
+- **Built-ins honor the configured string cap** (`upar`, `neeche`, `text`, `chaabiyan` key bytes, list cap for keys); `sankhya` already capped.
+- **`pucho` line cap applies even when the newline arrives in the same input chunk.** (Was: silently accepted.)
+
+### Internal
+- 159 tests (108 library + 27 CLI + 24 VM). Gates: fmt/check/test/clippy -D warnings/release build. Docs refreshed (README/SPEC/SECURITY_REPORT/TESTING/COMPLETE_AUDIT/ARCHITECTURE).
+
 ## [0.6.0] — 2026-11-18
 
 ### Added

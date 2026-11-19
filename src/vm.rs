@@ -12,9 +12,9 @@ use crate::scope::Scope;
 
 #[derive(Debug, Clone)]
 enum Op {
-    Const(u16),
-    LoadName(u16),
-    StoreName(u16),
+    Const(usize),
+    LoadName(usize),
+    StoreName(usize),
     Out,
     Arith(ArithOp),
     Compare(CmpOp),
@@ -22,14 +22,14 @@ enum Op {
     JumpIfTrue(usize),
     Jump(usize),
     PopScope,
-    MakeList(u16),
-    MakeMap(u16),
+    MakeList(usize),
+    MakeMap(usize),
     Index,
     StoreIndex, // target, index, value on stack -> target updated in current scope? needs name
-    Call(u16, u16), // name idx, argc
+    Call(usize, usize), // name idx, argc
     Return,
     PopValue,
-    Pucho(u16, u16), // name idx, prompt idx
+    Pucho(usize, usize), // name idx, prompt idx
     MakeRange,
     GintiNext,
     JumpIfNoLeft(usize),
@@ -51,6 +51,8 @@ struct Compiler {
     loop_stack: Vec<(usize, Vec<usize>, bool)>, // (loop_start_addr, break sites, is_range)
     loaded: HashSet<std::path::PathBuf>,
     source_dir: Option<std::path::PathBuf>,
+    import_depth: usize,
+    max_import_depth: usize,
     max_string_bytes: usize,
 }
 
@@ -67,22 +69,25 @@ impl Compiler {
             loop_stack: Vec::new(),
             loaded: HashSet::new(),
             source_dir: None,
+            import_depth: 0,
+            max_import_depth: env_limit("BOLI_MAX_IMPORT_DEPTH", limits::DEFAULT_MAX_IMPORT_DEPTH)
+                as usize,
             max_string_bytes,
         }
     }
 
-    fn const_value(&mut self, v: Value) -> u16 {
+    fn const_value(&mut self, v: Value) -> usize {
         let idx = self.constants.len();
         self.constants.push(v);
-        idx as u16
+        idx
     }
 
-    fn name(&mut self, n: &str) -> u16 {
+    fn name(&mut self, n: &str) -> usize {
         if let Some(idx) = self.names.iter().position(|x| x == n) {
-            return idx as u16;
+            return idx;
         }
         self.names.push(n.to_string());
-        (self.names.len() - 1) as u16
+        self.names.len() - 1
     }
 
     fn with_dir(source_dir: Option<std::path::PathBuf>) -> Self {
@@ -135,14 +140,14 @@ impl Compiler {
                     self.compile_expr(a, code, lines)?;
                 }
                 let idx = self.name(name);
-                code.push(Op::Call(idx, args.len() as u16));
+                code.push(Op::Call(idx, args.len()));
                 lines.push(*l);
             }
             Expr::List(items, l) => {
                 for e in items {
                     self.compile_expr(e, code, lines)?;
                 }
-                code.push(Op::MakeList(items.len() as u16));
+                code.push(Op::MakeList(items.len()));
                 lines.push(*l);
             }
             Expr::Index(target, index, l) => {
@@ -240,7 +245,7 @@ impl Compiler {
                     self.compile_expr(k, code, lines)?;
                     self.compile_expr(v, code, lines)?;
                 }
-                code.push(Op::MakeMap(pairs.len() as u16));
+                code.push(Op::MakeMap(pairs.len()));
                 lines.push(*line);
                 code.push(Op::StoreName(self.name(name)));
                 lines.push(*line);
@@ -371,7 +376,7 @@ impl Compiler {
                     self.compile_expr(a, code, lines)?;
                 }
                 let idx = self.name(name);
-                code.push(Op::Call(idx, args.len() as u16));
+                code.push(Op::Call(idx, args.len()));
                 lines.push(*line);
                 code.push(Op::PopValue);
                 lines.push(*line);
@@ -436,6 +441,16 @@ impl Compiler {
                 lines.push(*line);
             }
             Stmt::Laao { path, line } => {
+                // import nesting depth limit (compile recursion protection)
+                if self.import_depth >= self.max_import_depth {
+                    return Err(BoliError::line(
+                        *line,
+                        format!(
+                            "module import bahut gehra ho gaya (max depth {}, BOLI_MAX_IMPORT_DEPTH)",
+                            self.max_import_depth
+                        ),
+                    ));
+                }
                 // compile-time import: doosri .hl file ko inline compile karo
                 let resolve_base = self.source_dir.clone().unwrap_or_else(|| {
                     std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
@@ -453,23 +468,19 @@ impl Compiler {
                 }
                 let max_source =
                     limits::env_limit("BOLI_MAX_SOURCE_BYTES", limits::DEFAULT_MAX_SOURCE_BYTES);
-                let meta_len = std::fs::metadata(&canonical).map(|m| m.len()).unwrap_or(0);
-                if meta_len > max_source {
-                    return Err(BoliError::line(
-                        *line,
-                        format!(
-                            "file '{}' bahut badi hai ({} bytes, max {})",
-                            path, meta_len, max_source
-                        ),
-                    ));
-                }
-                let source = std::fs::read_to_string(&canonical).map_err(|e| {
-                    BoliError::line(*line, format!("file '{}' padh nahi paye: {}", path, e))
-                })?;
+                // bounded read (growth-safe)
+                let source = limits::read_source_capped(&canonical, max_source, *line)?;
                 let program = crate::parser::parse_source(&source).map_err(|e| {
                     BoliError::line(*line, format!("file '{}' me error: {}", path, e))
                 })?;
-                self.compile_block(&program, code, lines)?;
+                // nested relative paths is file ke directory ke relative honge; restore after
+                let prev_dir = self.source_dir.take();
+                self.source_dir = canonical.parent().map(|p| p.to_path_buf());
+                self.import_depth += 1;
+                let result = self.compile_block(&program, code, lines);
+                self.import_depth -= 1;
+                self.source_dir = prev_dir;
+                result?;
             }
         }
         Ok(())
@@ -537,6 +548,16 @@ impl Vm {
 
     pub fn take_output(&mut self) -> Vec<String> {
         self.captured.take().unwrap_or_default()
+    }
+
+    pub fn with_total_budget_bytes(mut self, max_total_bytes: u64) -> Self {
+        self.max_total_bytes = max_total_bytes;
+        self
+    }
+
+    pub fn with_max_steps(mut self, max_steps: u64) -> Self {
+        self.max_steps = max_steps;
+        self
     }
 
     pub fn set_source_dir(&mut self, dir: std::path::PathBuf) {
@@ -618,16 +639,26 @@ impl Vm {
     }
 
     fn exec(&mut self, code: &[Op], lines: &[usize]) -> Result<ExecResult, BoliError> {
+        let entry_scopes = self.scopes.len();
+        let result = self.exec_inner(code, lines);
+        // Error path bhi har scope pop ho - reusable VM me stale scopes nahi reh sakte
+        while self.scopes.len() > entry_scopes {
+            self.pop_scope();
+        }
+        result
+    }
+
+    fn exec_inner(&mut self, code: &[Op], lines: &[usize]) -> Result<ExecResult, BoliError> {
         let mut ip = 0usize;
         while ip < code.len() {
             let line = lines.get(ip).copied().unwrap_or(0);
             self.step(line)?;
             match &code[ip] {
                 Op::Const(idx) => {
-                    self.stack.push(self.constants[*idx as usize].clone());
+                    self.stack.push(self.constants[*idx].clone());
                 }
                 Op::LoadName(idx) => {
-                    let name = self.names[*idx as usize].clone();
+                    let name = self.names[*idx].clone();
                     match self.get_local(&name) {
                         Some(v) => self.stack.push(v),
                         None => {
@@ -645,7 +676,7 @@ impl Vm {
                     }
                 }
                 Op::StoreName(idx) => {
-                    let name = self.names[*idx as usize].clone();
+                    let name = self.names[*idx].clone();
                     let v = self.stack.pop().expect("stack underflow");
                     self.set_local(&name, v, line)?;
                 }
@@ -697,7 +728,7 @@ impl Vm {
                 }
                 Op::PopScope => self.pop_scope(),
                 Op::MakeList(n) => {
-                    let n = *n as usize;
+                    let n = *n;
                     let mut items = Vec::with_capacity(n);
                     for _ in 0..n {
                         items.push(self.stack.pop().expect("stack underflow"));
@@ -715,7 +746,7 @@ impl Vm {
                     self.stack.push(Value::List(items));
                 }
                 Op::MakeMap(n) => {
-                    let n = *n as usize;
+                    let n = *n;
                     let mut pairs = Vec::with_capacity(n);
                     for _ in 0..n {
                         let value = self.stack.pop().expect("stack underflow");
@@ -757,8 +788,8 @@ impl Vm {
                     self.stack.push(updated);
                 }
                 Op::Call(name_idx, argc) => {
-                    let name = self.names[*name_idx as usize].clone();
-                    let argc = *argc as usize;
+                    let name = self.names[*name_idx].clone();
+                    let argc = *argc;
                     let mut args = Vec::with_capacity(argc);
                     for _ in 0..argc {
                         args.push(self.stack.pop().expect("stack underflow"));
@@ -775,8 +806,8 @@ impl Vm {
                     self.stack.pop().expect("stack underflow");
                 }
                 Op::Pucho(name_idx, prompt_idx) => {
-                    let name = self.names[*name_idx as usize].clone();
-                    let prompt = match &self.constants[*prompt_idx as usize] {
+                    let name = self.names[*name_idx].clone();
+                    let prompt = match &self.constants[*prompt_idx] {
                         Value::Text(t) => t.clone(),
                         _ => String::new(),
                     };
@@ -833,7 +864,13 @@ impl Vm {
         let Some((params, code, klines)) = kaam else {
             // user-defined nahi hai to built-in try karo
             if builtins::is_builtin(name) {
-                return builtins::call_builtin(name, args, line);
+                return builtins::call_builtin(
+                    name,
+                    args,
+                    line,
+                    self.max_string_bytes,
+                    self.max_list_items,
+                );
             }
             return Err(BoliError::line(line, format!("kaam '{}' nahi mila", name)));
         };
@@ -860,8 +897,18 @@ impl Vm {
         self.call_depth += 1;
         self.trace.push((name.to_string(), line));
         self.push_scope();
-        for (param, value) in params.into_iter().zip(args) {
-            self.set_local(&param, value, line)?;
+        // Param binding ek closure me - error ho to bhi scope/trace/depth clean hoga
+        let bind_result = (|| -> Result<(), BoliError> {
+            for (param, value) in params.into_iter().zip(args) {
+                self.set_local(&param, value, line)?;
+            }
+            Ok(())
+        })();
+        if let Err(e) = bind_result {
+            self.trace.pop();
+            self.pop_scope();
+            self.call_depth -= 1;
+            return Err(e);
         }
         let result = self.exec(&code, &klines);
         let snapshot = self.trace.clone();

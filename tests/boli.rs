@@ -1022,3 +1022,104 @@ fn map_nested() {
         "inner rakho map \"x\" 1\nouter rakho map \"k\" inner\nlikho outer hissa \"k\" hissa \"x\"";
     assert_eq!(run_out(src).unwrap(), vec!["1"]);
 }
+
+// ---------- audit fixes (v0.6.1) ----------
+
+#[test]
+fn param_bind_budget_failure_does_not_leak_scope_or_depth() {
+    // tiny budget: pehla call bind-fail kare, phir env reuse hona chahiye
+    let src1 = "kaam f a b\n    likho \"bind-ok\"\nkhatam\n\
+                f \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\" \
+\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"";
+    let program1 = parse_source(src1).unwrap();
+    let mut env = Environment::new().with_total_budget_bytes(512);
+    env.collect_output();
+    assert!(env.run_program(&program1).is_err());
+
+    // env reuse: small program kaam karna chahiye
+    let program2 = parse_source("likho \"reuse ok\"").unwrap();
+    env.run_program(&program2).unwrap();
+    assert_eq!(env.take_output(), vec!["reuse ok"]);
+}
+
+#[test]
+fn repeated_bind_failures_do_not_block_recursion() {
+    // har bind-fail call ke baad call_depth sahi wapas hona chahiye
+    let src = "kaam f a b\n    likho \"ok\"\nkhatam\n";
+    let program = parse_source(src).unwrap();
+    let mut env = Environment::new().with_total_budget_bytes(256);
+    env.collect_output();
+    for _ in 0..70 {
+        let _ = env.run_program(&program); // har ek fail (budget kam)
+    }
+    assert!(env.run_program(&program).is_err()); // error milega par "infinite recursion" nahi
+    let err = env.run_program(&program).unwrap_err();
+    assert!(
+        !err.to_string().contains("bahut zyada gehra"),
+        "depth leak hua: {}",
+        err
+    );
+    // depth wapas 0 ya normal hai
+    env.reset_steps();
+    let program2 = parse_source("kaam g x\n    wapas do 7\nkhatam\nlikho g 1").unwrap();
+    env.run_program(&program2).unwrap();
+}
+
+#[test]
+fn builtins_respect_string_cap() {
+    // neeche("İ") -> "i̇" (3 bytes) — cap 2 me error, cap 4 me chal jayega
+    let err = boli::builtins::call_builtin(
+        "neeche",
+        vec![boli::interpreter::Value::Text("İ".to_string())],
+        1,
+        2,
+        100,
+    )
+    .unwrap_err();
+    assert!(err.to_string().contains("bahut bada"));
+    assert!(
+        boli::builtins::call_builtin(
+            "neeche",
+            vec![boli::interpreter::Value::Text("İ".to_string())],
+            1,
+            4,
+            100
+        )
+        .is_ok()
+    );
+}
+
+#[test]
+fn builtins_respect_string_cap_for_text_cast() {
+    // text kisi bhi value ko badi text me convert kar sakta hai - cap lagu hona chahiye
+    let big_number = 999999999999999999999f64;
+    let err = boli::builtins::call_builtin(
+        "text",
+        vec![boli::interpreter::Value::Number(big_number)],
+        1,
+        3,
+        100,
+    )
+    .unwrap_err();
+    assert!(err.to_string().contains("bahut bada"));
+}
+
+#[test]
+fn chaabiyan_caps_keys_bytes() {
+    let mut m = std::collections::BTreeMap::new();
+    for i in 0..50 {
+        m.insert(
+            format!("key{:08}", i),
+            boli::interpreter::Value::Number(i as f64),
+        );
+    }
+    let err = boli::builtins::call_builtin(
+        "chaabiyan",
+        vec![boli::interpreter::Value::Map(m)],
+        1,
+        10,
+        100,
+    )
+    .unwrap_err();
+    assert!(err.to_string().contains("bahut bada"));
+}
