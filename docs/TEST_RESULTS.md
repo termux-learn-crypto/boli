@@ -1,6 +1,6 @@
-# BOLI v0.6.4 — Test Results (actual commands, actual output)
+# BOLI v0.6.5 — Test Results (actual commands, actual output)
 
-**Host:** Termux on Android (aarch64), rustc/cargo 1.100.0 via the system Termux package. **Date:** 2026-11-19. **Version:** `BOLI version 0.6.4`. **Note:** `~/.cargo/bin/cargo` is a broken rustup shim; commands below use `/data/data/com.termux/files/usr/bin/cargo` (exported via `PATH`).
+**Host:** Termux on Android (aarch64), rustc/cargo 1.100.0 via the system Termux package. **Date:** 2026-11-19. **Version:** `BOLI version 0.6.5`. **Note:** `~/.cargo/bin/cargo` is a broken rustup shim; commands below use `/data/data/com.termux/files/usr/bin/cargo` (exported via `PATH`).
 
 This is the current status page. Older reports remain as historical snapshots: [COMPLETE_AUDIT.md](COMPLETE_AUDIT.md), [SECURITY_REPORT.md](SECURITY_REPORT.md), [UPGRADE_ROADMAP.md](UPGRADE_ROADMAP.md).
 
@@ -13,14 +13,14 @@ This is the current status page. Older reports remain as historical snapshots: [
 
 ### 2. `cargo check --all-targets`
 ```
-    Checking boli v0.6.4 (/data/data/com.termux/files/home/boli)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.05s
+    Checking boli v0.6.5 (/data/data/com.termux/files/home/boli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.24s
 ```
 
 ### 3. `cargo clippy --all-targets -- -D warnings`
 ```
-    Checking boli v0.6.4 (/data/data/com.termux/files/home/boli)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.24s
+    Checking boli v0.6.5 (/data/data/com.termux/files/home/boli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.82s
 ```
 Zero warnings.
 
@@ -39,8 +39,8 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 running 114 tests
 test result: ok. 114 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 
-running 33 tests
-test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+running 34 tests
+test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 
 running 39 tests
 test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
@@ -49,7 +49,7 @@ running 0 tests
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 ```
 
-**190 passed / 0 failed** (4 unit + 114 `tests/boli.rs` library + 33 `tests/cli.rs` end-to-end + 39 `tests/vm.rs` VM/parity).
+**191 passed / 0 failed** (4 unit + 114 `tests/boli.rs` library + 34 `tests/cli.rs` end-to-end + 39 `tests/vm.rs` VM/parity).
 
 Regenerate the count with:
 ```bash
@@ -58,14 +58,20 @@ cargo test -- --list | grep ': test$' | wc -l
 
 ### 5. `cargo build --release`
 ```
-   Compiling boli v0.6.4 (/data/data/com.termux/files/home/boli)
-    Finished `release` profile [optimized] target(s) in 11.53s
+   Compiling boli v0.6.5 (/data/data/com.termux/files/home/boli)
+    Finished `release` profile [optimized] target(s) in 24.73s
 ```
 
 ### 6. `./target/release/boli version`
 ```
-BOLI version 0.6.4
+BOLI version 0.6.5
 ```
+
+## What v0.6.5 added
+
+- Production-readiness packaging: pinned Rust 1.100.0 toolchain, `--locked` CI builds, crates.io metadata, and tag-gated releases with SHA-256 checksums.
+- One CLI production smoke test brings the CLI suite to 34 tests and the total to 191.
+- The CI matrix covers ubuntu/macOS/Windows; the command output above was produced locally on Termux aarch64 only — the multi-OS matrix was not run locally.
 
 ## What v0.6.4 added to verification
 
@@ -100,4 +106,4 @@ BOLI version 0.6.4
 
 ## Conclusion
 
-All configured gates are green, 190/190 tests pass, and the release binary reports v0.6.4. No regressions detected.
+All configured gates are green, 191/191 tests pass, and the release binary reports v0.6.5. No regressions detected.

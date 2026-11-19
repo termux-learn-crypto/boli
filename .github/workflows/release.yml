@@ -1,0 +1,89 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            target: x86_64-apple-darwin
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.100.0
+          targets: ${{ matrix.target }}
+      # Compare the tag (vX.Y.Z) with the crate version reported by cargo pkgid.
+      - name: Validate tag version
+        shell: bash
+        run: |
+          crate_version="$(cargo pkgid)"
+          crate_version="${crate_version##*#}"
+          tag_version="${GITHUB_REF_NAME#v}"
+          if [ "$tag_version" != "$crate_version" ]; then
+            echo "Tag version ($tag_version) does not match crate version ($crate_version)."
+            exit 1
+          fi
+      - name: Build release
+        run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          mkdir -p dist
+          archive="boli-${GITHUB_REF_NAME}-${{ matrix.target }}.tar.gz"
+          tar -czf "dist/$archive" -C "target/${{ matrix.target }}/release" boli
+          if command -v sha256sum >/dev/null 2>&1; then
+            (cd dist && sha256sum "$archive" > "$archive.sha256")
+          else
+            (cd dist && shasum -a 256 "$archive" > "$archive.sha256")
+          fi
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $archive = "dist/boli-$env:GITHUB_REF_NAME-${{ matrix.target }}.zip"
+          Compress-Archive -Path "target/${{ matrix.target }}/release/boli.exe" -DestinationPath $archive
+          $hash = (Get-FileHash -Algorithm SHA256 -Path $archive).Hash.ToLower()
+          "$hash  $([System.IO.Path]::GetFileName($archive))" | Set-Content -Path "$archive.sha256" -Encoding ascii
+      - uses: actions/upload-artifact@v4
+        with:
+          name: boli-${{ github.ref_name }}-${{ matrix.target }}
+          path: dist/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # Checkout gives gh the repository context needed to create the release.
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: boli-v*-*
+          path: dist
+          merge-multiple: true
+      # Only this job creates the release, so the matrix jobs cannot race.
+      - name: Create GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "${GITHUB_REF_NAME}" dist/* --generate-notes --verify-tag

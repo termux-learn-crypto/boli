@@ -1,9 +1,13 @@
 [package]
 name = "boli"
-version = "0.6.4"
+version = "0.6.5"
 edition = "2024"
+rust-version = "1.100.0"
 description = "BOLI - Hinglish programming language (Rust interpreter, .hl files)"
 license = "MIT"
 repository = "https://github.com/termux-learn-crypto/boli"
+readme = "README.md"
+keywords = ["language", "interpreter", "hindi", "hinglish", "education"]
+categories = ["development-tools", "command-line-utilities"]
 
 [dependencies]

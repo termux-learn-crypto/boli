@@ -130,7 +130,53 @@ fn cli_calculator2_example_works() {
     let output = child.wait_with_output().unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(output.status.success());
-    assert!(stdout.contains("42"), "guna ka jawab nahi aaya: {}", stdout);
+    assert!(stdout.contains("42"), "stdout: {}", stdout);
+}
+
+#[test]
+fn cli_production_smoke_interpreter_and_vm() {
+    write_program(
+        "prod_smoke_mod.hl",
+        "MODULE rakho \"prod-ok\"\nkaam prod_double x\n    guna jawab x ko 2 se\n    wapas do jawab\nkhatam\n",
+    );
+    let main_path = write_program(
+        "prod_smoke_main.hl",
+        "laao \"prod_smoke_mod.hl\"\ncfg rakho map \"mode\" \"prod\" \"limit\" 3\ntotal rakho 0\nginti rakho 1\njab tak ginti 3 se chhota ya barabar hai to\n    jodo total total aur ginti\n    jodo ginti ginti aur 1\nkhatam\nlikho MODULE\nlikho cfg hissa \"mode\"\nlikho total\nlikho prod_double 3\n",
+    );
+
+    for vm in [false, true] {
+        let mut cmd = Command::new(boli_bin());
+        cmd.arg("run")
+            .arg(&main_path)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        if vm {
+            cmd.env("BOLI_VM", "1");
+        }
+        let output = cmd.output().expect("boli binary chala nahi");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            output.status.success(),
+            "mode vm={} stderr: {}",
+            vm,
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let lines: Vec<&str> = stdout.lines().collect();
+        assert_eq!(
+            lines,
+            ["prod-ok", "prod", "6", "6"],
+            "mode vm={} stdout: {}",
+            vm,
+            stdout
+        );
+    }
+
+    let version = Command::new(boli_bin())
+        .arg("version")
+        .output()
+        .expect("boli binary chala nahi");
+    assert!(version.status.success());
+    assert!(String::from_utf8_lossy(&version.stdout).contains(env!("CARGO_PKG_VERSION")));
 }
 
 // ---------- BUG 5: pucho input with non-finite values ----------

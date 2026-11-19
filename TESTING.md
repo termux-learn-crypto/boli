@@ -6,7 +6,7 @@
 cargo test                  # everything (unit + integration)
 cargo test --lib            # bounded-input + suggestion unit tests (4 tests)
 cargo test --test boli      # library-level semantics (114 tests)
-cargo test --test cli       # CLI/binary end-to-end (33 tests)
+cargo test --test cli       # CLI/binary end-to-end (34 tests)
 cargo test --test vm        # bytecode VM + parity (39 tests)
 ```
 
@@ -15,8 +15,8 @@ Full verification matrix (run before a release):
 ```bash
 cargo fmt --check                          # formatting gate
 cargo check --all-targets                  # compile gate (all targets)
-cargo test                                 # 172 tests (4 unit + 108 library + 30 CLI + 30 VM)
-cargo clippy --all-targets --all-features -- -D warnings   # lint gate
+cargo test                                 # 191 tests (4 unit + 114 library + 34 CLI + 39 VM)
+cargo clippy --all-targets -- -D warnings                  # lint gate
 cargo build --release                      # release artifact gate
 ```
 
@@ -51,6 +51,9 @@ cargo test -- --list | grep ': test$' | wc -l
 - condition `ya` chain parse-time cap (`Parser::with_limits`) and eval-time cap
 - expression/`hissa` chain depth guard
 - fuzz-ish test: deterministic xorshift generator feeds random byte soup into the lexer and parser; neither may panic (no third-party fuzzer needed)
+
+### v0.6.5 production readiness
+- One CLI production smoke test exercises the cargo-built binary end-to-end; the release gates (fmt/check/test/clippy -D warnings/release build) run in CI on ubuntu, macOS and Windows with `--locked`, and tagged releases publish SHA-256 checksummed artifacts.
 
 ### v0.6.4 audit regressions
 - `deeply_nested_values_error_before_stack_overflow`, VM deep-value parity test: 5,000 nested maps fail with a bounded-depth Galti instead of SIGSEGV.

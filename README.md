@@ -4,7 +4,9 @@ BOLI - Bina + - * / ke, sirf shabdon se programming
 Yahan `+ - * / { } ( ) = :` jaise symbols ki jagah shabd use hote hain. Poor poora program sirf shabdon, number aur text se likha jata hai.
 Interpreter **Rust** me bana hai. File extension: **`.hl`**.
 
-**Current status:** v0.6.4 — zero dependencies, 190 tests green, tree-walking interpreter (default) + experimental bytecode VM, read-only local modules via `laao`. Current verification: [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md).
+**Current status:** v0.6.5 — zero dependencies, 191 tests green, tree-walking interpreter (default) + experimental bytecode VM, read-only local modules via `laao`. Current verification: [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md).
+
+**Production readiness:** the toolchain is pinned to Rust 1.100.0, CI builds on an ubuntu/macOS/Windows matrix with `--locked`, and tagged releases publish SHA-256 checksummed artifacts.
 
 ```boli
 likho "Namaste Duniya"
@@ -384,11 +386,11 @@ boli/
 ├── README.md
 ├── LANGUAGE_SPEC.md    # poora grammar/semantics reference
 ├── ARCHITECTURE.md     # code flow aur module design
-├── CHANGELOG.md        # v0.1.0 → v0.6.4 changes
+├── CHANGELOG.md        # v0.1.0 → v0.6.5 changes
 ├── TESTING.md          # tests kaise chalayein, kaise likhein
 ├── docs/
 │   ├── AUDIT_REPORT.md     # audit + "how verified" notes
-│   ├── COMPLETE_AUDIT.md   # complete source-code audit + v0.6.4 addendum
+│   ├── COMPLETE_AUDIT.md   # complete source-code audit + addenda through v0.6.5
 │   ├── BUG_FIXES.md        # har fix ka symptom→root cause→verification
 │   ├── SECURITY_REPORT.md  # resource-limit matrix + threat model
 │   ├── ARCHITECTURE_REPORT.md  # module decisions
@@ -420,7 +422,7 @@ boli/
 ## Testing
 
 ```bash
-cargo test          # 190 tests chalenge (4 unit + 114 library + 33 CLI + 39 VM)
+cargo test          # 191 tests chalenge (4 unit + 114 library + 34 CLI + 39 VM)
 ```
 
 Details aur test-adding guide: [TESTING.md](TESTING.md). Spec: [LANGUAGE_SPEC.md](LANGUAGE_SPEC.md). Changes: [CHANGELOG.md](CHANGELOG.md). Audit: [docs/COMPLETE_AUDIT.md](docs/COMPLETE_AUDIT.md). Security: [docs/SECURITY_REPORT.md](docs/SECURITY_REPORT.md).
@@ -441,9 +443,9 @@ Kaam karne ka flow: `source.hl` → **lexer** (tokens) → **parser** (AST) → 
 
 User-defined kaam in naam se shadow kar sakta hai — user kaam ki priority zyada hai.
 
-## Safety limits (BOLI v0.6.4)
+## Safety limits (BOLI v0.6.5)
 
-Sab limits env variable se override ho sakti hain — har violation Hinglish Galti error hai, kabhi crash nahi:
+Sab limits env variable se override ho sakti hain — test kiye gaye raston me har violation Hinglish Galti error hai, kabhi crash nahi; kabhi bhi panic na hone ka claim nahi:
 
 | Limit | Default | Env var |
 |---|---|---|

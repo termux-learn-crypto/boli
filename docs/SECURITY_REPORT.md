@@ -1,6 +1,6 @@
-# BOLI — Security Report (v0.6.4)
+# BOLI — Security Report (v0.6.5)
 
-**Scope:** the tree-walking interpreter, experimental bytecode VM, CLI and REPL as shipped in `boli` v0.6.4. **Threat model:** BOLI programs may come from untrusted authors (a user running someone else's `.hl`). The host process must not crash, hang forever, exhaust memory without bound, leak state into a later program, or misreport safety guarantees. **Not in scope:** confidentiality (a running program can print what it is given), full OS sandboxing (BOLI has no shell/network/write/FFI capability), and the security of the host filesystem outside files the user chose to expose through `laao`.
+**Scope:** the tree-walking interpreter, experimental bytecode VM, CLI and REPL as shipped in `boli` v0.6.5. **Threat model:** BOLI programs may come from untrusted authors (a user running someone else's `.hl`). The host process must not crash, hang forever, exhaust memory without bound, leak state into a later program, or misreport safety guarantees. **Not in scope:** confidentiality (a running program can print what it is given), full OS sandboxing (BOLI has no shell/network/write/FFI capability), and the security of the host filesystem outside files the user chose to expose through `laao`.
 
 ## Resource-limit matrix (all enforced, all documented, all env-overridable)
 
@@ -74,16 +74,23 @@ Remaining `unwrap`s are internal invariants (scope stack never empty; last token
 
 ## Verification performed (not claims — actual commands)
 
-- `cargo test` — 172/172 pass (4 unit + 108 library + 30 CLI + 30 VM)
-- `cargo clippy --all-targets --all-features -- -D warnings` — clean
+- `cargo test` — 191/191 pass (4 unit + 114 library + 34 CLI + 39 VM)
+- `cargo clippy --all-targets -- -D warnings` — clean
 - `BOLI_IMPORT_ROOT` confinement verified for interpreter and `BOLI_VM=1` (`cli_import_root_confines_laao`)
 - Over-limit input drainage verified in `src/limits.rs` unit tests and CLI REPL regression
 
 ## VM (v0.6.0)
-The experimental bytecode VM (`--vm`, `BOLI_VM=1`) enforces the same limits: step budget, call depth 64, eval/parse depth, list item cap, string budget, live-scope bytes budget, token cap. `laao` is resolved at compile time (bounded file read, cap `BOLI_MAX_SOURCE_BYTES`, canonical-path cycle protection, optional `BOLI_IMPORT_ROOT`). Steps, scopes and the value stack reset before each program and unwind after an error, so a reused `Machine` is clean. Default remains the tree-walking interpreter.
+The experimental bytecode VM (`--vm`, `BOLI_VM=1`) enforces the same limits: step budget, call depth 64, eval/parse depth, list item cap, string budget, live-scope bytes budget, token cap. `laao` is resolved/loaded at compile time and executed at runtime (bounded file read, cap `BOLI_MAX_SOURCE_BYTES`, canonical-path cycle protection, optional `BOLI_IMPORT_ROOT`). Steps, scopes and the value stack reset before each program and unwind after an error, so a reused `Machine` is clean. Default remains the tree-walking interpreter.
 
 ## Runtime tracebacks (v0.5.0)
 `BoliError.trace` exposes the kaam call stack on runtime errors (innermost-first, name + call line). This discloses internal kaam names and call line numbers to whoever reads stderr — acceptable for a local interpreter (the program source is visible anyway), but worth noting for CI log hygiene. No new memory risk: frames are small and popped on every exit path (tested).
+
+## Audit fixes / release hygiene (v0.6.5)
+
+- CI builds every target with `--locked` on a pinned Rust 1.100.0 toolchain, so the committed `Cargo.lock` is exactly what is compiled and released.
+- Releases are tag-gated and check that the tag matches the package version before publishing artifacts.
+- Release artifacts are published with SHA-256 checksums so downloads can be verified.
+- These are packaging/hygiene changes only: no new runtime limits or attack surface. External security review is still **not** claimed — findings remain self-reviewed and regression-tested.
 
 ## Audit fixes (v0.6.4)
 

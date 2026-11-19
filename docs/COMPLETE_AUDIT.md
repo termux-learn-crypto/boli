@@ -241,3 +241,19 @@ Verification at v0.6.3: 172/172 tests green (4 unit + 108 library + 30 CLI + 30 
 | 15 | Broken-pipe test drained stdout and never triggered EPIPE; security report overclaimed panic-freedom | Fixed in v0.6.4 | Test drops the stdout pipe before waiting; report now limits the guarantee to tested paths. |
 
 Verification at v0.6.4: 190/190 tests green (4 unit + 114 library + 33 CLI + 39 VM); fmt, check, clippy -D warnings and release build all pass.
+
+---
+
+# Appendix — v0.6.5 addendum (production readiness, 2026-11-19)
+
+Packaging and release hygiene only: no new source-code audit findings, and the v0.6.4 findings table above is unchanged.
+
+| # | Item | Notes |
+|---|---|---|
+| P1 | Pinned toolchain | `rust-toolchain.toml` pins Rust 1.100.0 for CI and local builds alike. |
+| P2 | CI matrix | ubuntu, macOS and Windows build and test with `--locked`. |
+| P3 | Tag-gated releases | Artifacts are built only on version tags; the tag must match the package version; SHA-256 checksums are published. |
+| P4 | crates.io metadata | `readme`, `keywords` and `categories` added; edition 2024 and zero dependencies unchanged. |
+| P5 | CLI production smoke test | One end-to-end smoke test of the cargo-built binary; CLI suite is now 34 tests. |
+
+Verification at v0.6.5: 191/191 tests green (4 unit + 114 library + 34 CLI + 39 VM).

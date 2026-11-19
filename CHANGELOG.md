@@ -2,6 +2,17 @@
 
 All notable changes to BOLI. BOLI follows [Semantic Versioning](https://semver.org/): breaking changes bump the minor digit (pre-1.0).
 
+## [0.6.5] — 2026-11-19
+
+### Production-readiness packaging
+- **Pinned toolchain & CI:** Rust 1.100.0 pinned via `rust-toolchain.toml`; CI matrix covers ubuntu, macOS and Windows.
+- **Tag-gated releases:** release artifacts are built only on tags and published with SHA-256 checksums.
+- **crates.io metadata:** `Cargo.toml` now carries `readme`, `keywords` and `categories` (edition 2024 and zero dependencies unchanged).
+- **Smoke test:** one CLI production smoke test added.
+
+### Internal
+- 191 tests (4 unit + 114 library + 34 CLI + 39 VM). Gates unchanged: fmt/check/test/clippy -D warnings/release build.
+
 ## [0.6.4] — 2026-11-19
 
 ### Full-audit fix pass (15 findings)
