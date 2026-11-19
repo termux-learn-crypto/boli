@@ -24,19 +24,18 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master
         with:
           toolchain: 1.100.0
           targets: ${{ matrix.target }}
-      # Compare the tag (vX.Y.Z) with the crate version reported by cargo pkgid.
+      # Compare the tag (vX.Y.Z) with the package version from cargo metadata.
       - name: Validate tag version
         shell: bash
         run: |
-          crate_version="$(cargo pkgid)"
-          crate_version="${crate_version##*#}"
+          crate_version="$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[] | select(.name == "boli") | .version')"
           tag_version="${GITHUB_REF_NAME#v}"
-          if [ "$tag_version" != "$crate_version" ]; then
+          if [ -z "$crate_version" ] || [ "$tag_version" != "$crate_version" ]; then
             echo "Tag version ($tag_version) does not match crate version ($crate_version)."
             exit 1
           fi
@@ -63,7 +62,7 @@ jobs:
           Compress-Archive -Path "target/${{ matrix.target }}/release/boli.exe" -DestinationPath $archive
           $hash = (Get-FileHash -Algorithm SHA256 -Path $archive).Hash.ToLower()
           "$hash  $([System.IO.Path]::GetFileName($archive))" | Set-Content -Path "$archive.sha256" -Encoding ascii
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: boli-${{ github.ref_name }}-${{ matrix.target }}
           path: dist/*
@@ -75,8 +74,8 @@ jobs:
       contents: write
     steps:
       # Checkout gives gh the repository context needed to create the release.
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: boli-v*-*
           path: dist

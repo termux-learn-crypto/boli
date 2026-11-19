@@ -90,6 +90,8 @@ The experimental bytecode VM (`--vm`, `BOLI_VM=1`) enforces the same limits: ste
 - CI builds every target with `--locked` on a pinned Rust 1.100.0 toolchain, so the committed `Cargo.lock` is exactly what is compiled and released.
 - Releases are tag-gated and check that the tag matches the package version before publishing artifacts.
 - Release artifacts are published with SHA-256 checksums so downloads can be verified.
+- Tag validation reads the package version from `cargo metadata` (via `jq`) instead of parsing `cargo pkgid` text.
+- GitHub Actions are pinned to full commit SHAs, with weekly Dependabot updates for the Actions ecosystem.
 - These are packaging/hygiene changes only: no new runtime limits or attack surface. External security review is still **not** claimed — findings remain self-reviewed and regression-tested.
 
 ## Audit fixes (v0.6.4)
