@@ -4,7 +4,7 @@ BOLI - Bina + - * / ke, sirf shabdon se programming
 Yahan `+ - * / { } ( ) = :` jaise symbols ki jagah shabd use hote hain. Poor poora program sirf shabdon, number aur text se likha jata hai.
 Interpreter **Rust** me bana hai. File extension: **`.hl`**.
 
-**Current status:** v0.6.5 — zero dependencies, 214 tests passed / 2 ignored (including 10 Phase 3 lexer tests), tree-walking interpreter (default) + experimental bytecode VM, read-only local modules via `laao`. Current verification: [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md).
+**Current status:** v0.6.5 — zero dependencies, 215 tests passed / 2 ignored (including 11 Phase 3 lexer tests), tree-walking interpreter (default) + experimental bytecode VM, read-only local modules via `laao`. Current verification: [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md).
 
 **Production readiness:** the toolchain is pinned to Rust 1.100.0, CI builds on an ubuntu/macOS/Windows matrix with `--locked`, and tagged releases publish SHA-256 checksummed artifacts.
 
@@ -422,7 +422,7 @@ boli/
 ## Testing
 
 ```bash
-cargo test --all-targets --locked --quiet   # 214 passed / 2 ignored; 4 unit + 114 library + 34 CLI + 10 phase3 + VM/other suites
+cargo test --all-targets --locked --quiet   # 215 passed / 2 ignored; 4 unit + 114 library + 34 CLI + 11 phase3 + VM/other suites
 ```
 
 Details aur test-adding guide: [TESTING.md](TESTING.md). Spec: [LANGUAGE_SPEC.md](LANGUAGE_SPEC.md). Changes: [CHANGELOG.md](CHANGELOG.md). Audit: [docs/COMPLETE_AUDIT.md](docs/COMPLETE_AUDIT.md). Security: [docs/SECURITY_REPORT.md](docs/SECURITY_REPORT.md).

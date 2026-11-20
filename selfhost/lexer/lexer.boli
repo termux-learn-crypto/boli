@@ -72,17 +72,10 @@ kaam lexer_in_range ch low high
     wapas do sahi
 khatam
 
-kaam lexer_is_word_atom ch
+kaam lexer_is_mark ch
     size rakho lambayi ch
     agar size 0 barabar hai to
         wapas do galat
-    khatam
-    agar ch "_" barabar hai to
-        wapas do sahi
-    khatam
-    basic rakho hai_text "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" ch
-    agar basic sahi barabar hai to
-        wapas do sahi
     khatam
     r rakho lexer_in_range ch "̀" "ͯ"
     agar r sahi barabar hai to
@@ -132,20 +125,34 @@ kaam lexer_is_word_atom ch
 khatam
 
 kaam lexer_is_word_start ch
-    atom rakho lexer_is_word_atom ch
-    agar atom galat barabar hai to
+    size rakho lambayi ch
+    agar size 0 barabar hai to
         wapas do galat
     khatam
-    digit rakho lexer_is_digit ch
-    agar digit sahi barabar hai to
-        wapas do galat
+    agar ch "_" barabar hai to
+        wapas do sahi
     khatam
-    wapas do sahi
+    alpha rakho lexer_is_unicode_alphabetic ch
+    agar alpha sahi barabar hai to
+        wapas do sahi
+    khatam
+    mark rakho lexer_is_mark ch
+    agar mark sahi barabar hai to
+        wapas do sahi
+    khatam
+    wapas do galat
 khatam
 
 kaam lexer_is_word_char ch
-    atom rakho lexer_is_word_atom ch
-    wapas do atom
+    start rakho lexer_is_word_start ch
+    agar start sahi barabar hai to
+        wapas do sahi
+    khatam
+    numeric rakho lexer_is_unicode_numeric ch
+    agar numeric sahi barabar hai to
+        wapas do sahi
+    khatam
+    wapas do galat
 khatam
 
 lexer_overflow_prefix rakho "179769313486231580793728971405303415079934132710037826936173778980444968292764750946649017977587207096330286416692887910946555547851940402630657488671505820681908902000708383676273854845817711531764475730270069855571366959622842914819860834936475292719074168444365510704342711559699508093042880177904174497792"
@@ -198,7 +205,7 @@ kaam lexer_trim_leading_zeros digits
     wapas do acc
 khatam
 
-kaam lexer_check_text_size st acc line
+kaam lexer_check_text_size st acc line start_byte start_line start_col
     limit rakho st hissa "max_string"
     size rakho lexer_byte_length acc
     agar size limit se bada hai to
@@ -207,14 +214,16 @@ kaam lexer_check_text_size st acc line
         jodo msg msg aur ltext
         jodo msg msg aur " bytes)"
         col rakho st hissa "col"
-        res rakho lexer_fail "text_too_large" msg line col
+        end_byte rakho st hissa "byte"
+        end_line rakho st hissa "line"
+        res rakho lexer_fail_span "text_too_large" msg line col start_byte end_byte start_line start_col end_line col
         wapas do res
     khatam
     ok rakho map "ok" sahi
     wapas do ok
 khatam
 
-kaam lexer_check_word_size st word line
+kaam lexer_check_word_size st word line start_byte start_line start_col
     limit rakho st hissa "max_string"
     size rakho lexer_byte_length word
     agar size limit se bada hai to
@@ -223,18 +232,20 @@ kaam lexer_check_word_size st word line
         jodo msg msg aur ltext
         jodo msg msg aur " bytes)"
         col rakho st hissa "col"
-        res rakho lexer_fail "word_too_large" msg line col
+        end_byte rakho st hissa "byte"
+        end_line rakho st hissa "line"
+        res rakho lexer_fail_span "word_too_large" msg line col start_byte end_byte start_line start_col end_line col
         wapas do res
     khatam
     ok rakho map "ok" sahi
     wapas do ok
 khatam
 
-kaam lexer_finite_error num line col
+kaam lexer_finite_error num line col start_byte start_line start_col end_byte end_line end_col
     msg rakho "'"
     jodo msg msg aur num
     jodo msg msg aur "' bahut bada hai, finite number nahi hai"
-    res rakho lexer_fail "number_not_finite" msg line col
+    res rakho lexer_fail_span "number_not_finite" msg line col start_byte end_byte start_line start_col end_line end_col
     wapas do res
 khatam
 
@@ -290,7 +301,7 @@ kaam lexer_lex source max_source max_string max_tokens
         jodo msg msg aur " bytes, max "
         jodo msg msg aur ml
         jodo msg msg aur ")"
-        res rakho lexer_fail "source_too_large" msg 1 1
+        res rakho lexer_fail_span "source_too_large" msg 1 1 0 0 1 1 1 1
         wapas do res
     khatam
     st rakho lexer_state_new source max_string max_tokens
@@ -308,9 +319,13 @@ kaam lexer_lex source max_source max_string max_tokens
                     st hissa "separated" rakho sahi
                     nahi to
                         agar ch "\n" barabar hai to
-                            start_line rakho st hissa "line"
-                            start_col rakho st hissa "col"
-                            pushed rakho lexer_push st "Newline" "" start_line start_col
+                            st rakho lexer_mark st
+                            start_byte rakho st hissa "span_start_byte"
+                            start_line rakho st hissa "span_start_line"
+                            start_col rakho st hissa "span_start_col"
+                            end_byte rakho jodo start_byte aur 1
+                            end_col rakho jodo start_col aur 1
+                            pushed rakho lexer_push st "Newline" "" start_byte start_line start_col end_byte start_line end_col
                             flag rakho pushed hissa "ok"
                             agar flag galat barabar hai to
                                 wapas do pushed
@@ -337,8 +352,10 @@ kaam lexer_lex source max_source max_string max_tokens
                                     st hissa "separated" rakho sahi
                                     nahi to
                                         agar ch "\"" barabar hai to
-                                            start_line rakho st hissa "line"
-                                            start_col rakho st hissa "col"
+                                            st rakho lexer_mark st
+                                            start_byte rakho st hissa "span_start_byte"
+                                            start_line rakho st hissa "span_start_line"
+                                            start_col rakho st hissa "span_start_col"
                                             st rakho lexer_bump st
                                             acc rakho ""
                                             closed rakho galat
@@ -352,7 +369,9 @@ kaam lexer_lex source max_source max_string max_tokens
                                                     handled rakho sahi
                                                     agar closed galat barabar hai to
                                                         bad_col rakho st hissa "col"
-                                                        res rakho lexer_fail "unterminated_text" "text pura nahi hua, band karne ke liye \" lagao" start_line bad_col
+                                                        end_byte rakho st hissa "byte"
+                                                        end_line rakho st hissa "line"
+                                                        res rakho lexer_fail_span "unterminated_text" "text pura nahi hua, band karne ke liye \" lagao" start_line bad_col start_byte end_byte start_line start_col end_line bad_col
                                                         wapas do res
                                                     khatam
                                                 khatam
@@ -366,8 +385,10 @@ kaam lexer_lex source max_source max_string max_tokens
                                                 khatam
                                                 agar handled galat barabar hai to
                                                     agar sch "\n" barabar hai to
-                                                    bad_col rakho st hissa "col"
-                                                        res rakho lexer_fail "unterminated_text" "text pura nahi hua, band karne ke liye \" lagao" start_line bad_col
+                                                        bad_col rakho st hissa "col"
+                                                        end_byte rakho st hissa "byte"
+                                                        end_line rakho st hissa "line"
+                                                        res rakho lexer_fail_span "unterminated_text" "text pura nahi hua, band karne ke liye \" lagao" start_line bad_col start_byte end_byte start_line start_col end_line bad_col
                                                         wapas do res
                                                     khatam
                                                 khatam
@@ -394,7 +415,7 @@ kaam lexer_lex source max_source max_string max_tokens
                                                             jodo acc acc aur "\\"
                                                             st rakho lexer_bump st
                                                         khatam
-                                                        checked rakho lexer_check_text_size st acc start_line
+                                                        checked rakho lexer_check_text_size st acc start_line start_byte start_line start_col
                                                         cflag rakho checked hissa "ok"
                                                         agar cflag galat barabar hai to
                                                             wapas do checked
@@ -402,7 +423,7 @@ kaam lexer_lex source max_source max_string max_tokens
                                                         nahi to
                                                             st rakho lexer_bump st
                                                             jodo acc acc aur sch
-                                                            checked rakho lexer_check_text_size st acc start_line
+                                                            checked rakho lexer_check_text_size st acc start_line start_byte start_line start_col
                                                             cflag rakho checked hissa "ok"
                                                             agar cflag galat barabar hai to
                                                                 wapas do checked
@@ -412,10 +433,15 @@ kaam lexer_lex source max_source max_string max_tokens
                                                 khatam
                                             agar closed galat barabar hai to
                                                 bad_col rakho st hissa "col"
-                                                res rakho lexer_fail "unterminated_text" "text pura nahi hua, band karne ke liye \" lagao" start_line bad_col
+                                                end_byte rakho st hissa "byte"
+                                                end_line rakho st hissa "line"
+                                                res rakho lexer_fail_span "unterminated_text" "text pura nahi hua, band karne ke liye \" lagao" start_line bad_col start_byte end_byte start_line start_col end_line bad_col
                                                 wapas do res
                                             khatam
-                                            pushed rakho lexer_push st "Text" acc start_line start_col
+                                            end_byte rakho st hissa "byte"
+                                            end_line rakho st hissa "line"
+                                            end_col rakho st hissa "col"
+                                            pushed rakho lexer_push st "Text" acc start_byte start_line start_col end_byte end_line end_col
                                             flag rakho pushed hissa "ok"
                                             agar flag galat barabar hai to
                                                 wapas do pushed
@@ -430,15 +456,19 @@ kaam lexer_lex source max_source max_string max_tokens
                                             neg_digit rakho lexer_is_digit after_sign
                                         khatam
                                         agar is_number_start sahi barabar hai ya neg_digit sahi barabar hai to
-                                            start_line rakho st hissa "line"
-                                            start_col rakho st hissa "col"
+                                            st rakho lexer_mark st
+                                            start_byte rakho st hissa "span_start_byte"
+                                            start_line rakho st hissa "span_start_line"
+                                            start_col rakho st hissa "span_start_col"
                                             sep rakho st hissa "separated"
                                             agar ch "-" barabar hai to
-                                                        agar sep galat barabar hai to
-                                                            msg rakho "'-' number ke saath chipka hai, space do ya 'ghatao' likho"
-                                                            res rakho lexer_fail "stuck_minus" msg start_line start_col
-                                                            wapas do res
-                                                        khatam
+                                                agar sep galat barabar hai to
+                                                    msg rakho "'-' number ke saath chipka hai, space do ya 'ghatao' likho"
+                                                    end_byte rakho jodo start_byte aur 1
+                                                    end_col rakho jodo start_col aur 1
+                                                    res rakho lexer_fail_span "stuck_minus" msg start_line start_col start_byte end_byte start_line start_col start_line end_col
+                                                    wapas do res
+                                                khatam
                                                     khatam
                                                     acc rakho ""
                                                     agar ch "-" barabar hai to
@@ -477,14 +507,16 @@ kaam lexer_lex source max_source max_string max_tokens
                                                             khatam
                                                         khatam
                                                     finite rakho lexer_is_finite_text acc
+                                                    end_byte rakho st hissa "byte"
+                                                    end_line rakho st hissa "line"
                                                     end_col rakho st hissa "col"
                                                     agar finite galat barabar hai to
-                                                        res rakho lexer_finite_error acc start_line end_col
+                                                        res rakho lexer_finite_error acc start_line end_col start_byte start_line start_col end_byte end_line end_col
                                                         wapas do res
                                                     khatam
                                                     val rakho sankhya acc
                                                     vtext rakho text val
-                                                    pushed rakho lexer_push st "Number" vtext start_line start_col
+                                                    pushed rakho lexer_push st "Number" vtext start_byte start_line start_col end_byte end_line end_col
                                                     flag rakho pushed hissa "ok"
                                                     agar flag galat barabar hai to
                                                         wapas do pushed
@@ -494,9 +526,11 @@ kaam lexer_lex source max_source max_string max_tokens
                                                     nahi to
                                                         is_word_start rakho lexer_is_word_start ch
                                                         agar is_word_start sahi barabar hai to
-                                                            start_line rakho st hissa "line"
-                                                            start_col rakho st hissa "col"
-                                                            acc rakho ""
+                                                        st rakho lexer_mark st
+                                                        start_byte rakho st hissa "span_start_byte"
+                                                        start_line rakho st hissa "span_start_line"
+                                                        start_col rakho st hissa "span_start_col"
+                                                        acc rakho ""
                                                             scanning rakho sahi
                                                             jab tak scanning sahi barabar hai to
                                                                 wch rakho lexer_current st
@@ -507,22 +541,25 @@ kaam lexer_lex source max_source max_string max_tokens
                                                                     nahi to
                                                                         jodo acc acc aur wch
                                                                         st rakho lexer_bump st
-                                                                        checked rakho lexer_check_word_size st acc start_line
+                                                                        checked rakho lexer_check_word_size st acc start_line start_byte start_line start_col
                                                                         cflag rakho checked hissa "ok"
                                                                         agar cflag galat barabar hai to
                                                                             wapas do checked
                                                                         khatam
                                                                     khatam
                                                                 khatam
+                                                            end_byte rakho st hissa "byte"
+                                                            end_line rakho st hissa "line"
+                                                            end_col rakho st hissa "col"
                                                             lower rakho neeche acc
                                                             info rakho lexer_keyword lower
                                                             found rakho info hissa "found"
                                                             agar found sahi barabar hai to
                                                                 kind rakho info hissa "kind"
                                                                 value rakho info hissa "value"
-                                                                pushed rakho lexer_push st kind value start_line start_col
+                                                                pushed rakho lexer_push st kind value start_byte start_line start_col end_byte end_line end_col
                                                                 nahi to
-                                                                    pushed rakho lexer_push st "Ident" acc start_line start_col
+                                                                    pushed rakho lexer_push st "Ident" acc start_byte start_line start_col end_byte end_line end_col
                                                                 khatam
                                                             flag rakho pushed hissa "ok"
                                                             agar flag galat barabar hai to
@@ -531,12 +568,17 @@ kaam lexer_lex source max_source max_string max_tokens
                                                             st rakho pushed hissa "state"
                                                             st hissa "separated" rakho galat
                                                             nahi to
-                                                                line rakho st hissa "line"
-                                                                col rakho st hissa "col"
+                                                                st rakho lexer_mark st
+                                                                start_byte rakho st hissa "span_start_byte"
+                                                                line rakho st hissa "span_start_line"
+                                                                col rakho st hissa "span_start_col"
+                                                                step rakho lexer_byte_length ch
+                                                                end_byte rakho jodo start_byte aur step
+                                                                end_col rakho jodo col aur 1
                                                                 msg rakho "'"
                                                                 jodo msg msg aur ch
                                                                 jodo msg msg aur "' nahi chahiye, BOLI me sirf shabd, number aur \"text\" use hota hai"
-                                                                res rakho lexer_fail "unexpected_character" msg line col
+                                                                res rakho lexer_fail_span "unexpected_character" msg line col start_byte end_byte line col line end_col
                                                                 wapas do res
                                                             khatam
                                                         khatam
@@ -546,9 +588,11 @@ kaam lexer_lex source max_source max_string max_tokens
                                         khatam
                                      khatam
                                   khatam
-    eof_line rakho st hissa "line"
-    eof_col rakho st hissa "col"
-    pushed rakho lexer_push st "Eof" "" eof_line eof_col
+    st rakho lexer_mark st
+    eof_byte rakho st hissa "span_start_byte"
+    eof_line rakho st hissa "span_start_line"
+    eof_col rakho st hissa "span_start_col"
+    pushed rakho lexer_push st "Eof" "" eof_byte eof_line eof_col eof_byte eof_line eof_col
     flag rakho pushed hissa "ok"
     agar flag galat barabar hai to
         wapas do pushed

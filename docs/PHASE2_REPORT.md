@@ -12,7 +12,7 @@ Status: **core runtime ready for compiler-stage design; full self-hosting readin
 - `src/interpreter/value.rs`: 6 copy-semantics values; no integer, bytes, function, error, iterator, reference.
 - `src/interpreter/mod.rs` aur `eval.rs`: innermost assignment, call scopes, separate global `kaam`, builtin shadowing.
 - `src/vm.rs`: yahi builtin dispatch; same value representation; VM experimental.
-- `src/ast.rs`: `BoliError { line, col, message, trace }`; no `kind`/`path`.
+- `src/ast.rs`: `BoliError { line, col, message, trace }`; no `kind`/`path` at that time. Phase 3.2 later added lexer `kind` and boxed `span`; `path` remains absent.
 - `src/limits.rs`: 15 safety limits with env overrides; defaults preserved.
 - `tests/`: 198 default tests before this phase, 2 ignored.
 - CLI/help/docs: stale builtin list aur test counts mile.

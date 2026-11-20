@@ -8,7 +8,7 @@ khatam
 kaam lexer_state_new source max_string max_tokens
     items rakho lexer_empty_list 0
     size rakho lambayi source
-    st rakho map "src" source "pos" 1 "line" 1 "col" 1 "separated" sahi "tokens" items "max_string" max_string "max_tokens" max_tokens "src_len" size
+    st rakho map "src" source "pos" 1 "byte" 0 "line" 1 "col" 1 "span_start_byte" 0 "span_start_line" 1 "span_start_col" 1 "separated" sahi "tokens" items "max_string" max_string "max_tokens" max_tokens "src_len" size
     wapas do st
 khatam
 
@@ -38,9 +38,12 @@ khatam
 kaam lexer_bump st
     ch rakho lexer_current st
     pos rakho st hissa "pos"
+    byte rakho st hissa "byte"
     line rakho st hissa "line"
     col rakho st hissa "col"
+    step rakho lexer_byte_length ch
     jodo pos pos aur 1
+    jodo byte byte aur step
     agar ch "\n" barabar hai to
         col rakho 1
         jodo line line aur 1
@@ -48,13 +51,24 @@ kaam lexer_bump st
         jodo col col aur 1
     khatam
     st hissa "pos" rakho pos
+    st hissa "byte" rakho byte
     st hissa "line" rakho line
     st hissa "col" rakho col
     wapas do st
 khatam
 
-kaam lexer_push st kind value line col
-    pushed rakho lexer_token kind value line col
+kaam lexer_mark st
+    byte rakho st hissa "byte"
+    line rakho st hissa "line"
+    col rakho st hissa "col"
+    st hissa "span_start_byte" rakho byte
+    st hissa "span_start_line" rakho line
+    st hissa "span_start_col" rakho col
+    wapas do st
+khatam
+
+kaam lexer_push st kind value start_byte start_line start_col end_byte end_line end_col
+    pushed rakho lexer_token kind value start_line start_col start_byte end_byte start_line start_col end_line end_col
     items rakho st hissa "tokens"
     count rakho lambayi items
     limit rakho st hissa "max_tokens"
@@ -63,7 +77,7 @@ kaam lexer_push st kind value line col
         msg rakho "code me bahut zyada tokens hain (max "
         jodo msg msg aur ltext
         jodo msg msg aur ")"
-        res rakho lexer_fail "token_limit" msg line col
+        res rakho lexer_fail_span "token_limit" msg start_line start_col start_byte end_byte start_line start_col end_line end_col
         wapas do res
     khatam
     next_items rakho jodega items pushed

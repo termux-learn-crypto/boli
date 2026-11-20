@@ -1,6 +1,7 @@
 laao "errors.boli"
 laao "token.boli"
 laao "reader.boli"
+laao "unicode.boli"
 laao "lexer.boli"
 
 kaam lexer_display_result res

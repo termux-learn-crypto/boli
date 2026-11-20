@@ -48,7 +48,7 @@ Har builtin:
 
 ## Errors
 
-Runtime error par program fail-fast rukta hai; catch/try nahi hai. Error me `line`, `col`, `message`, `trace` hote hain. File path aur machine-readable error kind abhi `BoliError` me nahi hain; ye self-hosting ke liye future milestone hai.
+Runtime error par program fail-fast rukta hai; catch/try nahi hai. Error me `line`, `col`, `message`, `trace`, `kind`, `span` hote hain. Lexer errors typed `kind` aur boxed `span` set karte hain; runtime errors me ye `None` rehte hain. File path aur parser/runtime error kinds abhi nahi hain; ye self-hosting ke liye future milestone hain.
 
 CLI user-facing error `Galti: ...` format me print karta hai. Library tests error string compare karte hain. VM aur interpreter ka error text agreed cases me same hona chahiye.
 

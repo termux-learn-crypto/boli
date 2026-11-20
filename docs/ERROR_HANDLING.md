@@ -12,6 +12,8 @@ BOLI abhi fail-fast runtime use karta hai. Error panics nahi; `Result<T, BoliErr
 | `col` | `Option<usize>` | Lexer/parser column; runtime me mostly `None`. |
 | `message` | `String` | Hinglish explanation. |
 | `trace` | `Vec<(String, usize)>` | Nested `kaam` call frames, innermost pehle. |
+| `kind` | `Option<&'static str>` | Typed lexer error category; other layers use `None`. |
+| `span` | `Option<Box<Span>>` | Six-field source span for lexer errors; other layers use `None`. |
 
 Display format:
 
@@ -40,9 +42,9 @@ Galti: line 2 me built-in kaam 'sankhya' galat text ke liye chal gaya
 ## Non-goals abhi ke liye
 
 - `try`/`catch` ya error value nahi.
-- Machine-readable `kind` field nahi.
+- Machine-readable `kind` field ab lexer errors ke liye hai; parser/runtime categories abhi typed nahi hain.
 - File path/context field nahi.
-- Error chaining/source spans (`start..end`) nahi.
+- Source spans ab lexer errors/tokens ke liye hain; AST/runtime error chaining aur spans (`start..end`) nahi.
 - OS error struct ko preserve karne wala typed I/O error nahi.
 
 Ye missing capabilities self-hosting ke later milestones me add honge. Tabhi stable declare kiya jayega jab interpreter aur VM dono naye error shape par same behavior dein.
@@ -56,7 +58,7 @@ Ye missing capabilities self-hosting ke later milestones me add honge. Tabhi sta
 
 ## Future compatibility plan
 
-1. `BoliError` me optional `kind` aur `path` fields add karo, default existing messages preserve karte hue.
+1. `BoliError` me `kind` add ho gaya hai; `path` field aur parser/runtime kind values abhi baaki hain. Purane default messages preserve karo.
 2. Typed categories: `syntax`, `type`, `arity`, `index`, `limit`, `io`, `import`, `assertion`.
 3. `Galti` se structured form tak gradual migration; old display string compatibility rakho.
 4. I/O errors ko capability-denied aur filesystem-error me separate karo (`FILE_IO_SECURITY.md`).

@@ -6,6 +6,8 @@
 **Reference:** Rust lexer `src/lexer.rs`; differential harness `tests/phase3_lexer.rs`.
 **Out of scope:** Phase 4 parser, AST helpers, compiler, bytecode, default CLI wiring, Rust lexer deletion.
 
+> **Phase 3.2 supersession:** this report is retained as the Phase 3.1 baseline. Phase 3.2 implemented full Unicode identifier parity via `selfhost/lexer/unicode.boli`, added source spans to Rust/BOLI tokens and errors, added typed `kind` to Rust `BoliError`, expanded `tests/phase3_lexer.rs` from 10 to 11 tests, and moved the full gate to 215 passed / 0 failed / 2 ignored. Statements below saying Unicode parity, spans, or Rust error kinds are missing describe Phase 3.1 only. Current truth is in `docs/TOKEN_CONTRACT.md`, `docs/PARSER_INTERFACE_SPEC.md`, and `docs/PHASE3_2_REPORT.md`.
+
 ## A. Feature matrix
 
 Classifications use only source and test evidence.
@@ -19,11 +21,11 @@ Classifications use only source and test evidence.
 | Negative numeric literals | IMPLEMENTED AND VERIFIED | `lexer_peek_next` gate; `phase3_negative_number_boundaries`. |
 | Finite-number precheck before `sankhya` | IMPLEMENTED AND VERIFIED for supported decimal syntax | Exact 309-digit boundary; `phase3_numeric_finite_boundaries`. |
 | Error `line:col:message` parity with Rust | IMPLEMENTED AND VERIFIED | All differential error cases compare canonical `line:col:message`. |
-| BOLI error `kind` values | IMPLEMENTED AND VERIFIED inside BOLI | `phase3_boli_error_kinds`; not compared to Rust because `BoliError` has no `kind`. |
+| BOLI error `kind` values | IMPLEMENTED AND VERIFIED inside BOLI | Phase 3.1: `phase3_boli_error_kinds`; Phase 3.2 added Rust `BoliError.kind` parity. |
 | Internal cursor threading (`{line, col, pos}`) | IMPLEMENTED AND VERIFIED | Used by all lexer helpers and exercised by the harness. |
 | Public incremental `state` in result maps | NOT IMPLEMENTED | `lexer_ok`/`lexer_fail` set `state` to `khaali`; documented as reserved. |
-| Full Rust `char::is_alphanumeric()` identifier parity | NOT IMPLEMENTED | Rust has 858 ranges; BOLI has ASCII plus curated mark/Indic ranges. Greek `α` gap is test-documented. |
-| Byte offsets / spans | NOT IMPLEMENTED | Token maps carry line/col only. |
+| Full Rust `char::is_alphanumeric()` identifier parity | NOT IMPLEMENTED IN PHASE 3.1; IMPLEMENTED IN PHASE 3.2 | Phase 3.1 had the Greek `α` gap; Phase 3.2 added `selfhost/lexer/unicode.boli`. |
+| Byte offsets / spans | NOT IMPLEMENTED IN PHASE 3.1; IMPLEMENTED IN PHASE 3.2 | Phase 3.1 token maps carried line/col only; Phase 3.2 added six span fields. |
 | File I/O, bytecode, AST, parser, compiler, default wiring | NOT IMPLEMENTED | Explicit Phase 3 non-goals; no Phase 4 code added. |
 
 ## B. Confirmed bugs / issues and fixes
@@ -134,11 +136,11 @@ Boundary strings were probed with temporary `rustc` files outside the repository
 
 ## G. Remaining limitations
 
-- Full Unicode identifier parity remains missing; Greek `α` is an intentional verified gap.
+- Full Unicode identifier parity was missing in Phase 3.1; Greek `α` was an intentional verified gap. Phase 3.2 superseded this with `unicode.boli`.
 - `state` is reserved but always `khaali`.
 - `lexer_byte_length` walks every character, so very large inputs cost more BOLI steps than Rust's `len()`.
-- No byte offsets/spans; AST/parser diagnostics will need a future span design.
-- BOLI `kind` values are internal only; Rust `BoliError` has no comparable typed field.
+- Byte offsets/spans were missing in Phase 3.1; Phase 3.2 added them to Rust and BOLI tokens/errors. AST spans remain future work.
+- BOLI `kind` values were internal only in Phase 3.1; Phase 3.2 added a comparable typed `BoliError.kind`.
 - Finite-boundary verification covers the decimal syntax both lexers accept; exponent notation is not part of this corpus.
 - `run.boli` executes at import time; the harness deliberately imports implementation modules only.
 - The lexer remains additive and is not wired into the default CLI, parser, interpreter, or VM.
@@ -153,9 +155,9 @@ Do **not** promote this to "self-hosting complete" or a stable Phase 4 foundatio
 
 | Readiness area | Score | Basis |
 |---|---:|---|
-| Token-stream fidelity for supported syntax | 4/5 | 8 parity tests, negative/finite/byte fixes; Unicode identifier gap remains. |
-| Parser input contract | 3/5 | Tokens have line/col and stable formatting, but no spans or typed Rust parity. |
-| Error/diagnostic fidelity | 3/5 | `line:col:message` matches; BOLI kinds are internal only. |
+| Token-stream fidelity for supported syntax | 4/5 | Phase 3.1 basis: 8 parity tests, negative/finite/byte fixes; Unicode gap remained. Phase 3.2 closed that gap. |
+| Parser input contract | 3/5 | Phase 3.1 basis: tokens had line/col but no spans or typed Rust parity. Phase 3.2 added both. |
+| Error/diagnostic fidelity | 3/5 | Phase 3.1 basis: `line:col:message` matched; BOLI kinds were internal only. Phase 3.2 added Rust kind/span parity. |
 | Integration maturity | 2/5 | Additive only; no parser, default wiring, or build pipeline. |
 | **Overall Phase 4 parser readiness** | **3/5** | Safe to design as an additive experiment; not safe to call stable. |
 

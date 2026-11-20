@@ -7,8 +7,10 @@ All notable changes to BOLI. BOLI follows [Semantic Versioning](https://semver.o
 ### Experimental self-hosted lexer
 - Added `selfhost/lexer/` and `tests/phase3_lexer.rs` as an additive, non-default BOLI lexer experiment.
 - Phase 3.1 fixed negative-number lexing, finite-number prechecks, UTF-8 byte caps, and documented the remaining Unicode-identifier and public-state limitations.
-- Current gate: 214 passed / 2 ignored; Rust remains authoritative.
 
+- Phase 3.2 added deterministic Unicode identifier parity, source spans, structured Rust lexer error kinds, span-aware canonical dumps, and fixed-seed differential cases.
+
+- Current gate: 215 passed / 2 ignored; Rust remains authoritative.
 ## [0.6.5] — 2026-11-19
 
 ### Production-readiness packaging

@@ -1,11 +1,16 @@
-kaam lexer_make_error kind message line col
-    err rakho map "kind" kind "message" message "line" line "col" col
+kaam lexer_make_error kind message line col start_byte end_byte start_line start_col end_line end_col
+    err rakho map "kind" kind "message" message "line" line "col" col "start_byte" start_byte "end_byte" end_byte "start_line" start_line "start_col" start_col "end_line" end_line "end_col" end_col
     wapas do err
 khatam
 
-kaam lexer_fail kind message line col
-    err rakho lexer_make_error kind message line col
+kaam lexer_fail_span kind message line col start_byte end_byte start_line start_col end_line end_col
+    err rakho lexer_make_error kind message line col start_byte end_byte start_line start_col end_line end_col
     res rakho map "ok" galat "tokens" khaali "state" khaali "error" err
+    wapas do res
+khatam
+
+kaam lexer_fail kind message line col
+    res rakho lexer_fail_span kind message line col 0 0 1 1 1 1
     wapas do res
 khatam
 

@@ -1,9 +1,13 @@
 # BOLI — Rust Independence & Self-Hosting Architecture Audit
 
-**Status:** Phase 1 + Phase 2 + Phase 3 implemented, Phase 3.1 audit/fix applied, Phase 4 planning report
+**Status:** Phase 1 + Phase 2 + Phase 3 implemented, Phase 3.1 audit/fix applied, Phase 3.2 lexer hardening applied, Phase 4A parser design complete (design only)
 **Repository:** `/data/data/com.termux/files/home/boli`
-**Audited snapshot:** `main` at `c10129a BOLI Phase 3: experimental self-hosted lexer and differential tests`; release tag `v0.6.5` points to `13bc28b`
-**Current task scope:** Phase 3.1 lexer audit, fixes, tests, and documentation only. No Phase 4 parser implementation.
+**Audited snapshot:** `main` at `c10129a BOLI Phase 3: experimental self-hosted lexer and differential tests` for the original roadmap; release tag `v0.6.5` points to `13bc28b`
+**Current task scope:** Phase 3.2 lexer spans, structured errors, Unicode parity, differential hardening, and documentation only. No Phase 4 parser implementation.
+
+> **Phase 3.2 update:** the original roadmap below is retained as the Phase 3/3.1 baseline. Phase 3.2 closed the Unicode identifier gap with `selfhost/lexer/unicode.boli`, added six span fields to tokens and errors, added Rust `BoliError.kind`/boxed span, and expanded the full gate from 214 to **215 passed / 0 failed / 2 ignored**. Parser-facing truth is `docs/TOKEN_CONTRACT.md` and `docs/PARSER_INTERFACE_SPEC.md`; claims below that spans or typed Rust error kinds are missing are historical. Phase 4 readiness is **READY WITH LIMITATIONS**, not full self-hosting readiness.
+
+> **Phase 4A update:** parser design is now documented in `docs/PARSER_GRAMMAR.md`, `docs/PARSER_AST_SPEC.md`, `docs/PARSER_ARCHITECTURE.md`, `docs/PARSER_ERROR_RECOVERY.md`, and `docs/PHASE4A_REPORT.md`. This phase was design-only: no BOLI parser, AST, lexer, VM, CLI, or Rust parser implementation was added. The design keeps the current recursive-descent grammar, flat call arguments, contextual `kaam`/`hissa`, fail-fast errors, and line-only Rust AST compatibility. Phase 4B implementation readiness is **READY WITH BLOCKERS**; the roadmap below remains the implementation order.
 
 ---
 
@@ -15,7 +19,7 @@
 
 | Area | Readiness | Basis |
 |---|---:|---|
-| Stage 0 Rust reference implementation | **5/5** | `src/` me complete lexer, parser, AST, interpreter, VM, limits, builtins, CLI, tests hain. 214 tests passed, 2 ignored in the current gate. |
+| Stage 0 Rust reference implementation | **5/5** | `src/` me complete lexer, parser, AST, interpreter, VM, limits, builtins, CLI, tests hain. 215 tests passed, 2 ignored in the current gate. |
 | Core language logic for a compiler | **3/5** | Recursion, `kaam`, lists, maps, `hissa`, comparisons, `wapas do` exist. Enums/pattern matching/closures nahi hain, par tagged maps + explicit state threading se prototype ban sakta hai. |
 | Systems capability for a compiler | **1/5** | No general file read/write, no bytes type, no binary output, no structured catchable errors, no source spans in AST, no BOLI-level bytecode API. |
 | VM as a stable compiler target | **3/5** | 39 VM tests + parity suite exist, but VM explicitly experimental (`src/vm.rs:1`), no bytecode serialization/loader, no fuzz corpus dedicated to VM, no benchmarks. |
@@ -41,7 +45,7 @@
 
 `VM stabilize` → `runtime primitives` → `sandboxed FS/bytes` → `bytecode format + Rust compiler emits bytecode` → `BOLI lexer` → `BOLI parser` → `BOLI AST helpers` → `BOLI bytecode compiler` → `self-host check` → `reproducibility` → `Rust-free release` → `native codegen`.
 
-Har step par existing gate (ab 214 passed, 2 ignored) plus naye tests green honi chahiye. Rust implementation ko delete nahi karna; use **bootstrap/reference implementation** ke roop me preserve karna hai.
+Har step par existing gate (ab 215 passed, 2 ignored) plus naye tests green honi chahiye. Rust implementation ko delete nahi karna; use **bootstrap/reference implementation** ke roop me preserve karna hai.
 
 ---
 
@@ -51,10 +55,10 @@ Har step par existing gate (ab 214 passed, 2 ignored) plus naye tests green honi
 
 | Module | Actual file(s) | What it does today | Rust dependency? | Compiler migration relevance |
 |---|---|---|---|---|
-| Lexer | `src/lexer.rs:8-486` | `Tok`, `Token { tok, line, col }`, cursor, keywords, strings, numbers, comments, limits. | Yes, pure Rust. | BOLI lexer ka reference. Rust byte caps `source.len()`/`text.len()` (`lexer.rs:239,332,436`) ab BOLI side par local `lexer_byte_length` se match hote hain; general `byte_lambayi` builtin abhi bhi nahi hai. |
-| Parser | `src/parser.rs:14-835` | Recursive descent, 2-token lookahead, no backtracking, statement/expression/condition parsing. | Yes. | BOLI parser same recursive style me likha ja sakta hai, par structured errors/spans nahi hain. |
-| AST | `src/ast.rs:58-218` | Rust enums `Expr`, `Stmt`, `Cond`, `ArithOp`, `CmpOp`; line numbers only. | Yes. | BOLI me tagged maps se emulate hoga. Missing enums/pattern matching is main friction. |
-| Error system | `src/ast.rs:8-55` | `BoliError { line, col, message, trace }`, Hinglish `Display`. | Yes. | BOLI me structured error value nahi hai. `try/catch` nahi. `line`/`col` runtime me aksar drop ho jate hain. |
+| Lexer | `src/lexer.rs` | `Tok`, `Token { tok, line, col, span }`, byte-aware cursor, keywords, strings, numbers, comments, limits. | Yes, pure Rust. | BOLI lexer ka reference. Phase 3.2 added full Unicode identifier parity via `unicode.boli`; general `byte_lambayi` builtin abhi bhi nahi hai. |
+| Parser | `src/parser.rs` | Recursive descent, 2-token lookahead, no backtracking, statement/expression/condition parsing. | Yes. | BOLI parser same recursive style me likha ja sakta hai; token boundary is now documented in `docs/TOKEN_CONTRACT.md`. |
+| AST | `src/ast.rs` | Rust enums `Expr`, `Stmt`, `Cond`, `ArithOp`, `CmpOp`; AST nodes still store line only. | Yes. | BOLI me tagged maps se emulate hoga. Missing enums/pattern matching is main friction. |
+| Error system | `src/ast.rs` | `BoliError { line, col, message, trace, kind, span }`, Hinglish `Display`. | Yes. | Lexer errors now have typed kind and boxed span; BOLI still has no catchable structured error value. |
 | Scope | `src/scope.rs:8-28` | `Scope { map: HashMap<String, Value>, bytes: u64 }`. | Yes. | BOLI `kaam` writes sirf innermost scope me (`interpreter/mod.rs:232-252`), isliye compiler state explicitly thread karna padega. |
 | Limits | `src/limits.rs:4-247` | 14 env-tunable caps, bounded reads, path resolution, `BOLI_IMPORT_ROOT`. | Yes. | Security model ka reference. BOLI programs se ye APIs accessible nahi hain. |
 | Interpreter | `src/interpreter/mod.rs:33-687`, `eval.rs`, `value.rs` | Tree-walker default engine, scopes, kaam table, imports, budgets, value accounting. | Yes. | Semantic oracle. VM aur future BOLI compiler ke output isi se compare honge. |
@@ -62,7 +66,7 @@ Har step par existing gate (ab 214 passed, 2 ignored) plus naye tests green honi
 | Builtins | `src/builtins.rs:8-191` | `lambayi`, `upar`, `neeche`, `text`, `sankhya`, `chaabiyan`. | Yes. | Compiler ke liye string/list/map basics hain, par file/bytes/binary nahi. |
 | CLI / REPL | `src/main.rs:23-461` | `run`, `.hl` shortcut, help/version, `--vm`, REPL with depth heuristic. | Yes. | REPL interpreter-only hai (`main.rs:306`) even with `--vm`. New build pipeline ko CLI flags reproduce karne honge. |
 | Imports | `interpreter/mod.rs:170-206`, `vm.rs:451-505,1066-1097`, `limits.rs:147-187` | `laao`, canonical path, root confinement, dedup, depth guard. | Yes. | Read-only imports exist; general file I/O nahi. Module namespace/export nahi. |
-| Tests | `tests/boli.rs`, `tests/cli.rs`, `tests/vm.rs`, `tests/phase3_lexer.rs`, embedded unit tests | Historical v0.6.5 baseline 191 tests; current gate 214 passed, 2 ignored. | Rust test harness. | Golden corpus preserve karna hai. BOLI-level test runner abhi nahi. |
+| Tests | `tests/boli.rs`, `tests/cli.rs`, `tests/vm.rs`, `tests/phase3_lexer.rs`, embedded unit tests | Historical v0.6.5 baseline 191 tests; current gate 215 passed, 2 ignored. | Rust test harness. | Golden corpus preserve karna hai. BOLI-level test runner abhi nahi. |
 | CI/CD | `.github/workflows/ci.yml`, `release.yml`, `dependabot.yml` | 3-OS CI, 4 release targets, checksums, pinned actions, Dependabot. | Cargo/Rust required. | Rust-free release ke liye replace hona hai. |
 | Installer | `install.sh:1-57` | Copies local `target/release/boli`. | Needs Cargo-built binary path. | Non-Cargo artifact path ya installer change chahiye. |
 
@@ -84,8 +88,8 @@ Har step par existing gate (ab 214 passed, 2 ignored) plus naye tests green honi
 | File read | No general API | Only internal `read_source_capped` (`limits.rs:113-145`) and `laao` | Missing |
 | File write | No | No statement/builtin | Missing |
 | Bytes/binary | No | `Value` has no byte type (`value.rs:9-17`) | Missing |
-| Structured errors | No | `BoliError` is Rust-only (`ast.rs:8-15`); no `try`/`throw` | Missing |
-| Source spans | Partial | Lexer has line+col (`lexer.rs:55-60`); AST only line (`ast.rs:102-215`) | Missing for compiler quality |
+| Structured errors | Partial | Rust lexer errors now have `kind` and boxed `span`; BOLI has no `try`/`throw` | Missing catchable BOLI value |
+| Source spans | Partial | Lexer tokens/errors have full spans; AST only stores line | Missing for compiler-quality AST diagnostics |
 | Enums / sum types | No | No `enum` in language; Rust uses enums | Workaround: tagged maps |
 | Pattern matching | No | Only `agar ... barabar hai` | Workaround: nested condition chains |
 | Closures / captured state | No | `Kaam` stores only params+body (`mod.rs:20-24`) | Workaround: explicit state passing |
@@ -371,7 +375,7 @@ Notes:
 
 - Use current Rust `boli` binary and Rust VM (`src/vm.rs`) as oracle.
 - Add capability to emit/load `.bc` v1 (Milestone 4). This is a Rust-side extension, not a rewrite.
-- Existing gate (214 passed, 2 ignored) remains the compatibility baseline.
+- Existing gate (215 passed, 2 ignored) remains the compatibility baseline.
 
 Conceptual command:
 
@@ -424,6 +428,26 @@ Acceptance: two clean checkouts produce identical hashes.
 ## 4. Phase 4 — Migration roadmap
 
 Effort legend: `S` small, `M` medium, `L` large, `XL` multi-step research.
+
+### Phase 4A — Parser design specification (complete, design only)
+
+**Status:** complete.
+**Required docs:** `docs/PARSER_GRAMMAR.md`, `docs/PARSER_AST_SPEC.md`, `docs/PARSER_ARCHITECTURE.md`, `docs/PARSER_ERROR_RECOVERY.md`, `docs/PHASE4A_REPORT.md`.
+**Method:** inspected `src/parser.rs`, `src/ast.rs`, `src/lexer.rs`, interpreter, VM, builtins, limits, tests, language docs, Phase 3.2 report, token contract, and parser interface spec.
+
+Design decisions:
+
+- grammar source of truth is the implemented Rust parser, not an invented conventional grammar;
+- future BOLI parser keeps state-threaded recursive descent with two-token lookahead;
+- arithmetic remains explicit nested prefix Hinglish, not symbol infix precedence;
+- call arguments remain flat atoms; `f a b` is `f(a, b)`;
+- `kaam` and `hissa` keep their contextual disambiguation;
+- AST compatibility is tagged maps with exact current node/field names;
+- Rust AST stays line-only, so golden AST dumps need legacy and strict modes;
+- default errors stay fail-fast with one error; structured kinds and multi-error recovery are later opt-ins;
+- no parser, AST, lexer, VM, CLI, or syntax change was made.
+
+**Decision:** Phase 4B implementation is **READY WITH BLOCKERS**. Blockers are runtime/step/call/value-depth limits, absence of a BOLI AST representation, absence of a parser differential corpus, and the standing rule that VM stabilization precedes compiler migration.
 
 ### Milestone 1 — VM stabilization
 
@@ -613,9 +637,9 @@ Effort legend: `S` small, `M` medium, `L` large, `XL` multi-step research.
 
 ### 5.1 Preserve existing suite
 
-- Keep all existing tests; current gate is 214 passed, 2 ignored.
+- Keep all existing tests; current gate is 215 passed, 2 ignored.
   - `tests/boli.rs`, `tests/cli.rs`, `tests/vm.rs`, embedded unit tests
-  - `tests/phase3_lexer.rs` (10 tests after Phase 3.1)
+  - `tests/phase3_lexer.rs` (11 tests after Phase 3.2)
 - No test deletion. New behavior adds new tests; no test rewritten to hide regressions.
 - CI continues to run Rust reference suite even after Rust is removed from release path.
 

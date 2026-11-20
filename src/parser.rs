@@ -1,7 +1,7 @@
 // BOLI ka Parser - tokens se AST banata hai
 // Line hi statement ka khatam hai, isliye statements newline pe alag hote hain
 
-use crate::ast::{ArithOp, BoliError, CmpOp, Cond, Expr, Program, Stmt};
+use crate::ast::{ArithOp, BoliError, CmpOp, Cond, Expr, Program, Span, Stmt};
 use crate::lexer::{Tok, Token, lex};
 use crate::limits::{DEFAULT_MAX_CONDITION_DEPTH, DEFAULT_MAX_PARSE_DEPTH, env_limit};
 
@@ -9,6 +9,14 @@ const SYNTHETIC_EOF: Token = Token {
     tok: Tok::Eof,
     line: 1,
     col: 1,
+    span: Span {
+        start: 0,
+        end: 0,
+        start_line: 1,
+        start_col: 1,
+        end_line: 1,
+        end_col: 1,
+    },
 };
 
 pub struct Parser {

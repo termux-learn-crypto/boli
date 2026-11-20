@@ -618,6 +618,8 @@ impl Vm {
                 path.display(),
                 e
             ),
+            kind: None,
+            span: None,
             trace: Vec::new(),
         })?;
         self.entry_path = Some(canonical);

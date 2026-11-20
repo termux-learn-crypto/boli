@@ -1,5 +1,5 @@
-kaam lexer_token kind value line col
-    t rakho map "kind" kind "value" value "line" line "col" col
+kaam lexer_token kind value line col start_byte end_byte start_line start_col end_line end_col
+    t rakho map "kind" kind "value" value "line" line "col" col "start_byte" start_byte "end_byte" end_byte "start_line" start_line "start_col" start_col "end_line" end_line "end_col" end_col
     wapas do t
 khatam
 
@@ -8,12 +8,24 @@ kaam lexer_token_text t
     value rakho t hissa "value"
     line rakho t hissa "line"
     col rakho t hissa "col"
+    sb rakho t hissa "start_byte"
+    eb rakho t hissa "end_byte"
+    sl rakho t hissa "start_line"
+    sc rakho t hissa "start_col"
+    el rakho t hissa "end_line"
+    ec rakho t hissa "end_col"
     shown rakho value
     agar kind "Text" barabar hai to
         shown rakho escape_text value
     khatam
     ltext rakho text line
     ctext rakho text col
+    sbt rakho text sb
+    ebt rakho text eb
+    slt rakho text sl
+    sct rakho text sc
+    elt rakho text el
+    ect rakho text ec
     out rakho kind
     jodo out out aur "|"
     jodo out out aur shown
@@ -21,5 +33,17 @@ kaam lexer_token_text t
     jodo out out aur ltext
     jodo out out aur "|"
     jodo out out aur ctext
+    jodo out out aur "|"
+    jodo out out aur sbt
+    jodo out out aur "|"
+    jodo out out aur ebt
+    jodo out out aur "|"
+    jodo out out aur slt
+    jodo out out aur "|"
+    jodo out out aur sct
+    jodo out out aur "|"
+    jodo out out aur elt
+    jodo out out aur "|"
+    jodo out out aur ect
     wapas do out
 khatam

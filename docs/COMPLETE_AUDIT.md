@@ -256,4 +256,4 @@ Packaging and release hygiene only: no new source-code audit findings, and the v
 | P4 | crates.io metadata | `readme`, `keywords` and `categories` added; edition 2024 and zero dependencies unchanged. |
 | P5 | CLI production smoke test | One end-to-end smoke test of the cargo-built binary; CLI suite is now 34 tests. |
 
-Verification at v0.6.5: 191/191 tests green (4 unit + 114 library + 34 CLI + 39 VM). Current Phase 3.1 gate: 214 passed / 0 failed / 2 ignored, including 10 `tests/phase3_lexer.rs` tests.
+Verification at v0.6.5: 191/191 tests green (4 unit + 114 library + 34 CLI + 39 VM). Current Phase 3.2 gate: 215 passed / 0 failed / 2 ignored, including 11 `tests/phase3_lexer.rs` tests.

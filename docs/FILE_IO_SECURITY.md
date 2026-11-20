@@ -100,7 +100,7 @@ Har error Hinglish display rakhega, e.g. `Galti: line 4 me path 'x' sandbox root
 
 ## Gate before enabling
 
-- [ ] `BoliError` me `kind` + `path` fields with backward-compatible display.
+- [ ] `BoliError` me `path` field, aur parser/runtime `kind` values, backward-compatible display ke saath. Lexer `kind` Phase 3.2 me add ho gaya hai.
 - [ ] VM stability gates se kam se kam 100k fuzz + `.bc` corpus green.
 - [ ] Upari test plan green on Linux, macOS, Windows.
 - [ ] Docs update: `RUNTIME_SPEC.md`, `STANDARD_LIBRARY.md`, `ERROR_HANDLING.md`.

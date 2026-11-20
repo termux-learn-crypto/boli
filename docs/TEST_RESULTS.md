@@ -51,7 +51,7 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 
 Historical v0.6.5 baseline above: **191 passed / 0 failed** (4 unit + 114 `tests/boli.rs` library + 34 `tests/cli.rs` end-to-end + 39 `tests/vm.rs` VM/parity).
 
-Current Phase 3.1 gate: **214 passed / 0 failed / 2 ignored** via `cargo test --all-targets --locked --quiet`; the increase is from `tests/phase3_lexer.rs` (10 tests) and the Phase 3 lexer additions.
+Current Phase 3.2 gate: **215 passed / 0 failed / 2 ignored** via `cargo test --all-targets --locked --quiet`; the increase over the Phase 3.1 baseline (214 passed) is the additional `tests/phase3_lexer.rs` deterministic Unicode/generated-case test.
 
 Regenerate the count with:
 ```bash
@@ -100,11 +100,11 @@ BOLI version 0.6.5
 - 20,000-item list literal → Hinglish Galti.
 - Oversized `pucho` line in REPL → Galti, then the next short line is accepted.
 
-## Phase 3.1 verification addendum
+## Phase 3.1 and Phase 3.2 verification addenda
 
-- `cargo test --test phase3_lexer --locked --quiet`: 10 passed, 0 failed.
-- `cargo run --quiet -- run selfhost/lexer/demo.boli`: `Likho||1|1`, `Number|5|1|7`, `Newline||1|8`, `Eof||2|1`.
-- Full gate re-run after Phase 3.1 edits: `cargo fmt --all -- --check`, `cargo check --all-targets --locked`, `cargo clippy --all-targets --locked -- -D warnings`, `cargo test --all-targets --locked --quiet`, `cargo build --release --locked`, `cargo run --release --locked --quiet -- version`.
+- `cargo test --test phase3_lexer --locked --quiet`: 11 passed, 0 failed after Phase 3.2 (10 passed after Phase 3.1).
+- `cargo run --quiet -- run selfhost/lexer/demo.boli`: `Likho||1|1|0|5|1|1|1|6`, `Number|5|1|7|6|7|1|7|1|8`, `Newline||1|8|7|8|1|8|1|9`, `Eof||2|1|8|8|2|1|2|1`.
+- Full gate re-run after Phase 3.2 edits: `cargo fmt --all -- --check`, `cargo check --all-targets --locked`, `cargo clippy --all-targets --locked -- -D warnings`, `cargo test --all-targets --locked --quiet`, `cargo build --release --locked`, `cargo run --release --locked --quiet -- version`.
 - Release binary still reports `BOLI version 0.6.5`.
 - YAML parse: `.github/workflows/ci.yml` and `.github/workflows/release.yml` OK.
 - `git diff --check`: clean.
@@ -117,4 +117,4 @@ BOLI version 0.6.5
 
 ## Conclusion
 
-All configured gates are green, the current gate has 214 passed / 2 ignored, and the release binary reports v0.6.5. No regressions detected.
+All configured gates are green, the current gate has 215 passed / 2 ignored, and the release binary reports v0.6.5. No regressions detected.

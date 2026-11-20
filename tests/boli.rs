@@ -1,6 +1,6 @@
 // BOLI ke regression tests
 
-use boli::ast::{BoliError, Expr, Stmt};
+use boli::ast::{BoliError, Expr, Span, Stmt};
 use boli::interpreter::Environment;
 use boli::lexer::{Tok, Token, lex};
 use boli::parser::{Parser, parse_source};
@@ -1198,11 +1198,13 @@ fn public_parser_handles_empty_and_eofless_tokens() {
             tok: Tok::Likho,
             line: 1,
             col: 1,
+            span: Span::default(),
         },
         Token {
             tok: Tok::Number(5.0),
             line: 1,
             col: 7,
+            span: Span::default(),
         },
     ];
     let program = Parser::new(tokens).parse_program().unwrap();
@@ -1212,6 +1214,7 @@ fn public_parser_handles_empty_and_eofless_tokens() {
         tok: Tok::Agar,
         line: 1,
         col: 1,
+        span: Span::default(),
     }];
     assert!(Parser::new(tokens).parse_program().is_err());
 
@@ -1219,6 +1222,7 @@ fn public_parser_handles_empty_and_eofless_tokens() {
         tok: Tok::Newline,
         line: 1,
         col: 1,
+        span: Span::default(),
     }];
     assert!(Parser::new(tokens).parse_program().unwrap().is_empty());
 }

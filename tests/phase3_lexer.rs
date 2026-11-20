@@ -56,18 +56,41 @@ fn canonical_token(token: &boli::lexer::Token) -> String {
         Tok::Ident(word) => word.clone(),
         _ => String::new(),
     };
-    format!("{}|{}|{}|{}", kind, value, token.line, token.col)
+    let span = token.span;
+    format!(
+        "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+        kind,
+        value,
+        token.line,
+        token.col,
+        span.start,
+        span.end,
+        span.start_line,
+        span.start_col,
+        span.end_line,
+        span.end_col
+    )
 }
 
 fn canonical_rust(source: &str, limits: &Limits) -> Result<Vec<String>, String> {
     match lex_with_limits(source, limits.source, limits.string, limits.tokens) {
         Ok(tokens) => Ok(tokens.iter().map(canonical_token).collect()),
-        Err(error) => Err(format!(
-            "{}:{}:{}",
-            at(error.line),
-            at(error.col),
-            error.message
-        )),
+        Err(error) => {
+            let span = error.span.as_deref().copied().unwrap_or_default();
+            Err(format!(
+                "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+                error.kind.unwrap_or(""),
+                error.message,
+                at(error.line),
+                at(error.col),
+                span.start,
+                span.end,
+                span.start_line,
+                span.start_col,
+                span.end_line,
+                span.end_col
+            ))
+        }
     }
 }
 
@@ -90,6 +113,7 @@ fn canonical_boli(source: &str, limits: &Limits) -> Result<Vec<String>, String> 
         "laao \"errors.boli\"\n\
          laao \"token.boli\"\n\
          laao \"reader.boli\"\n\
+         laao \"unicode.boli\"\n\
          laao \"lexer.boli\"\n\
          source rakho {}\n\
          max_source rakho {}\n\
@@ -111,14 +135,16 @@ fn canonical_boli(source: &str, limits: &Limits) -> Result<Vec<String>, String> 
          nahi to\n\
              likho \"ERR\"\n\
              err rakho res hissa \"error\"\n\
-             kind rakho err hissa \"kind\"\n\
-             msg rakho err hissa \"message\"\n\
-             ln rakho err hissa \"line\"\n\
-             cl rakho err hissa \"col\"\n\
-             likho kind\n\
-             likho msg\n\
-             likho text ln\n\
-             likho text cl\n\
+             likho err hissa \"kind\"\n\
+             likho err hissa \"message\"\n\
+             likho text err hissa \"line\"\n\
+             likho text err hissa \"col\"\n\
+             likho text err hissa \"start_byte\"\n\
+             likho text err hissa \"end_byte\"\n\
+             likho text err hissa \"start_line\"\n\
+             likho text err hissa \"start_col\"\n\
+             likho text err hissa \"end_line\"\n\
+             likho text err hissa \"end_col\"\n\
          khatam\n",
         boli_literal(source),
         limits.source,
@@ -131,11 +157,29 @@ fn canonical_boli(source: &str, limits: &Limits) -> Result<Vec<String>, String> 
     match lines.next().as_deref() {
         Some("OK") => Ok(lines.collect()),
         Some("ERR") => {
-            let _kind = lines.next().unwrap_or_default();
+            let kind = lines.next().unwrap_or_default();
             let message = lines.next().unwrap_or_default();
             let line = lines.next().unwrap_or_default();
             let col = lines.next().unwrap_or_default();
-            Err(format!("{}:{}:{}", line, col, message))
+            let start_byte = lines.next().unwrap_or_default();
+            let end_byte = lines.next().unwrap_or_default();
+            let start_line = lines.next().unwrap_or_default();
+            let start_col = lines.next().unwrap_or_default();
+            let end_line = lines.next().unwrap_or_default();
+            let end_col = lines.next().unwrap_or_default();
+            Err(format!(
+                "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+                kind,
+                message,
+                line,
+                col,
+                start_byte,
+                end_byte,
+                start_line,
+                start_col,
+                end_line,
+                end_col
+            ))
         }
         other => panic!("unknown BOLI lexer marker: {:?}", other),
     }
@@ -260,15 +304,42 @@ fn phase3_unicode_byte_limits() {
 }
 
 #[test]
-fn phase3_documented_unicode_identifier_gap() {
+fn phase3_unicode_identifier_policy() {
     let limits = wide_limits();
-    let rust = canonical_rust("α", &limits);
-    let boli = canonical_boli("α", &limits);
-    assert!(rust.is_ok(), "Rust lexer should accept Greek alpha");
-    assert!(
-        boli.is_err(),
-        "BOLI lexer currently rejects Greek alpha; documented Phase 3.1 limitation"
-    );
+    assert_match("α βγ Привет مرحبا नमस्ते क_1", &limits);
+    assert_match("a\u{0301} क\u{0301}", &limits);
+    assert_match("x१२३ ९abc α1", &limits);
+    assert_match("likho α1", &limits);
+    assert_match("likho 🙂", &limits);
+}
+
+fn deterministic_cases(seed: u64) -> Vec<String> {
+    let pieces = [
+        "likho ", "rakho ", " ", "\n", "5", "-3", "3.14", "abc", "α", "नम", "१", "\u{0301}",
+        "\"hi\"", "#x\n", ";",
+    ];
+    let mut state = seed;
+    let mut cases = Vec::new();
+    for _ in 0..24 {
+        let mut source = String::new();
+        for _ in 0..6 {
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            let index = ((state >> 33) as usize) % pieces.len();
+            source.push_str(pieces[index]);
+        }
+        cases.push(source);
+    }
+    cases
+}
+
+#[test]
+fn phase3_deterministic_generated_lexer_cases() {
+    let limits = wide_limits();
+    for source in deterministic_cases(0xB01_2026) {
+        assert_match(&source, &limits);
+    }
 }
 
 #[test]
@@ -310,6 +381,7 @@ fn boli_error_kind(source: &str, limits: &Limits) -> String {
         "laao \"errors.boli\"\n\
          laao \"token.boli\"\n\
          laao \"reader.boli\"\n\
+         laao \"unicode.boli\"\n\
          laao \"lexer.boli\"\n\
          source rakho {}\n\
          max_source rakho {}\n\

@@ -161,6 +161,8 @@ impl Environment {
                 path.display(),
                 e
             ),
+            kind: None,
+            span: None,
             trace: Vec::new(),
         })?;
         self.loaded_modules.insert(canonical);

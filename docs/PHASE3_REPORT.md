@@ -6,6 +6,8 @@ Phase 3 ka constrained, in-memory BOLI lexer complete hai. `selfhost/lexer/` me 
 
 Status: **Phase 3 experiment complete for the lexer boundary only.** Phase 3.1 audit/fix results `docs/PHASE3_1_AUDIT_REPORT.md` me hain. Iska matlab self-hosting complete nahi hua. Default pipeline abhi bhi Rust lexer/parser/interpreter use karta hai. BOLI lexer default build me wired **nahi** hai.
 
+> **Phase 3.2 addendum:** this report preserves the Phase 3/3.1 baseline. Phase 3.2 added `unicode.boli`, span fields, Rust `BoliError.kind`/span parity, canonical span dumps, and an 11th differential test. Later sections that say there are no spans, no Rust error kind, or a Unicode identifier gap are historical and superseded by `docs/TOKEN_CONTRACT.md` and `docs/PHASE3_2_REPORT.md`. The current full gate is 215 passed / 0 failed / 2 ignored.
+
 ## Inspect kiya gaya
 
 - `src/lexer.rs`: `Tok`, `Token { tok, line, col }`, keyword table, string/number/identifier rules, comments, limits, error strings.
@@ -50,7 +52,7 @@ Status: **Phase 3 experiment complete for the lexer boundary only.** Phase 3.1 a
 
 ### Tests
 
-- `tests/phase3_lexer.rs` new: 10 tests after Phase 3.1.
+- `tests/phase3_lexer.rs` new: 10 tests after Phase 3.1, 11 after Phase 3.2.
   - `phase3_keywords_numbers_and_identifiers`
   - `phase3_strings_comments_and_unicode`
   - `phase3_whitespace_and_columns`
@@ -105,9 +107,9 @@ Results:
   - `Number|5|1|7`
   - `Newline||1|8`
   - `Eof||2|1`
-- `cargo test --test phase3_lexer --locked --quiet`: **10 passed, 0 failed**.
+- `cargo test --test phase3_lexer --locked --quiet`: **10 passed, 0 failed** after Phase 3.1; **11 passed, 0 failed** after Phase 3.2.
 - Full gate: **all checks passed**.
-- Default test total: **214 passed, 2 ignored**.
+- Default test total: **214 passed, 2 ignored** after Phase 3.1; **215 passed, 2 ignored** after Phase 3.2.
 - `cargo run --release --locked --quiet -- version`: `BOLI version 0.6.5`.
 - YAML parse: both workflows OK.
 - `git diff --check`: clean.
@@ -131,10 +133,10 @@ Results:
 ## Known limitations
 
 - `lexer_byte_length` now matches Rust's UTF-8 byte caps, but it walks every character and inherits BOLI's evaluation-step cost on very large sources.
-- Unicode identifiers use ASCII plus the curated mark/Indic ranges from `src/lexer.rs`; Rust's full `is_alphanumeric()` set is not implemented. Greek `α` is a verified documented gap.
-- Error maps include `kind`, but Rust `BoliError` has only `line`, `col`, `message`, and `trace`; differential tests ignore `kind`. BOLI kinds are verified separately.
+- Phase 3.1 used ASCII plus curated mark/Indic ranges and documented Greek `α` as a gap; Phase 3.2 replaced this with generated full Unicode alphabetic/numeric parity via `unicode.boli`.
+- Phase 3.1 Rust `BoliError` had only `line`, `col`, `message`, and `trace`; Phase 3.2 added lexer `kind` and boxed `span`, and differential tests now compare full kind/span output.
 - Public `state` is always `khaali`; internal helpers thread a cursor map.
-- No byte offsets/spans are produced.
+- Phase 3.1 produced no byte offsets/spans; Phase 3.2 added full span fields to tokens and errors.
 - `run.boli` has import-time behavior; harness imports implementation modules directly.
 - `sankhya` finite-number overflow is now pre-checked against Rust's first non-finite 309-digit decimal boundary, avoiding the interpreter's different non-finite error.
 - No BOLI parser, AST helper, compiler, or bytecode integration exists in this phase.

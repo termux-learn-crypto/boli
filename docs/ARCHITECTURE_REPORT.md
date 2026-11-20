@@ -13,8 +13,8 @@ source.hl ──► lexer.rs ──► parser.rs ──► ast.rs (Program) ─�
 
 | Module | Lines (approx) | Responsibility |
 |---|---|---|
-| `src/ast.rs` | ~180 | `Program`/`Stmt`/`Expr`/`Cond`, `BoliError` (line-numbered Hinglish), `Expr::line_for_error` |
-| `src/lexer.rs` | ~290 | UTF-8 tokenizer; keywords (ci match), Unicode identifiers, finite numbers, text escapes, `#` comments |
+| `src/ast.rs` | ~291 | `Program`/`Stmt`/`Expr`/`Cond`, `Span`, `BoliError` (line/column/kind/span), `Expr::line_for_error` |
+| `src/lexer.rs` | 574 | UTF-8 tokenizer; keywords (ci match), full Unicode identifiers via generated BOLI table parity, finite numbers, text escapes, `#` comments, byte spans |
 | `src/parser.rs` | ~640 | Recursive-descent; newline-terminated statements; `aur`>`ya` precedence; flat call args; depth+chain guards |
 | `src/interpreter.rs` | ~640 | Tree-walking evaluator: scope stack, kaam table, env-tunable limits, output-capture hook |
 | `src/limits.rs` | ~25 | **Single source of truth** for defaults + `BOLI_MAX_*` env parsing |
@@ -33,7 +33,7 @@ Reasons:
 5. Re-evaluate if and when a bytecode VM lands (see UPGRADE_ROADMAP.md) — a VM is a different execution strategy and *should* be its own module.
 
 ## Error model
-One error type (`BoliError { line: Option<usize>, message }`), one display form (`Galti: line N me …`). Every layer (lex/parse/eval) produces it; nothing else escapes to the user except `std::process::exit(0)` on closed stdout (deliberate SIGPIPE behavior).
+One error type (`BoliError { line, col, message, trace, kind, span }`), one display form (`Galti: line N me …`). Lexer errors carry typed `kind` and a boxed `Span`; other layers still set them to `None`. Every layer (lex/parse/eval) produces it; nothing else escapes to the user except `std::process::exit(0)` on closed stdout (deliberate SIGPIPE behavior).
 
 ## Safety model
 All recursion axes and resource growth are capped by env-tunable limits with Hinglish-error semantics (see SECURITY_REPORT.md for the matrix). `push_scope`/`pop_scope` are strictly paired on every exit path (tested). Kaam calls are table-based (no closures); recursion depth 64.

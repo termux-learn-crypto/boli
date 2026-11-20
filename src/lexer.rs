@@ -1,7 +1,7 @@
 // BOLI ka Lexer - code ko tokens (toshne) me todta hai
 // BOLI me koi symbol nahi hota, isliye lexer sirf shabd, number, text, newline aur # comment samajhta hai
 
-use crate::ast::BoliError;
+use crate::ast::{BoliError, Span};
 
 // Token ke type
 #[derive(Debug, Clone, PartialEq)]
@@ -57,6 +57,34 @@ pub struct Token {
     pub tok: Tok,
     pub line: usize,
     pub col: usize, // 1-based char column (Unicode-honest)
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LexErrorKind {
+    SourceTooLarge,
+    TokenLimit,
+    TextTooLarge,
+    WordTooLarge,
+    UnterminatedText,
+    NumberNotFinite,
+    UnexpectedCharacter,
+    StuckMinus,
+}
+
+impl LexErrorKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            LexErrorKind::SourceTooLarge => "source_too_large",
+            LexErrorKind::TokenLimit => "token_limit",
+            LexErrorKind::TextTooLarge => "text_too_large",
+            LexErrorKind::WordTooLarge => "word_too_large",
+            LexErrorKind::UnterminatedText => "unterminated_text",
+            LexErrorKind::NumberNotFinite => "number_not_finite",
+            LexErrorKind::UnexpectedCharacter => "unexpected_character",
+            LexErrorKind::StuckMinus => "stuck_minus",
+        }
+    }
 }
 
 impl Token {
@@ -167,64 +195,118 @@ fn keyword(word: &str) -> Option<Tok> {
 
 struct Cursor<'a> {
     iter: std::str::CharIndices<'a>,
-    cur: Option<char>,
-    nxt: Option<char>,
-    col: usize, // current char ka 1-based column; newline par reset
+    cur: Option<(usize, char)>,
+    nxt: Option<(usize, char)>,
+    len: usize,
+    line: usize,
+    col: usize,
+    start_byte: usize,
+    start_line: usize,
+    start_col: usize,
 }
 
 impl<'a> Cursor<'a> {
     fn new(source: &'a str) -> Self {
         let mut iter = source.char_indices();
-        let cur = iter.next().map(|(_, c)| c);
-        let nxt = iter.next().map(|(_, c)| c);
+        let cur = iter.next();
+        let nxt = iter.next();
         Cursor {
             iter,
             cur,
             nxt,
+            len: source.len(),
+            line: 1,
             col: 1,
+            start_byte: 0,
+            start_line: 1,
+            start_col: 1,
         }
     }
 
     fn peek(&self) -> Option<char> {
-        self.cur
+        self.cur.map(|(_, c)| c)
     }
 
     fn peek_next(&self) -> Option<char> {
-        self.nxt
+        self.nxt.map(|(_, c)| c)
     }
 
     fn peek_col(&self) -> usize {
         self.col
     }
 
+    fn byte_pos(&self) -> usize {
+        self.cur.map(|(i, _)| i).unwrap_or(self.len)
+    }
+
+    fn mark(&mut self) {
+        self.start_byte = self.byte_pos();
+        self.start_line = self.line;
+        self.start_col = self.col;
+    }
+
+    fn span(&self) -> Span {
+        self.span_to(self.byte_pos(), self.line, self.col)
+    }
+
+    fn span_to(&self, end_byte: usize, end_line: usize, end_col: usize) -> Span {
+        Span {
+            start: self.start_byte,
+            end: end_byte,
+            start_line: self.start_line,
+            start_col: self.start_col,
+            end_line,
+            end_col,
+        }
+    }
+
     fn bump(&mut self) -> Option<char> {
         let old = self.cur;
         self.cur = self.nxt;
-        self.nxt = self.iter.next().map(|(_, c)| c);
+        self.nxt = self.iter.next();
         match old {
-            Some('\n') => self.col = 1,
+            Some((_, '\n')) => {
+                self.line += 1;
+                self.col = 1;
+            }
             Some(_) => self.col += 1,
             None => {}
         }
-        old
+        old.map(|(_, c)| c)
     }
+}
+
+fn lex_error(
+    kind: LexErrorKind,
+    line: usize,
+    col: usize,
+    span: Span,
+    message: impl Into<String>,
+) -> BoliError {
+    BoliError::line_col_kind_span(line, col, kind.as_str(), span, message)
 }
 
 fn push_token(
     tokens: &mut Vec<Token>,
     tok: Tok,
-    line: usize,
-    col: usize,
+    span: Span,
     max_tokens: u64,
 ) -> Result<(), BoliError> {
     if tokens.len() as u64 >= max_tokens {
-        return Err(BoliError::line_col(
-            line,
-            col,
+        return Err(lex_error(
+            LexErrorKind::TokenLimit,
+            span.start_line,
+            span.start_col,
+            span,
             format!("code me bahut zyada tokens hain (max {})", max_tokens),
         ));
     }
-    tokens.push(Token { tok, line, col });
+    tokens.push(Token {
+        tok,
+        line: span.start_line,
+        col: span.start_col,
+        span,
+    });
     Ok(())
 }
 
@@ -235,11 +317,20 @@ pub fn lex_with_limits(
     max_string_bytes: u64,
     max_tokens: u64,
 ) -> Result<Vec<Token>, BoliError> {
-    // Source size limit pehle - badi files ko tokenize karne se pehle hi rok do
     if source.len() as u64 > max_source_bytes {
-        return Err(BoliError::line_col(
+        let span = Span {
+            start: 0,
+            end: 0,
+            start_line: 1,
+            start_col: 1,
+            end_line: 1,
+            end_col: 1,
+        };
+        return Err(lex_error(
+            LexErrorKind::SourceTooLarge,
             1,
             1,
+            span,
             format!(
                 "source bahut bada hai ({} bytes, max {})",
                 source.len(),
@@ -250,28 +341,24 @@ pub fn lex_with_limits(
 
     let mut cursor = Cursor::new(source);
     let mut tokens: Vec<Token> = Vec::new();
-    let mut line = 1usize;
     let mut separated = true;
 
     while let Some(c) = cursor.peek() {
-        // Spaces aur tabs - inhe chhod do
         if c == ' ' || c == '\t' || c == '\r' {
             cursor.bump();
             separated = true;
             continue;
         }
 
-        // Nai line
         if c == '\n' {
-            let tok_col = cursor.peek_col();
-            push_token(&mut tokens, Tok::Newline, line, tok_col, max_tokens)?;
-            line += 1;
+            cursor.mark();
+            let span = cursor.span_to(cursor.byte_pos() + 1, cursor.line, cursor.col + 1);
+            push_token(&mut tokens, Tok::Newline, span, max_tokens)?;
             cursor.bump();
             separated = true;
             continue;
         }
 
-        // # se lekar line ke ant tak comment hai, usse chhod do
         if c == '#' {
             while let Some(x) = cursor.peek() {
                 if x == '\n' {
@@ -283,10 +370,9 @@ pub fn lex_with_limits(
             continue;
         }
 
-        // Text (string) - double quotes ke beech ka hissa
         if c == '"' {
-            let start_line = line;
-            let tok_col = cursor.peek_col();
+            cursor.mark();
+            let start_line = cursor.start_line;
             let mut text = String::new();
             cursor.bump();
             let mut band_hua = false;
@@ -299,73 +385,72 @@ pub fn lex_with_limits(
                         break;
                     }
                     Some('\n') => {
-                        return Err(BoliError::line_col(
+                        return Err(lex_error(
+                            LexErrorKind::UnterminatedText,
                             start_line,
                             cursor.peek_col(),
+                            cursor.span(),
                             "text pura nahi hua, band karne ke liye \" lagao",
                         ));
                     }
-                    Some('\\') => {
-                        // Simple escape: backslash ke baad quote/backslash/n aya to asli character dalo
-                        match cursor.peek_next() {
-                            Some(n @ ('"' | '\\')) => {
-                                text.push(n);
-                                cursor.bump();
-                                cursor.bump();
-                            }
-                            Some('n') => {
-                                text.push('\n');
-                                cursor.bump();
-                                cursor.bump();
-                            }
-                            _ => {
-                                text.push('\\');
-                                cursor.bump();
-                            }
+                    Some('\\') => match cursor.peek_next() {
+                        Some(n @ ('"' | '\\')) => {
+                            text.push(n);
+                            cursor.bump();
+                            cursor.bump();
                         }
-                    }
+                        Some('n') => {
+                            text.push('\n');
+                            cursor.bump();
+                            cursor.bump();
+                        }
+                        _ => {
+                            text.push('\\');
+                            cursor.bump();
+                        }
+                    },
                     Some(ch) => {
                         text.push(ch);
                         cursor.bump();
                     }
                 }
                 if text.len() as u64 > max_string_bytes {
-                    return Err(BoliError::line_col(
+                    return Err(lex_error(
+                        LexErrorKind::TextTooLarge,
                         start_line,
                         cursor.peek_col(),
+                        cursor.span(),
                         format!("text bahut bada hai (max {} bytes)", max_string_bytes),
                     ));
                 }
             }
             if !band_hua {
-                return Err(BoliError::line_col(
+                return Err(lex_error(
+                    LexErrorKind::UnterminatedText,
                     start_line,
                     cursor.peek_col(),
+                    cursor.span(),
                     "text pura nahi hua, band karne ke liye \" lagao",
                 ));
             }
-            push_token(
-                &mut tokens,
-                Tok::Text(text),
-                start_line,
-                tok_col,
-                max_tokens,
-            )?;
+            push_token(&mut tokens, Tok::Text(text), cursor.span(), max_tokens)?;
             separated = false;
             continue;
         }
 
-        // Number - ankh laage hue, ek dot ho sakti hai (jaise 99.50 ya -7)
-        // '-' number ka hissa tabhi jab digit ho aur koi atom usse chipka na ho
         if c.is_ascii_digit()
             || (c == '-' && cursor.peek_next().is_some_and(|n| n.is_ascii_digit()))
         {
-            let start_line = line;
-            let tok_col = cursor.peek_col();
+            cursor.mark();
+            let start_line = cursor.start_line;
+            let start_col = cursor.start_col;
             if c == '-' && !separated {
-                return Err(BoliError::line_col(
+                let span = cursor.span_to(cursor.start_byte + 1, start_line, start_col + 1);
+                return Err(lex_error(
+                    LexErrorKind::StuckMinus,
                     start_line,
-                    tok_col,
+                    start_col,
+                    span,
                     "'-' number ke saath chipka hai, space do ya 'ghatao' likho",
                 ));
             }
@@ -382,7 +467,6 @@ pub fn lex_with_limits(
                     break;
                 }
             }
-            // Dot sirf tab lo jab uske baad digit ho (warna oh alag galti hai)
             if cursor.peek() == Some('.') && cursor.peek_next().is_some_and(|n| n.is_ascii_digit())
             {
                 num.push('.');
@@ -397,35 +481,31 @@ pub fn lex_with_limits(
                 }
             }
             let value: f64 = num.parse().map_err(|_| {
-                BoliError::line_col(
+                lex_error(
+                    LexErrorKind::UnexpectedCharacter,
                     start_line,
                     cursor.peek_col(),
+                    cursor.span(),
                     format!("'{}' number sahi nahi hai", num),
                 )
             })?;
-            // BOLI me sirf finite numbers chalte hain (inf/nan allowed nahi)
             if !value.is_finite() {
-                return Err(BoliError::line_col(
+                return Err(lex_error(
+                    LexErrorKind::NumberNotFinite,
                     start_line,
                     cursor.peek_col(),
+                    cursor.span(),
                     format!("'{}' bahut bada hai, finite number nahi hai", num),
                 ));
             }
-            push_token(
-                &mut tokens,
-                Tok::Number(value),
-                start_line,
-                tok_col,
-                max_tokens,
-            )?;
+            push_token(&mut tokens, Tok::Number(value), cursor.span(), max_tokens)?;
             separated = false;
             continue;
         }
 
-        // Shabd - letters (Devanagari bhi chal sakti hai), digits aur underscore
         if c.is_alphabetic() || c == '_' || is_mark(c) {
-            let start_line = line;
-            let tok_col = cursor.peek_col();
+            cursor.mark();
+            let start_line = cursor.start_line;
             let mut word = String::new();
             while let Some(x) = cursor.peek() {
                 if !is_word_char(x) {
@@ -434,32 +514,39 @@ pub fn lex_with_limits(
                 word.push(x);
                 cursor.bump();
                 if word.len() as u64 > max_string_bytes {
-                    return Err(BoliError::line_col(
+                    return Err(lex_error(
+                        LexErrorKind::WordTooLarge,
                         start_line,
                         cursor.peek_col(),
+                        cursor.span(),
                         format!("shabd bahut bada hai (max {} bytes)", max_string_bytes),
                     ));
                 }
             }
             let lower = word.to_lowercase();
-            match keyword(&lower) {
-                Some(kw) => push_token(&mut tokens, kw, start_line, tok_col, max_tokens)?,
-                None => push_token(
-                    &mut tokens,
-                    Tok::Ident(word),
-                    start_line,
-                    tok_col,
-                    max_tokens,
-                )?,
-            }
+            let token = match keyword(&lower) {
+                Some(kw) => kw,
+                None => Tok::Ident(word),
+            };
+            push_token(&mut tokens, token, cursor.span(), max_tokens)?;
             separated = false;
             continue;
         }
 
-        // Koi symbol (jaise ; { } ( ) = : .) BOLI me allowed nahi
-        return Err(BoliError::line_col(
-            line,
-            cursor.peek_col(),
+        let start_byte = cursor.byte_pos();
+        let span = Span {
+            start: start_byte,
+            end: start_byte + c.len_utf8(),
+            start_line: cursor.line,
+            start_col: cursor.col,
+            end_line: cursor.line,
+            end_col: cursor.col + 1,
+        };
+        return Err(lex_error(
+            LexErrorKind::UnexpectedCharacter,
+            cursor.line,
+            cursor.col,
+            span,
             format!(
                 "'{}' nahi chahiye, BOLI me sirf shabd, number aur \"text\" use hota hai",
                 c
@@ -467,7 +554,8 @@ pub fn lex_with_limits(
         ));
     }
 
-    push_token(&mut tokens, Tok::Eof, line, cursor.peek_col(), max_tokens)?;
+    cursor.mark();
+    push_token(&mut tokens, Tok::Eof, cursor.span(), max_tokens)?;
     Ok(tokens)
 }
 

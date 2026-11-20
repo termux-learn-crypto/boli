@@ -4,12 +4,24 @@
 
 use std::fmt;
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Span {
+    pub start: usize,
+    pub end: usize,
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+}
+
 // Galti (error) ka type - line number (aur lexer/parser phase par column) ke saath Hinglish message
 #[derive(Debug, Clone)]
 pub struct BoliError {
     pub line: Option<usize>,
     pub col: Option<usize>,
     pub message: String,
+    pub kind: Option<&'static str>,
+    pub span: Option<Box<Span>>,
     // Runtime kaam-call trace (innermost sabse pehle print hota hai)
     pub trace: Vec<(String, usize)>,
 }
@@ -21,6 +33,8 @@ impl BoliError {
             line: Some(line),
             col: None,
             message: message.into(),
+            kind: None,
+            span: None,
             trace: Vec::new(),
         }
     }
@@ -31,6 +45,25 @@ impl BoliError {
             line: Some(line),
             col: Some(col),
             message: message.into(),
+            kind: None,
+            span: None,
+            trace: Vec::new(),
+        }
+    }
+
+    pub fn line_col_kind_span(
+        line: usize,
+        col: usize,
+        kind: &'static str,
+        span: Span,
+        message: impl Into<String>,
+    ) -> Self {
+        BoliError {
+            line: Some(line),
+            col: Some(col),
+            message: message.into(),
+            kind: Some(kind),
+            span: Some(Box::new(span)),
             trace: Vec::new(),
         }
     }
