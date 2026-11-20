@@ -60,7 +60,7 @@ Eof||2|1
 
 ### Explicit state
 
-BOLI assignment writes only to the innermost scope, and functions cannot capture outer mutable state. Therefore the cursor is a map `{line, col, pos}` that is returned from every helper and threaded explicitly through `lexer_lex`.
+BOLI assignment writes only to the innermost scope, and functions cannot capture outer mutable state. Therefore the cursor is a map `{line, col, pos}` that is returned from every helper and threaded explicitly through `lexer_lex`. The public result keeps a `state` field for future incremental use, but `lexer_ok` and `lexer_fail` currently set it to `khaali`. This is a deliberate additive compatibility choice, not a claim of exposed incremental state.
 
 ### No nested calls
 
@@ -80,7 +80,7 @@ The lexer consumes source escapes `\"`, `\\`, and `\n`. It escapes token text on
 
 ### Infinite-number pre-check
 
-`lexer_is_finite_text` checks digit count and leading digits before calling `sankhya`, avoiding the interpreter's large-integer parse error on 300+ digit inputs. The error column is the cursor column after consuming the digits, matching Rust.
+`lexer_is_finite_text` strips sign and leading zeros, then compares the integer part against Rust's first non-finite 309-digit decimal boundary before calling `sankhya`. This avoids the interpreter's non-finite parse error while matching Rust's `line:col:message`. Negative numbers are recognized only when `-` is immediately followed by a digit.
 
 ## Differential harness
 
@@ -91,15 +91,16 @@ The lexer consumes source escapes `\"`, `\\`, and `\n`. It escapes token text on
 - invokes the BOLI lexer through the CLI runner;
 - canonicalizes both outputs to `KIND|escaped-value|line|col` text;
 - compares errors as `line:col:message`;
-- covers keywords, numbers, identifiers, strings, escapes, comments, Unicode text, whitespace, tabs, CR, limits, and error cases.
+- covers keywords, numbers, identifiers, strings, escapes, comments, Unicode text, whitespace, tabs, CR, limits, error cases, negative-number boundaries, finite-number boundaries, UTF-8 byte caps, BOLI error kinds, and one documented Unicode identifier gap.
 
 `boli_literal` escapes `\`, `"`, and newline, and leaves CR/tab raw in generated BOLI literals. Earlier plans to inject `unescape_text` into generated source were superseded by this direct approach.
 
 ## Known limitations
 
-- Byte-length caps cannot be reproduced exactly because `lambayi` counts Unicode chars while Rust uses UTF-8 bytes.
-- Unicode identifier recognition approximates Rust with ASCII plus selected Indic ranges.
+- `lexer_byte_length` now matches Rust's UTF-8 byte caps, but it walks every character and inherits BOLI's evaluation-step cost on very large sources.
+- Unicode identifier recognition approximates Rust with ASCII plus the curated mark/Indic ranges from `src/lexer.rs`; scripts outside that set, such as Greek, are still rejected. This is verified by `phase3_documented_unicode_identifier_gap`.
 - Errors are maps; Rust `BoliError` has no `kind` field, so `kind` is documentation-only for now.
+- Public `state` is always `khaali`, even though internal helpers thread a cursor map.
 - No byte offsets/spans are produced.
 - No file I/O is used or permitted in this phase.
 - No Phase 4 parser consumption or BOLI bytecode integration exists yet.

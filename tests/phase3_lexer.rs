@@ -210,3 +210,123 @@ fn phase3_limit_error_cases() {
     };
     assert_match("likho 5", &few_tokens);
 }
+
+const LAST_FINITE: &str = "179769313486231580793728971405303415079934132710037826936173778980444968292764750946649017977587207096330286416692887910946555547851940402630657488671505820681908902000708383676273854845817711531764475730270069855571366959622842914819860834936475292719074168444365510704342711559699508093042880177904174497791";
+const FIRST_INFINITE: &str = "179769313486231580793728971405303415079934132710037826936173778980444968292764750946649017977587207096330286416692887910946555547851940402630657488671505820681908902000708383676273854845817711531764475730270069855571366959622842914819860834936475292719074168444365510704342711559699508093042880177904174497792";
+
+#[test]
+fn phase3_negative_number_boundaries() {
+    let limits = wide_limits();
+    assert_match("-", &limits);
+    assert_match("-abc", &limits);
+    assert_match("--5", &limits);
+    assert_match("-.5", &limits);
+    assert_match("5 - 3", &limits);
+    assert_match("5--3", &limits);
+    assert_match("5-3", &limits);
+    assert_match(" likho -5", &limits);
+}
+
+#[test]
+fn phase3_numeric_finite_boundaries() {
+    let limits = wide_limits();
+    assert_match("9".repeat(308).as_str(), &limits);
+    assert_match(LAST_FINITE, &limits);
+    assert_match(FIRST_INFINITE, &limits);
+    assert_match(&format!("{}.9", LAST_FINITE), &limits);
+    assert_match(&format!("{}.0", FIRST_INFINITE), &limits);
+    assert_match("0000000000000000000000000000000000000000001", &limits);
+}
+
+#[test]
+fn phase3_unicode_byte_limits() {
+    let small_source = Limits {
+        source: 10,
+        string: 1_000_000,
+        tokens: 1_000_000,
+    };
+    assert_match("नमस्ते", &small_source);
+
+    let small_string = Limits {
+        source: 1_000_000,
+        string: 10,
+        tokens: 1_000_000,
+    };
+    assert_match("\"नमस्ते\"", &small_string);
+    assert_match("नमस्ते", &small_string);
+
+    let wide = wide_limits();
+    assert_match("नमस्ते क_1", &wide);
+}
+
+#[test]
+fn phase3_documented_unicode_identifier_gap() {
+    let limits = wide_limits();
+    let rust = canonical_rust("α", &limits);
+    let boli = canonical_boli("α", &limits);
+    assert!(rust.is_ok(), "Rust lexer should accept Greek alpha");
+    assert!(
+        boli.is_err(),
+        "BOLI lexer currently rejects Greek alpha; documented Phase 3.1 limitation"
+    );
+}
+
+#[test]
+fn phase3_boli_error_kinds() {
+    let limits = wide_limits();
+    assert_eq!(boli_error_kind("likho \"abc", &limits), "unterminated_text");
+    assert_eq!(boli_error_kind("likho 5-3", &limits), "stuck_minus");
+    assert_eq!(boli_error_kind("likho ;", &limits), "unexpected_character");
+    assert_eq!(
+        boli_error_kind(&format!("likho {}", "9".repeat(400)), &limits),
+        "number_not_finite"
+    );
+
+    let short = Limits {
+        source: 6,
+        string: 1_000_000,
+        tokens: 1_000_000,
+    };
+    assert_eq!(boli_error_kind("likho 5", &short), "source_too_large");
+
+    let small_string = Limits {
+        source: 1_000_000,
+        string: 2,
+        tokens: 1_000_000,
+    };
+    assert_eq!(boli_error_kind("\"abc\"", &small_string), "text_too_large");
+    assert_eq!(boli_error_kind("abcdef", &small_string), "word_too_large");
+
+    let few_tokens = Limits {
+        source: 1_000_000,
+        string: 1_000_000,
+        tokens: 2,
+    };
+    assert_eq!(boli_error_kind("likho 5", &few_tokens), "token_limit");
+}
+
+fn boli_error_kind(source: &str, limits: &Limits) -> String {
+    let runner = format!(
+        "laao \"errors.boli\"\n\
+         laao \"token.boli\"\n\
+         laao \"reader.boli\"\n\
+         laao \"lexer.boli\"\n\
+         source rakho {}\n\
+         max_source rakho {}\n\
+         max_string rakho {}\n\
+         max_tokens rakho {}\n\
+         res rakho lexer_lex source max_source max_string max_tokens\n\
+         ok rakho res hissa \"ok\"\n\
+         agar ok galat barabar hai to\n\
+             err rakho res hissa \"error\"\n\
+             likho err hissa \"kind\"\n\
+         khatam\n",
+        boli_literal(source),
+        limits.source,
+        limits.string,
+        limits.tokens
+    );
+    run_boli_source(&runner)
+        .unwrap_or_else(|error| panic!("BOLI runner failed: {}", error))
+        .join("")
+}

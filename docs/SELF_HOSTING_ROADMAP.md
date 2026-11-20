@@ -1,9 +1,9 @@
 # BOLI — Rust Independence & Self-Hosting Architecture Audit
 
-**Status:** Phase 1 + Phase 2 + Phase 3 + Phase 4 planning report
+**Status:** Phase 1 + Phase 2 + Phase 3 implemented, Phase 3.1 audit/fix applied, Phase 4 planning report
 **Repository:** `/data/data/com.termux/files/home/boli`
-**Audited snapshot:** `main` after CI hardening commit `5fb562c`; release tag `v0.6.5` points to `13bc28b`
-**Current task scope:** report only. No implementation and no modification of existing files.
+**Audited snapshot:** `main` at `c10129a BOLI Phase 3: experimental self-hosted lexer and differential tests`; release tag `v0.6.5` points to `13bc28b`
+**Current task scope:** Phase 3.1 lexer audit, fixes, tests, and documentation only. No Phase 4 parser implementation.
 
 ---
 
@@ -15,7 +15,7 @@
 
 | Area | Readiness | Basis |
 |---|---:|---|
-| Stage 0 Rust reference implementation | **5/5** | `src/` me complete lexer, parser, AST, interpreter, VM, limits, builtins, CLI, tests hain. 191 tests known green. |
+| Stage 0 Rust reference implementation | **5/5** | `src/` me complete lexer, parser, AST, interpreter, VM, limits, builtins, CLI, tests hain. 214 tests passed, 2 ignored in the current gate. |
 | Core language logic for a compiler | **3/5** | Recursion, `kaam`, lists, maps, `hissa`, comparisons, `wapas do` exist. Enums/pattern matching/closures nahi hain, par tagged maps + explicit state threading se prototype ban sakta hai. |
 | Systems capability for a compiler | **1/5** | No general file read/write, no bytes type, no binary output, no structured catchable errors, no source spans in AST, no BOLI-level bytecode API. |
 | VM as a stable compiler target | **3/5** | 39 VM tests + parity suite exist, but VM explicitly experimental (`src/vm.rs:1`), no bytecode serialization/loader, no fuzz corpus dedicated to VM, no benchmarks. |
@@ -41,7 +41,7 @@
 
 `VM stabilize` → `runtime primitives` → `sandboxed FS/bytes` → `bytecode format + Rust compiler emits bytecode` → `BOLI lexer` → `BOLI parser` → `BOLI AST helpers` → `BOLI bytecode compiler` → `self-host check` → `reproducibility` → `Rust-free release` → `native codegen`.
 
-Har step par existing 191 tests plus naye tests green honi chahiye. Rust implementation ko delete nahi karna; use **bootstrap/reference implementation** ke roop me preserve karna hai.
+Har step par existing gate (ab 214 passed, 2 ignored) plus naye tests green honi chahiye. Rust implementation ko delete nahi karna; use **bootstrap/reference implementation** ke roop me preserve karna hai.
 
 ---
 
@@ -51,7 +51,7 @@ Har step par existing 191 tests plus naye tests green honi chahiye. Rust impleme
 
 | Module | Actual file(s) | What it does today | Rust dependency? | Compiler migration relevance |
 |---|---|---|---|---|
-| Lexer | `src/lexer.rs:8-486` | `Tok`, `Token { tok, line, col }`, cursor, keywords, strings, numbers, comments, limits. | Yes, pure Rust. | BOLI lexer ka reference. Byte-length caps `source.len()`/`text.len()` (`lexer.rs:239,332,436`) BOLI me direct nahi hain because `lambayi` Unicode chars count karta hai (`builtins.rs:121-135`). |
+| Lexer | `src/lexer.rs:8-486` | `Tok`, `Token { tok, line, col }`, cursor, keywords, strings, numbers, comments, limits. | Yes, pure Rust. | BOLI lexer ka reference. Rust byte caps `source.len()`/`text.len()` (`lexer.rs:239,332,436`) ab BOLI side par local `lexer_byte_length` se match hote hain; general `byte_lambayi` builtin abhi bhi nahi hai. |
 | Parser | `src/parser.rs:14-835` | Recursive descent, 2-token lookahead, no backtracking, statement/expression/condition parsing. | Yes. | BOLI parser same recursive style me likha ja sakta hai, par structured errors/spans nahi hain. |
 | AST | `src/ast.rs:58-218` | Rust enums `Expr`, `Stmt`, `Cond`, `ArithOp`, `CmpOp`; line numbers only. | Yes. | BOLI me tagged maps se emulate hoga. Missing enums/pattern matching is main friction. |
 | Error system | `src/ast.rs:8-55` | `BoliError { line, col, message, trace }`, Hinglish `Display`. | Yes. | BOLI me structured error value nahi hai. `try/catch` nahi. `line`/`col` runtime me aksar drop ho jate hain. |
@@ -62,7 +62,7 @@ Har step par existing 191 tests plus naye tests green honi chahiye. Rust impleme
 | Builtins | `src/builtins.rs:8-191` | `lambayi`, `upar`, `neeche`, `text`, `sankhya`, `chaabiyan`. | Yes. | Compiler ke liye string/list/map basics hain, par file/bytes/binary nahi. |
 | CLI / REPL | `src/main.rs:23-461` | `run`, `.hl` shortcut, help/version, `--vm`, REPL with depth heuristic. | Yes. | REPL interpreter-only hai (`main.rs:306`) even with `--vm`. New build pipeline ko CLI flags reproduce karne honge. |
 | Imports | `interpreter/mod.rs:170-206`, `vm.rs:451-505,1066-1097`, `limits.rs:147-187` | `laao`, canonical path, root confinement, dedup, depth guard. | Yes. | Read-only imports exist; general file I/O nahi. Module namespace/export nahi. |
-| Tests | `tests/boli.rs`, `tests/cli.rs`, `tests/vm.rs`, embedded unit tests | 191 tests: 114 library, 34 CLI, 39 VM, 4 unit. | Rust test harness. | Golden corpus preserve karna hai. BOLI-level test runner abhi nahi. |
+| Tests | `tests/boli.rs`, `tests/cli.rs`, `tests/vm.rs`, `tests/phase3_lexer.rs`, embedded unit tests | Historical v0.6.5 baseline 191 tests; current gate 214 passed, 2 ignored. | Rust test harness. | Golden corpus preserve karna hai. BOLI-level test runner abhi nahi. |
 | CI/CD | `.github/workflows/ci.yml`, `release.yml`, `dependabot.yml` | 3-OS CI, 4 release targets, checksums, pinned actions, Dependabot. | Cargo/Rust required. | Rust-free release ke liye replace hona hai. |
 | Installer | `install.sh:1-57` | Copies local `target/release/boli`. | Needs Cargo-built binary path. | Non-Cargo artifact path ya installer change chahiye. |
 
@@ -146,11 +146,11 @@ Har step par existing 191 tests plus naye tests green honi chahiye. Rust impleme
 
 Current: `upar`, `neeche`, `text`, `sankhya`, `lambayi`, `hissa` char access. Missing:
 - `hissa_text` substring/slice.
-- `byte_lambayi` UTF-8 byte length.
+- `byte_lambayi` UTF-8 byte length (general builtin; the Phase 3.1 lexer uses a local `lexer_byte_length` helper instead).
 - `utf8_bytes` / `utf8_text`.
 - `milao` already via `jodo`, but need bounded join/split.
 - `shuru`, `ant`, `baad`, `pehle`, `badlo`.
-- Codepoint vs byte distinction must be explicit because current `lambayi` is Unicode-char count (`builtins.rs:121-136`) while Rust lexer caps bytes.
+- Codepoint vs byte distinction must be explicit because `lambayi` is Unicode-char count (`builtins.rs:121-136`) while Rust lexer caps bytes. Phase 3.1 added a lexer-local `lexer_byte_length`; a general builtin is still missing.
 
 **Security:** every result bounded by `BOLI_MAX_STRING_BYTES`; no regex/backtracking blowup; simple linear algorithms.
 
@@ -353,7 +353,7 @@ Notes:
 #### 3.2.3 Compiler phases inside `compile.hl`
 
 1. `lex(source, path, limits) -> {tokens, errors, state}`
-   Must match Rust lexer token stream on golden corpus. Byte caps require new `byte_lambayi`.
+   Must match Rust lexer token stream on golden corpus. Phase 3.1 proved byte caps are possible with a lexer-local `lexer_byte_length`; a general `byte_lambayi` builtin is still preferred for the final compiler.
 2. `parse(tokens, path, limits) -> {ast, errors, state}`
    Recursive descent with explicit `pos` returned; no global mutable pos.
 3. `resolve(ast, imports, limits) -> {ast, symbols, errors, state}`
@@ -371,7 +371,7 @@ Notes:
 
 - Use current Rust `boli` binary and Rust VM (`src/vm.rs`) as oracle.
 - Add capability to emit/load `.bc` v1 (Milestone 4). This is a Rust-side extension, not a rewrite.
-- Existing 191 tests remain the compatibility gate.
+- Existing gate (214 passed, 2 ignored) remains the compatibility baseline.
 
 Conceptual command:
 
@@ -613,11 +613,9 @@ Effort legend: `S` small, `M` medium, `L` large, `XL` multi-step research.
 
 ### 5.1 Preserve existing suite
 
-- Keep all 191 tests:
-  - 114 `tests/boli.rs`
-  - 34 `tests/cli.rs`
-  - 39 `tests/vm.rs`
-  - 4 embedded unit tests (`limits.rs`, `interpreter/mod.rs`)
+- Keep all existing tests; current gate is 214 passed, 2 ignored.
+  - `tests/boli.rs`, `tests/cli.rs`, `tests/vm.rs`, embedded unit tests
+  - `tests/phase3_lexer.rs` (10 tests after Phase 3.1)
 - No test deletion. New behavior adds new tests; no test rewritten to hide regressions.
 - CI continues to run Rust reference suite even after Rust is removed from release path.
 
@@ -667,7 +665,7 @@ After M11, add equivalent BOLI pipeline gates and keep Rust gates as reference-o
 |---|---:|---|---|---|
 | VM called stable too early | High | Skipping differential/fuzz | Hard gate in M1; tree-walker stays default | M1 |
 | f64 used for bytecode offsets | High | Reusing `Number` everywhere | Add `puran`/i64 in M2 | M2, M4 |
-| Unicode byte/char confusion | High | lexer caps bytes, `lambayi` chars | Add `byte_lambayi` and explicit conversion | M2, M5 |
+| Unicode byte/char confusion | High | lexer caps bytes, `lambayi` chars | Lexer-local `lexer_byte_length` proven in Phase 3.1; add general `byte_lambayi` and explicit conversion | M2, M5 |
 | Sandbox escape via FS | Critical | `..`/symlink/absolute path | canonicalize + root + extension allow-list | M3 |
 | Partial bytecode on write failure | High | crash during emit | atomic temp+rename | M3, M4 |
 | Nondeterministic bytecode | High | timestamps, hash maps, path strings | sorted inputs, fixed hash, no timestamp | M4, M10 |
@@ -690,7 +688,7 @@ Removal means:
 3. Add BOLI VM/runtime or non-Rust launcher.
 4. Prove reproducibility (M10).
 5. Flip release workflow (M11) so `cargo` is absent from build steps.
-6. Keep optional Rust reference CI job running all 191 tests.
+6. Keep optional Rust reference CI job running the full current suite (214 passed, 2 ignored at Phase 3.1).
 7. Update installer to consume new artifact path or keep `boli` binary name.
 
 Existing user rules honored:

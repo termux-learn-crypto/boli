@@ -15,7 +15,7 @@ Full verification matrix (run before a release):
 ```bash
 cargo fmt --check                          # formatting gate
 cargo check --all-targets                  # compile gate (all targets)
-cargo test                                 # 191 tests (4 unit + 114 library + 34 CLI + 39 VM)
+cargo test --all-targets --locked --quiet   # 214 passed / 2 ignored (includes 10 phase3_lexer tests)
 cargo clippy --all-targets -- -D warnings                  # lint gate
 cargo build --release                      # release artifact gate
 ```

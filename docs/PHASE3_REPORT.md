@@ -2,9 +2,9 @@
 
 ## Result summary
 
-Phase 3 ka constrained, in-memory BOLI lexer complete hai. `selfhost/lexer/` me BOLI se likha gaya lexer aur `tests/phase3_lexer.rs` me Rust lexer ke against real differential tests hain. Sab 5 Phase 3 tests green hain aur full repository gate bhi pass hai.
+Phase 3 ka constrained, in-memory BOLI lexer complete hai. `selfhost/lexer/` me BOLI se likha gaya lexer aur `tests/phase3_lexer.rs` me Rust lexer ke against real differential tests hain. Phase 3.1 ne 5 original tests ko 10 tak expand kiya, audit kiya, aur confirmed mismatches fix kiye. Full repository gate pass hai.
 
-Status: **Phase 3 experiment complete for the lexer boundary only.** Iska matlab self-hosting complete nahi hua. Default pipeline abhi bhi Rust lexer/parser/interpreter use karta hai. BOLI lexer default build me wired **nahi** hai.
+Status: **Phase 3 experiment complete for the lexer boundary only.** Phase 3.1 audit/fix results `docs/PHASE3_1_AUDIT_REPORT.md` me hain. Iska matlab self-hosting complete nahi hua. Default pipeline abhi bhi Rust lexer/parser/interpreter use karta hai. BOLI lexer default build me wired **nahi** hai.
 
 ## Inspect kiya gaya
 
@@ -38,7 +38,7 @@ Status: **Phase 3 experiment complete for the lexer boundary only.** Iska matlab
 - `selfhost/lexer/reader.boli` new.
   - `lexer_empty_list`, `lexer_state_new`, `lexer_current`, `lexer_peek_next`, `lexer_bump`, `lexer_push`.
 - `selfhost/lexer/lexer.boli` new.
-  - Keyword maps, character classifiers, size checks, finite-number pre-check, `lexer_lex`.
+  - Keyword maps, character classifiers, byte-accurate size checks, exact finite-number pre-check, `lexer_lex`.
   - Explicit `{line, col, pos}` state threading.
   - `handled` flag for mutually exclusive text-scan branches.
 - `selfhost/lexer/run.boli` new.
@@ -50,12 +50,17 @@ Status: **Phase 3 experiment complete for the lexer boundary only.** Iska matlab
 
 ### Tests
 
-- `tests/phase3_lexer.rs` new: 5 tests.
+- `tests/phase3_lexer.rs` new: 10 tests after Phase 3.1.
   - `phase3_keywords_numbers_and_identifiers`
   - `phase3_strings_comments_and_unicode`
   - `phase3_whitespace_and_columns`
   - `phase3_lexer_error_cases`
   - `phase3_limit_error_cases`
+  - `phase3_negative_number_boundaries`
+  - `phase3_numeric_finite_boundaries`
+  - `phase3_unicode_byte_limits`
+  - `phase3_documented_unicode_identifier_gap`
+  - `phase3_boli_error_kinds`
 - Harness invokes the BOLI lexer through the real CLI runner with embedded source.
 - Harness imports implementation modules directly; it does not import `run.boli`, because `run.boli` calls `lexer_lex` at import time.
 - Canonical comparison:
@@ -100,9 +105,9 @@ Results:
   - `Number|5|1|7`
   - `Newline||1|8`
   - `Eof||2|1`
-- `cargo test --test phase3_lexer --locked -- --nocapture`: **5 passed, 0 failed**.
+- `cargo test --test phase3_lexer --locked --quiet`: **10 passed, 0 failed**.
 - Full gate: **all checks passed**.
-- Default test total: **209 passed, 2 ignored**.
+- Default test total: **214 passed, 2 ignored**.
 - `cargo run --release --locked --quiet -- version`: `BOLI version 0.6.5`.
 - YAML parse: both workflows OK.
 - `git diff --check`: clean.
@@ -114,7 +119,7 @@ Results:
 | BOLI lexer modules exist | Pass | `selfhost/lexer/*.boli`. |
 | No Rust source behavior changed | Pass | Additive files/tests/docs only. |
 | In-memory source only | Pass | No BOLI file I/O. |
-| Token stream matches Rust on golden corpus | Pass | 5 differential tests cover tokens, strings, comments, Unicode, whitespace, CR/tab, limits, errors. |
+| Token stream matches Rust on golden corpus | Pass | 8 parity tests cover tokens, strings, comments, Unicode, whitespace, CR/tab, limits, errors, negative boundaries, finite boundaries, and UTF-8 byte caps; 1 test checks BOLI error kinds, and 1 test documents a known Unicode identifier gap. |
 | Error line/col/message match Rust | Pass | Compared as `line:col:message`. |
 | Limits enforced | Pass | Source/string/token limit cases included. |
 | Deterministic output | Pass | No timestamps, no random order, map keys accessed explicitly. |
@@ -125,12 +130,13 @@ Results:
 
 ## Known limitations
 
-- BOLI `lambayi` counts Unicode chars, while Rust lexer caps UTF-8 bytes. Byte-exact limit parity is not possible without a new byte-length primitive.
-- Unicode identifiers use ASCII plus a curated Indic range; Rust's exact Unicode identifier rule is approximated.
-- Error maps include `kind`, but Rust `BoliError` has only `line`, `col`, `message`, and `trace`; differential tests ignore `kind`.
+- `lexer_byte_length` now matches Rust's UTF-8 byte caps, but it walks every character and inherits BOLI's evaluation-step cost on very large sources.
+- Unicode identifiers use ASCII plus the curated mark/Indic ranges from `src/lexer.rs`; Rust's full `is_alphanumeric()` set is not implemented. Greek `α` is a verified documented gap.
+- Error maps include `kind`, but Rust `BoliError` has only `line`, `col`, `message`, and `trace`; differential tests ignore `kind`. BOLI kinds are verified separately.
+- Public `state` is always `khaali`; internal helpers thread a cursor map.
 - No byte offsets/spans are produced.
 - `run.boli` has import-time behavior; harness imports implementation modules directly.
-- `sankhya` finite-number overflow is approximated with digit-count/leading-digit pre-checks, verified against the tested corpus.
+- `sankhya` finite-number overflow is now pre-checked against Rust's first non-finite 309-digit decimal boundary, avoiding the interpreter's different non-finite error.
 - No BOLI parser, AST helper, compiler, or bytecode integration exists in this phase.
 
 ## Self-hosting blockers unchanged
@@ -161,4 +167,4 @@ No existing Rust source, CLI command, parser path, interpreter path, VM path, or
 
 ## Commit status
 
-No Phase 3 commit or push has been made. Review diff and status before any commit; commit only when explicitly asked.
+Phase 3 was committed and pushed as `c10129a BOLI Phase 3: experimental self-hosted lexer and differential tests`. Phase 3.1 changes are recorded in a separate commit; review `git status` and `git diff` before any further commit, and commit only when explicitly asked.

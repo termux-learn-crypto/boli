@@ -148,9 +148,59 @@ kaam lexer_is_word_char ch
     wapas do atom
 khatam
 
+lexer_overflow_prefix rakho "179769313486231580793728971405303415079934132710037826936173778980444968292764750946649017977587207096330286416692887910946555547851940402630657488671505820681908902000708383676273854845817711531764475730270069855571366959622842914819860834936475292719074168444365510704342711559699508093042880177904174497792"
+
+kaam lexer_byte_length text
+    size rakho lambayi text
+    total rakho 0
+    i rakho 1
+    jab tak i size se chhota ya barabar hai to
+        ch rakho akshar text i
+        agar ch "" se chhota ya barabar hai to
+            jodo total total aur 1
+            nahi to
+                agar ch "߿" se chhota ya barabar hai to
+                    jodo total total aur 2
+                    nahi to
+                        agar ch "￿" se chhota ya barabar hai to
+                            jodo total total aur 3
+                            nahi to
+                                jodo total total aur 4
+                            khatam
+                        khatam
+                    khatam
+        jodo i i aur 1
+    khatam
+    wapas do total
+khatam
+
+kaam lexer_trim_leading_zeros digits
+    size rakho lambayi digits
+    acc rakho ""
+    i rakho 1
+    started rakho galat
+    jab tak i size se chhota ya barabar hai to
+        ch rakho akshar digits i
+        agar started galat barabar hai to
+            agar ch "0" barabar hai to
+                jodo i i aur 1
+                nahi to
+                    started rakho sahi
+                    jodo acc acc aur ch
+                    jodo i i aur 1
+                khatam
+            nahi to
+                started rakho sahi
+                jodo acc acc aur ch
+                jodo i i aur 1
+            khatam
+    khatam
+    wapas do acc
+khatam
+
 kaam lexer_check_text_size st acc line
     limit rakho st hissa "max_string"
-    size rakho lambayi acc
+    size rakho lexer_byte_length acc
     agar size limit se bada hai to
         ltext rakho text limit
         msg rakho "text bahut bada hai (max "
@@ -166,7 +216,7 @@ khatam
 
 kaam lexer_check_word_size st word line
     limit rakho st hissa "max_string"
-    size rakho lambayi word
+    size rakho lexer_byte_length word
     agar size limit se bada hai to
         ltext rakho text limit
         msg rakho "shabd bahut bada hai (max "
@@ -189,19 +239,49 @@ kaam lexer_finite_error num line col
 khatam
 
 kaam lexer_is_finite_text value
-    bad rakho hai_text value "inf"
-    agar bad sahi barabar hai to
+    digits rakho value
+    size rakho lambayi digits
+    agar size 0 se bada hai to
+        first rakho akshar digits 1
+        agar first "-" barabar hai to
+            digits rakho kato digits 2 size
+        khatam
+    khatam
+    dot_pos rakho khojo digits "."
+    whole rakho digits
+    agar dot_pos khaali barabar hai to
+        whole rakho digits
+        nahi to
+            agar dot_pos 1 se bada hai to
+                end rakho dot_pos
+                ghatao end end se 1
+                whole rakho kato digits 1 end
+                nahi to
+                    whole rakho ""
+                khatam
+        khatam
+    whole rakho lexer_trim_leading_zeros whole
+    whole_size rakho lambayi whole
+    agar whole_size 309 se bada hai to
         wapas do galat
     khatam
-    bad rakho hai_text value "NaN"
-    agar bad sahi barabar hai to
+    agar whole_size 309 se chhota hai to
+        wapas do sahi
+    khatam
+    agar whole_size 0 barabar hai to
+        wapas do sahi
+    khatam
+    agar whole lexer_overflow_prefix se chhota hai to
+        wapas do sahi
+    khatam
+    agar whole lexer_overflow_prefix barabar hai to
         wapas do galat
     khatam
-    wapas do sahi
+    wapas do galat
 khatam
 
 kaam lexer_lex source max_source max_string max_tokens
-    src_len rakho lambayi source
+    src_len rakho lexer_byte_length source
     agar src_len max_source se bada hai to
         sl rakho text src_len
         ml rakho text max_source
@@ -344,11 +424,16 @@ kaam lexer_lex source max_source max_string max_tokens
                                             st hissa "separated" rakho galat
                                             nahi to
                                         is_number_start rakho lexer_is_digit ch
-                                        agar ch "-" barabar hai ya is_number_start sahi barabar hai to
+                                        neg_digit rakho galat
+                                        agar ch "-" barabar hai to
+                                            after_sign rakho lexer_peek_next st
+                                            neg_digit rakho lexer_is_digit after_sign
+                                        khatam
+                                        agar is_number_start sahi barabar hai ya neg_digit sahi barabar hai to
                                             start_line rakho st hissa "line"
-                                                    start_col rakho st hissa "col"
-                                                    sep rakho st hissa "separated"
-                                                    agar ch "-" barabar hai to
+                                            start_col rakho st hissa "col"
+                                            sep rakho st hissa "separated"
+                                            agar ch "-" barabar hai to
                                                         agar sep galat barabar hai to
                                                             msg rakho "'-' number ke saath chipka hai, space do ya 'ghatao' likho"
                                                             res rakho lexer_fail "stuck_minus" msg start_line start_col
@@ -391,46 +476,14 @@ kaam lexer_lex source max_source max_string max_tokens
                                                                 khatam
                                                             khatam
                                                         khatam
-                                                    digits rakho acc
-                                                    dsize rakho lambayi acc
-                                                    agar dsize 1 se bada hai to
-                                                        first rakho akshar acc 1
-                                                        agar first "-" barabar hai to
-                                                            digits rakho kato acc 2 dsize
-                                                        khatam
-                                                    khatam
-                                                    dcount rakho lambayi digits
-                                                    too_big rakho galat
-                                                    agar dcount 309 se bada hai to
-                                                        too_big rakho sahi
-                                                        nahi to
-                                                            agar dcount 309 barabar hai to
-                                                                first rakho akshar digits 1
-                                                                agar first "1" se bada hai to
-                                                                    too_big rakho sahi
-                                                                    nahi to
-                                                                        agar first "1" barabar hai to
-                                                                            second rakho akshar digits 2
-                                                                            big_second rakho hai_text "23456789" second
-                                                                            agar big_second sahi barabar hai to
-                                                                                too_big rakho sahi
-                                                                            khatam
-                                                                        khatam
-                                                                    khatam
-                                                                khatam
-                                                            khatam
+                                                    finite rakho lexer_is_finite_text acc
                                                     end_col rakho st hissa "col"
-                                                    agar too_big sahi barabar hai to
+                                                    agar finite galat barabar hai to
                                                         res rakho lexer_finite_error acc start_line end_col
                                                         wapas do res
                                                     khatam
                                                     val rakho sankhya acc
                                                     vtext rakho text val
-                                                    finite rakho lexer_is_finite_text vtext
-                                                    agar finite galat barabar hai to
-                                                        res rakho lexer_finite_error acc start_line end_col
-                                                        wapas do res
-                                                    khatam
                                                     pushed rakho lexer_push st "Number" vtext start_line start_col
                                                     flag rakho pushed hissa "ok"
                                                     agar flag galat barabar hai to

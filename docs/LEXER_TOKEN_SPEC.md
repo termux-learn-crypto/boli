@@ -15,8 +15,8 @@ res rakho lexer_lex source max_source max_string max_tokens
 Inputs:
 
 - `source`: text, supplied in memory. The BOLI lexer never reads files.
-- `max_source`: number, source-character cap.
-- `max_string`: number, text-literal/word character cap.
+- `max_source`: number, source UTF-8 byte cap.
+- `max_string`: number, text-literal/word UTF-8 byte cap.
 - `max_tokens`: number, maximum token count including `Eof`.
 
 Result map:
@@ -30,7 +30,7 @@ Result map:
 }
 ```
 
-`state` is the final cursor map: `{line, col, pos}`. It is returned on success and failure so callers can continue incremental work or diagnose position.
+`state` is reserved for future incremental use. It is currently `khaali` in every result; internal helpers do pass a cursor map, but `lexer_lex` does not expose it. See `docs/PHASE3_1_AUDIT_REPORT.md` for the justification.
 
 `error` is `khaali` on success.
 
@@ -108,24 +108,24 @@ Payload kinds:
 Current kinds:
 
 - `source_too_large`
-- `too_many_tokens`
+- `token_limit`
 - `text_too_large`
 - `word_too_large`
 - `unterminated_text`
-- `invalid_escape`
-- `number_too_large`
+- `number_not_finite`
 - `unexpected_character`
-- `internal`
 
-Diagnostic text matches `src/lexer.rs` exactly where applicable. Differential tests compare `line:col:message`; `kind` is retained for future typed-error work but is not part of current Rust parity because `BoliError` has no `kind` field yet.
+`stuck_minus` is produced when `-` directly follows a completed atom and is followed by a digit (for example `5-3`), matching Rust. A bare `-` or `-` followed by a non-digit produces `unexpected_character`; see `docs/PHASE3_1_AUDIT_REPORT.md`.
+
+Diagnostic text matches `src/lexer.rs` exactly where applicable. Differential tests compare `line:col:message`; `kind` is retained for future typed-error work but is not part of current Rust parity because `BoliError` has no `kind` field yet. Unknown escapes are preserved literally as `backslash + character`, matching Rust; therefore no `invalid_escape` kind exists.
 
 ## Lexing rules
 
 - Whitespace: space, tab, and CR are skipped; LF emits `Newline`.
 - `#` comments run to end of line; the newline itself is still emitted.
 - Text literals use `"..."`. Supported escapes are `\"`, `\\`, and `\n`.
-- Numbers are decimal digit runs with optional leading `-`, using Rust-compatible finite-number formatting.
-- Word atoms are keywords or identifiers. ASCII letters/digits, `_`, and a curated Indic range are accepted.
+- Numbers are decimal digit runs with optional leading `-` only when the next character is a digit, using Rust-compatible finite-number formatting.
+- Word atoms are keywords or identifiers. ASCII letters/digits, `_`, and a curated Unicode mark/Indic range are accepted. Rust accepts the full Unicode `is_alphanumeric()` set; the remaining scripts are a documented gap.
 - Every other character produces `unexpected_character`.
 - `Eof` is always the final token.
 
@@ -138,7 +138,7 @@ Limits are enforced before unbounded accumulation:
 - text and word length checked while scanning;
 - finite-number pre-check avoids passing huge digit strings to `sankhya`.
 
-BOLI has no byte-length primitive, so `lambayi` counts Unicode characters while Rust caps UTF-8 bytes. This is a documented approximation, not exact parity for multibyte source. See `docs/PHASE3_REPORT.md`.
+`lexer_byte_length` walks Unicode characters and counts UTF-8 bytes by scalar-value ranges, so `max_source`, `max_string`, and word caps match Rust's byte-based limits. The finite-number pre-check compares the integer part against Rust's first non-finite 309-digit decimal boundary before calling `sankhya`. See `docs/PHASE3_1_AUDIT_REPORT.md`.
 
 ## Non-goals
 

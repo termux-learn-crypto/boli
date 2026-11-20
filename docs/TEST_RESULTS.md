@@ -49,7 +49,9 @@ running 0 tests
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 ```
 
-**191 passed / 0 failed** (4 unit + 114 `tests/boli.rs` library + 34 `tests/cli.rs` end-to-end + 39 `tests/vm.rs` VM/parity).
+Historical v0.6.5 baseline above: **191 passed / 0 failed** (4 unit + 114 `tests/boli.rs` library + 34 `tests/cli.rs` end-to-end + 39 `tests/vm.rs` VM/parity).
+
+Current Phase 3.1 gate: **214 passed / 0 failed / 2 ignored** via `cargo test --all-targets --locked --quiet`; the increase is from `tests/phase3_lexer.rs` (10 tests) and the Phase 3 lexer additions.
 
 Regenerate the count with:
 ```bash
@@ -98,6 +100,15 @@ BOLI version 0.6.5
 - 20,000-item list literal → Hinglish Galti.
 - Oversized `pucho` line in REPL → Galti, then the next short line is accepted.
 
+## Phase 3.1 verification addendum
+
+- `cargo test --test phase3_lexer --locked --quiet`: 10 passed, 0 failed.
+- `cargo run --quiet -- run selfhost/lexer/demo.boli`: `Likho||1|1`, `Number|5|1|7`, `Newline||1|8`, `Eof||2|1`.
+- Full gate re-run after Phase 3.1 edits: `cargo fmt --all -- --check`, `cargo check --all-targets --locked`, `cargo clippy --all-targets --locked -- -D warnings`, `cargo test --all-targets --locked --quiet`, `cargo build --release --locked`, `cargo run --release --locked --quiet -- version`.
+- Release binary still reports `BOLI version 0.6.5`.
+- YAML parse: `.github/workflows/ci.yml` and `.github/workflows/release.yml` OK.
+- `git diff --check`: clean.
+
 ## Environment notes (honest)
 
 - `cargo` in `~/.cargo/bin` is a rustup shim with no default toolchain; the system Termux `cargo`/`rustc` 1.100.0 is used.
@@ -106,4 +117,4 @@ BOLI version 0.6.5
 
 ## Conclusion
 
-All configured gates are green, 191/191 tests pass, and the release binary reports v0.6.5. No regressions detected.
+All configured gates are green, the current gate has 214 passed / 2 ignored, and the release binary reports v0.6.5. No regressions detected.
