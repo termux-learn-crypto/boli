@@ -1,0 +1,540 @@
+kaam ast_empty_list unused
+    seed rakho 0 0
+    empty rakho hatao seed 1
+    empty rakho hatao empty 1
+    wapas do empty
+khatam
+
+kaam ast_zero_span
+    sp rakho map "start" 0 "end" 0 "start_line" 1 "start_col" 1 "end_line" 1 "end_col" 1
+    wapas do sp
+khatam
+
+kaam ast_node tag span
+    n rakho map "tag" tag "line" span hissa "start_line" "col" span hissa "start_col" "span" span
+    wapas do n
+khatam
+
+kaam ast_program statements
+    sp rakho ast_zero_span
+    p rakho ast_node "Program" sp
+    p hissa "statements" rakho statements
+    wapas do p
+khatam
+
+kaam ast_expr_number value span
+    n rakho ast_node "Number" span
+    n hissa "value" rakho value
+    wapas do n
+khatam
+
+kaam ast_expr_text value span
+    n rakho ast_node "Text" span
+    n hissa "value" rakho value
+    wapas do n
+khatam
+
+kaam ast_expr_bool value span
+    n rakho ast_node "Bool" span
+    n hissa "value" rakho value
+    wapas do n
+khatam
+
+kaam ast_expr_khaali span
+    n rakho ast_node "Khaali" span
+    wapas do n
+khatam
+
+kaam ast_expr_var name span
+    n rakho ast_node "Var" span
+    n hissa "name" rakho name
+    wapas do n
+khatam
+
+kaam ast_expr_arith op left right span
+    n rakho ast_node "Arith" span
+    n hissa "op" rakho op
+    n hissa "left" rakho left
+    n hissa "right" rakho right
+    wapas do n
+khatam
+
+kaam ast_expr_call name args span
+    n rakho ast_node "Call" span
+    n hissa "name" rakho name
+    n hissa "args" rakho args
+    wapas do n
+khatam
+
+kaam ast_expr_list items span
+    n rakho ast_node "List" span
+    n hissa "items" rakho items
+    wapas do n
+khatam
+
+kaam ast_expr_index target index span
+    n rakho ast_node "Index" span
+    n hissa "target" rakho target
+    n hissa "index" rakho index
+    wapas do n
+khatam
+
+kaam ast_cond_cmp left op right span
+    n rakho ast_node "Cmp" span
+    n hissa "left" rakho left
+    n hissa "op" rakho op
+    n hissa "right" rakho right
+    wapas do n
+khatam
+
+kaam ast_cond_aur left right span
+    n rakho ast_node "Aur" span
+    n hissa "left" rakho left
+    n hissa "right" rakho right
+    wapas do n
+khatam
+
+kaam ast_cond_ya left right span
+    n rakho ast_node "Ya" span
+    n hissa "left" rakho left
+    n hissa "right" rakho right
+    wapas do n
+khatam
+
+kaam ast_stmt_likho value span
+    n rakho ast_node "Likho" span
+    n hissa "value" rakho value
+    wapas do n
+khatam
+
+kaam ast_stmt_rakho name value span
+    n rakho ast_node "Rakho" span
+    n hissa "name" rakho name
+    n hissa "value" rakho value
+    wapas do n
+khatam
+
+kaam ast_stmt_pucho name prompt span
+    n rakho ast_node "Pucho" span
+    n hissa "name" rakho name
+    n hissa "prompt" rakho prompt
+    wapas do n
+khatam
+
+kaam ast_stmt_arith_assign target op left right span
+    n rakho ast_node "ArithAssign" span
+    n hissa "target" rakho target
+    n hissa "op" rakho op
+    n hissa "left" rakho left
+    n hissa "right" rakho right
+    wapas do n
+khatam
+
+kaam ast_stmt_agar cond then_block else_block span
+    n rakho ast_node "Agar" span
+    n hissa "cond" rakho cond
+    n hissa "then_block" rakho then_block
+    n hissa "else_block" rakho else_block
+    wapas do n
+khatam
+
+kaam ast_stmt_range_loop from upper body span
+    n rakho ast_node "RangeLoop" span
+    n hissa "from" rakho from
+    n hissa "to" rakho upper
+    n hissa "body" rakho body
+    wapas do n
+khatam
+
+kaam ast_stmt_while_loop cond body span
+    n rakho ast_node "WhileLoop" span
+    n hissa "cond" rakho cond
+    n hissa "body" rakho body
+    wapas do n
+khatam
+
+kaam ast_stmt_kaam_def name params body span
+    n rakho ast_node "KaamDef" span
+    n hissa "name" rakho name
+    n hissa "params" rakho params
+    n hissa "body" rakho body
+    wapas do n
+khatam
+
+kaam ast_stmt_kaam_call name args span
+    n rakho ast_node "KaamCall" span
+    n hissa "name" rakho name
+    n hissa "args" rakho args
+    wapas do n
+khatam
+
+kaam ast_stmt_wapas value span
+    n rakho ast_node "Wapas" span
+    n hissa "value" rakho value
+    wapas do n
+khatam
+
+kaam ast_stmt_ruk span
+    n rakho ast_node "Ruk" span
+    wapas do n
+khatam
+
+kaam ast_stmt_agla span
+    n rakho ast_node "Agla" span
+    wapas do n
+khatam
+
+kaam ast_stmt_laao path span
+    n rakho ast_node "Laao" span
+    n hissa "path" rakho path
+    wapas do n
+khatam
+
+kaam ast_stmt_list_assign target index value span
+    n rakho ast_node "ListAssign" span
+    n hissa "target" rakho target
+    n hissa "index" rakho index
+    n hissa "value" rakho value
+    wapas do n
+khatam
+
+kaam ast_stmt_map_rakho name pairs span
+    n rakho ast_node "MapRakho" span
+    n hissa "name" rakho name
+    n hissa "pairs" rakho pairs
+    wapas do n
+khatam
+
+kaam ast_span_text span
+    out rakho "S("
+    jodo out out aur text span hissa "start"
+    jodo out out aur ","
+    jodo out out aur text span hissa "end"
+    jodo out out aur ","
+    jodo out out aur text span hissa "start_line"
+    jodo out out aur ","
+    jodo out out aur text span hissa "start_col"
+    jodo out out aur ","
+    jodo out out aur text span hissa "end_line"
+    jodo out out aur ","
+    jodo out out aur text span hissa "end_col"
+    jodo out out aur ")"
+    wapas do out
+khatam
+
+kaam ast_dump_scalar value
+    kind rakho prakaar value
+    agar kind "text" barabar hai to
+        out rakho escape_text value
+        wapas do out
+    khatam
+    agar kind "number" barabar hai to
+        out rakho text value
+        wapas do out
+    khatam
+    agar kind "sahi/galat" barabar hai to
+        agar value sahi barabar hai to
+            wapas do "sahi"
+        khatam
+        wapas do "galat"
+    khatam
+    agar kind "khaali" barabar hai to
+        wapas do "khaali"
+    khatam
+    wapas do kind
+khatam
+
+kaam ast_dump_prefix node
+    out rakho node hissa "tag"
+    jodo out out aur "|"
+    jodo out out aur text node hissa "line"
+    jodo out out aur "|"
+    jodo out out aur text node hissa "col"
+    jodo out out aur "|"
+    jodo out out aur ast_span_text node hissa "span"
+    wapas do out
+khatam
+
+kaam ast_wrap value
+    out rakho "("
+    jodo out out aur value
+    jodo out out aur ")"
+    wapas do out
+khatam
+
+kaam ast_field node
+    dumped rakho ast_dump node
+    wapas do ast_wrap dumped
+khatam
+
+kaam ast_join_parts parts separator
+    out rakho ""
+    total rakho lambayi parts
+    i rakho 1
+    jab tak i total se chhota ya barabar hai to
+        agar i 1 se bada hai to
+            jodo out out aur separator
+        khatam
+        jodo out out aur parts hissa i
+        jodo i i aur 1
+    khatam
+    wapas do out
+khatam
+
+kaam ast_dump_list nodes
+    parts rakho ast_empty_list 0
+    total rakho lambayi nodes
+    i rakho 1
+    jab tak i total se chhota ya barabar hai to
+        item rakho ast_field nodes hissa i
+        parts rakho jodega parts item
+        jodo i i aur 1
+    khatam
+    out rakho "<"
+    jodo out out aur text total
+    jodo out out aur ">["
+    jodo out out aur ast_join_parts parts ", "
+    jodo out out aur "]"
+    wapas do out
+khatam
+
+kaam ast_dump_text_list values
+    parts rakho ast_empty_list 0
+    total rakho lambayi values
+    i rakho 1
+    jab tak i total se chhota ya barabar hai to
+        item rakho ast_dump_scalar values hissa i
+        parts rakho jodega parts item
+        jodo i i aur 1
+    khatam
+    out rakho "<"
+    jodo out out aur text total
+    jodo out out aur ">["
+    jodo out out aur ast_join_parts parts ", "
+    jodo out out aur "]"
+    wapas do out
+khatam
+
+kaam ast_dump_optional_list nodes
+    agar nodes khaali barabar hai to
+        wapas do "khaali"
+    khatam
+    wapas do ast_dump_list nodes
+khatam
+
+kaam ast_dump_pairs pairs
+    parts rakho ast_empty_list 0
+    total rakho lambayi pairs
+    i rakho 1
+    jab tak i total se chhota ya barabar hai to
+        pair rakho pairs hissa i
+        key rakho ast_dump pair hissa 1
+        val rakho ast_dump pair hissa 2
+        item rakho "("
+        jodo item item aur key
+        jodo item item aur ","
+        jodo item item aur val
+        jodo item item aur ")"
+        parts rakho jodega parts item
+        jodo i i aur 1
+    khatam
+    out rakho "<"
+    jodo out out aur text total
+    jodo out out aur ">["
+    jodo out out aur ast_join_parts parts ", "
+    jodo out out aur "]"
+    wapas do out
+khatam
+
+kaam ast_dump node
+    tag rakho node hissa "tag"
+    out rakho ast_dump_prefix node
+    agar tag "Program" barabar hai to
+        jodo out out aur "|statements="
+        jodo out out aur ast_dump_list node hissa "statements"
+        wapas do out
+    khatam
+    agar tag "Number" barabar hai to
+        jodo out out aur "|value="
+        jodo out out aur ast_dump_scalar node hissa "value"
+        wapas do out
+    khatam
+    agar tag "Text" barabar hai to
+        jodo out out aur "|value="
+        jodo out out aur ast_dump_scalar node hissa "value"
+        wapas do out
+    khatam
+    agar tag "Bool" barabar hai to
+        jodo out out aur "|value="
+        jodo out out aur ast_dump_scalar node hissa "value"
+        wapas do out
+    khatam
+    agar tag "Khaali" barabar hai to
+        wapas do out
+    khatam
+    agar tag "Var" barabar hai to
+        jodo out out aur "|name="
+        jodo out out aur ast_dump_scalar node hissa "name"
+        wapas do out
+    khatam
+    agar tag "Arith" barabar hai to
+        jodo out out aur "|op="
+        jodo out out aur ast_dump_scalar node hissa "op"
+        jodo out out aur "|left="
+        jodo out out aur ast_field node hissa "left"
+        jodo out out aur "|right="
+        jodo out out aur ast_field node hissa "right"
+        wapas do out
+    khatam
+    agar tag "Call" barabar hai to
+        jodo out out aur "|name="
+        jodo out out aur ast_dump_scalar node hissa "name"
+        jodo out out aur "|args="
+        jodo out out aur ast_dump_list node hissa "args"
+        wapas do out
+    khatam
+    agar tag "List" barabar hai to
+        jodo out out aur "|items="
+        jodo out out aur ast_dump_list node hissa "items"
+        wapas do out
+    khatam
+    agar tag "Index" barabar hai to
+        jodo out out aur "|target="
+        jodo out out aur ast_field node hissa "target"
+        jodo out out aur "|index="
+        jodo out out aur ast_field node hissa "index"
+        wapas do out
+    khatam
+    agar tag "Cmp" barabar hai to
+        jodo out out aur "|left="
+        jodo out out aur ast_field node hissa "left"
+        jodo out out aur "|op="
+        jodo out out aur ast_dump_scalar node hissa "op"
+        jodo out out aur "|right="
+        jodo out out aur ast_field node hissa "right"
+        wapas do out
+    khatam
+    agar tag "Aur" barabar hai to
+        jodo out out aur "|left="
+        jodo out out aur ast_field node hissa "left"
+        jodo out out aur "|right="
+        jodo out out aur ast_field node hissa "right"
+        wapas do out
+    khatam
+    agar tag "Ya" barabar hai to
+        jodo out out aur "|left="
+        jodo out out aur ast_field node hissa "left"
+        jodo out out aur "|right="
+        jodo out out aur ast_field node hissa "right"
+        wapas do out
+    khatam
+    agar tag "Likho" barabar hai to
+        jodo out out aur "|value="
+        jodo out out aur ast_field node hissa "value"
+        wapas do out
+    khatam
+    agar tag "Rakho" barabar hai to
+        jodo out out aur "|name="
+        jodo out out aur ast_dump_scalar node hissa "name"
+        jodo out out aur "|value="
+        jodo out out aur ast_field node hissa "value"
+        wapas do out
+    khatam
+    agar tag "Pucho" barabar hai to
+        jodo out out aur "|name="
+        jodo out out aur ast_dump_scalar node hissa "name"
+        jodo out out aur "|prompt="
+        jodo out out aur ast_dump_scalar node hissa "prompt"
+        wapas do out
+    khatam
+    agar tag "ArithAssign" barabar hai to
+        jodo out out aur "|target="
+        jodo out out aur ast_dump_scalar node hissa "target"
+        jodo out out aur "|op="
+        jodo out out aur ast_dump_scalar node hissa "op"
+        jodo out out aur "|left="
+        jodo out out aur ast_field node hissa "left"
+        jodo out out aur "|right="
+        jodo out out aur ast_field node hissa "right"
+        wapas do out
+    khatam
+    agar tag "Agar" barabar hai to
+        jodo out out aur "|cond="
+        jodo out out aur ast_field node hissa "cond"
+        jodo out out aur "|then_block="
+        jodo out out aur ast_dump_list node hissa "then_block"
+        jodo out out aur "|else_block="
+        jodo out out aur ast_dump_optional_list node hissa "else_block"
+        wapas do out
+    khatam
+    agar tag "RangeLoop" barabar hai to
+        jodo out out aur "|from="
+        jodo out out aur ast_field node hissa "from"
+        jodo out out aur "|to="
+        jodo out out aur ast_field node hissa "to"
+        jodo out out aur "|body="
+        jodo out out aur ast_dump_list node hissa "body"
+        wapas do out
+    khatam
+    agar tag "WhileLoop" barabar hai to
+        jodo out out aur "|cond="
+        jodo out out aur ast_field node hissa "cond"
+        jodo out out aur "|body="
+        jodo out out aur ast_dump_list node hissa "body"
+        wapas do out
+    khatam
+    agar tag "KaamDef" barabar hai to
+        jodo out out aur "|name="
+        jodo out out aur ast_dump_scalar node hissa "name"
+        jodo out out aur "|params="
+        jodo out out aur ast_dump_text_list node hissa "params"
+        jodo out out aur "|body="
+        jodo out out aur ast_dump_list node hissa "body"
+        wapas do out
+    khatam
+    agar tag "KaamCall" barabar hai to
+        jodo out out aur "|name="
+        jodo out out aur ast_dump_scalar node hissa "name"
+        jodo out out aur "|args="
+        jodo out out aur ast_dump_list node hissa "args"
+        wapas do out
+    khatam
+    agar tag "Wapas" barabar hai to
+        jodo out out aur "|value="
+        val rakho node hissa "value"
+        agar val khaali barabar hai to
+            jodo out out aur "khaali"
+            nahi to
+                jodo out out aur ast_field val
+            khatam
+        wapas do out
+    khatam
+    agar tag "Ruk" barabar hai to
+        wapas do out
+    khatam
+    agar tag "Agla" barabar hai to
+        wapas do out
+    khatam
+    agar tag "Laao" barabar hai to
+        jodo out out aur "|path="
+        jodo out out aur ast_dump_scalar node hissa "path"
+        wapas do out
+    khatam
+    agar tag "ListAssign" barabar hai to
+        jodo out out aur "|target="
+        jodo out out aur ast_dump_scalar node hissa "target"
+        jodo out out aur "|index="
+        jodo out out aur ast_field node hissa "index"
+        jodo out out aur "|value="
+        jodo out out aur ast_field node hissa "value"
+        wapas do out
+    khatam
+    agar tag "MapRakho" barabar hai to
+        jodo out out aur "|name="
+        jodo out out aur ast_dump_scalar node hissa "name"
+        jodo out out aur "|pairs="
+        jodo out out aur ast_dump_pairs node hissa "pairs"
+        wapas do out
+    khatam
+    wapas do out
+khatam

@@ -1,0 +1,4 @@
+laao "parser.boli"
+
+result rakho parser_parse_program lex_result
+likho parser_result_text result

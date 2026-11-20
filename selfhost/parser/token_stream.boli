@@ -1,0 +1,249 @@
+laao "../lexer/token.boli"
+laao "errors.boli"
+
+kaam stream_empty_list unused
+    seed rakho 0 0
+    empty rakho hatao seed 1
+    empty rakho hatao empty 1
+    wapas do empty
+khatam
+
+kaam parser_synthetic_eof
+    t rakho lexer_token "Eof" "" 1 1 0 0 1 1 1 1
+    wapas do t
+khatam
+
+kaam parser_state_new tokens max_depth max_condition_depth
+    errors rakho parser_error_empty_list 0
+    options rakho map "max_steps" 100000 "max_call_depth" 64 "max_value_depth" 64 "max_tokens" 1000000
+    st rakho map "tokens" tokens "pos" 1 "depth" 0 "max_depth" max_depth "max_condition_depth" max_condition_depth "condition_nodes" 0 "errors" errors "options" options
+    wapas do st
+khatam
+
+kaam token_stream_peek state
+    tokens rakho state hissa "tokens"
+    pos rakho state hissa "pos"
+    total rakho lambayi tokens
+    agar pos 1 se chhota hai to
+        wapas do parser_synthetic_eof
+    khatam
+    agar pos total se bada hai to
+        wapas do parser_synthetic_eof
+    khatam
+    tok rakho tokens hissa pos
+    wapas do tok
+khatam
+
+kaam token_stream_peek_at state offset
+    tokens rakho state hissa "tokens"
+    pos rakho state hissa "pos"
+    idx rakho jodo pos aur offset
+    total rakho lambayi tokens
+    agar idx 1 se chhota hai to
+        wapas do parser_synthetic_eof
+    khatam
+    agar idx total se bada hai to
+        wapas do parser_synthetic_eof
+    khatam
+    tok rakho tokens hissa idx
+    wapas do tok
+khatam
+
+kaam token_stream_next state
+    tok rakho token_stream_peek state
+    advanced rakho state
+    tokens rakho advanced hissa "tokens"
+    pos rakho advanced hissa "pos"
+    total rakho lambayi tokens
+    agar pos 1 se bada ya barabar hai to
+        agar pos total se chhota ya barabar hai to
+            jodo pos pos aur 1
+            advanced hissa "pos" rakho pos
+        khatam
+    khatam
+    res rakho map "ok" sahi "token" tok "state" advanced
+    wapas do res
+khatam
+
+kaam token_stream_at_eof state
+    tok rakho token_stream_peek state
+    kind rakho tok hissa "kind"
+    agar kind "Eof" barabar hai to
+        wapas do sahi
+    khatam
+    wapas do galat
+khatam
+
+kaam token_stream_skip_newlines state
+    running rakho sahi
+    jab tak running sahi barabar hai to
+        tok rakho token_stream_peek state
+        kind rakho tok hissa "kind"
+        agar kind "Newline" barabar hai to
+            discarded rakho token_stream_next state
+            advanced rakho discarded hissa "state"
+            new_pos rakho advanced hissa "pos"
+            state hissa "pos" rakho new_pos
+        nahi to
+            running rakho galat
+        khatam
+    khatam
+    wapas do state
+khatam
+
+kaam token_stream_describe token
+    kind rakho token hissa "kind"
+    agar kind "Newline" barabar hai to
+        wapas do "line ka ant"
+    khatam
+    agar kind "Eof" barabar hai to
+        wapas do "file ka ant"
+    khatam
+    agar kind "Number" barabar hai to
+        wapas do token hissa "value"
+    khatam
+    agar kind "Text" barabar hai to
+        out rakho "\""
+        jodo out out aur token hissa "value"
+        jodo out out aur "\""
+        wapas do out
+    khatam
+    agar kind "Ident" barabar hai to
+        wapas do token hissa "value"
+    khatam
+    wapas do neeche kind
+khatam
+
+kaam token_stream_atom_start kind
+    agar kind "Number" barabar hai to
+        wapas do sahi
+    khatam
+    agar kind "Text" barabar hai to
+        wapas do sahi
+    khatam
+    agar kind "Sahi" barabar hai to
+        wapas do sahi
+    khatam
+    agar kind "Galat" barabar hai to
+        wapas do sahi
+    khatam
+    agar kind "Khaali" barabar hai to
+        wapas do sahi
+    khatam
+    agar kind "Ident" barabar hai to
+        wapas do sahi
+    khatam
+    agar kind "Kaam" barabar hai to
+        wapas do sahi
+    khatam
+    agar kind "Jodo" barabar hai to
+        wapas do sahi
+    khatam
+    agar kind "Ghatao" barabar hai to
+        wapas do sahi
+    khatam
+    agar kind "Guna" barabar hai to
+        wapas do sahi
+    khatam
+    agar kind "Bhaag" barabar hai to
+        wapas do sahi
+    khatam
+    wapas do galat
+khatam
+
+kaam token_stream_ident_kind kind
+    agar kind "Ident" barabar hai to
+        wapas do sahi
+    khatam
+    agar kind "Kaam" barabar hai to
+        wapas do sahi
+    khatam
+    agar kind "Hissa" barabar hai to
+        wapas do sahi
+    khatam
+    wapas do galat
+khatam
+
+kaam token_stream_expect state wanted label
+    tok rakho token_stream_peek state
+    kind rakho tok hissa "kind"
+    agar kind wanted barabar hai to
+        advanced_result rakho token_stream_next state
+        advanced rakho advanced_result hissa "state"
+        res rakho map "ok" sahi "token" tok "state" advanced
+        wapas do res
+    khatam
+    shown rakho token_stream_describe tok
+    msg rakho "yahan '"
+    jodo msg msg aur label
+    jodo msg msg aur "' chahiye tha, par '"
+    jodo msg msg aur shown
+    jodo msg msg aur "' mila"
+    err rakho parser_error_from_token "parser_expected_token" msg tok "token"
+    res rakho parser_fail err state
+    wapas do res
+khatam
+
+kaam token_stream_expect_line_end state
+    tok rakho token_stream_peek state
+    kind rakho tok hissa "kind"
+    agar kind "Newline" barabar hai to
+        advanced rakho token_stream_skip_newlines state
+        res rakho map "ok" sahi "state" advanced
+        wapas do res
+    khatam
+    agar kind "Eof" barabar hai to
+        res rakho map "ok" sahi "state" state
+        wapas do res
+    khatam
+    shown rakho token_stream_describe tok
+    msg rakho "'"
+    jodo msg msg aur shown
+    jodo msg msg aur "' yahan nahi aa sakta, ek line me ek hi kaam hota hai"
+    err rakho parser_error_from_token "parser_expected_line_end" msg tok "line"
+    res rakho parser_fail err state
+    wapas do res
+khatam
+
+kaam token_stream_expect_ident state
+    tok rakho token_stream_peek state
+    kind rakho tok hissa "kind"
+    ok rakho token_stream_ident_kind kind
+    agar ok sahi barabar hai to
+        name rakho tok hissa "value"
+        agar kind "Kaam" barabar hai to
+            name rakho "kaam"
+        khatam
+        agar kind "Hissa" barabar hai to
+            name rakho "hissa"
+        khatam
+        advanced_result rakho token_stream_next state
+        advanced rakho advanced_result hissa "state"
+        res rakho map "ok" sahi "name" name "token" tok "state" advanced
+        wapas do res
+    khatam
+    shown rakho token_stream_describe tok
+    msg rakho "yahan naam chahiye tha, par '"
+    jodo msg msg aur shown
+    jodo msg msg aur "' mila"
+    err rakho parser_error_from_token "parser_expected_ident" msg tok "name"
+    res rakho parser_fail err state
+    wapas do res
+khatam
+
+kaam parser_state_text state
+    out rakho "STATE|pos="
+    jodo out out aur text state hissa "pos"
+    jodo out out aur "|depth="
+    jodo out out aur text state hissa "depth"
+    jodo out out aur "|max_depth="
+    jodo out out aur text state hissa "max_depth"
+    jodo out out aur "|max_condition_depth="
+    jodo out out aur text state hissa "max_condition_depth"
+    jodo out out aur "|condition_nodes="
+    jodo out out aur text state hissa "condition_nodes"
+    jodo out out aur "|errors="
+    error_count rakho lambayi state hissa "errors"
+    jodo out out aur text error_count
+    wapas do out
+khatam

@@ -1,0 +1,86 @@
+laao "errors.boli"
+laao "ast.boli"
+laao "token_stream.boli"
+
+kaam parser_parse_stmt state
+    tok rakho token_stream_peek state
+    err rakho parser_error_from_token "parser_not_implemented" "statement parser abhi tayyar nahi hai" tok "statement"
+    res rakho parser_fail err state
+    wapas do res
+khatam
+
+kaam parser_parse_expr state
+    tok rakho token_stream_peek state
+    err rakho parser_error_from_token "parser_not_implemented" "expression parser abhi tayyar nahi hai" tok "expression"
+    res rakho parser_fail err state
+    wapas do res
+khatam
+
+kaam parser_parse_cond state
+    tok rakho token_stream_peek state
+    err rakho parser_error_from_token "parser_not_implemented" "condition parser abhi tayyar nahi hai" tok "condition"
+    res rakho parser_fail err state
+    wapas do res
+khatam
+
+kaam parser_parse_block state
+    tok rakho token_stream_peek state
+    err rakho parser_error_from_token "parser_not_implemented" "block parser abhi tayyar nahi hai" tok "block"
+    res rakho parser_fail err state
+    wapas do res
+khatam
+
+kaam parser_parse_program_state state
+    state rakho token_stream_skip_newlines state
+    tok rakho token_stream_peek state
+    kind rakho tok hissa "kind"
+    agar kind "Eof" barabar hai to
+        statements rakho ast_empty_list 0
+        program rakho ast_program statements
+        res rakho parser_ok program state
+        wapas do res
+    khatam
+    res rakho parser_parse_stmt state
+    wapas do res
+khatam
+
+kaam parser_parse_program lex_result
+    ok rakho lex_result hissa "ok"
+    agar ok galat barabar hai to
+        err rakho lex_result hissa "error"
+        res rakho parser_fail err khaali
+        wapas do res
+    khatam
+    tokens rakho lex_result hissa "tokens"
+    state rakho parser_state_new tokens 64 128
+    res rakho parser_parse_program_state state
+    wapas do res
+khatam
+
+kaam parser_result_text res
+    out rakho "RESULT|ok="
+    flag rakho res hissa "ok"
+    jodo out out aur text flag
+    jodo out out aur "|ast="
+    ast rakho res hissa "ast"
+    agar ast khaali barabar hai to
+        jodo out out aur "khaali"
+        nahi to
+            jodo out out aur ast_dump ast
+        khatam
+    jodo out out aur "|error="
+    err rakho res hissa "error"
+    agar err khaali barabar hai to
+        jodo out out aur "khaali"
+        nahi to
+            jodo out out aur parser_error_text err
+        khatam
+    jodo out out aur "|state="
+    state rakho res hissa "state"
+    agar state khaali barabar hai to
+        jodo out out aur "khaali"
+        nahi to
+            jodo out out aur parser_state_text state
+        khatam
+    wapas do out
+khatam

@@ -1,0 +1,49 @@
+kaam parser_error_empty_list unused
+    seed rakho 0 0
+    empty rakho hatao seed 1
+    empty rakho hatao empty 1
+    wapas do empty
+khatam
+
+kaam parser_make_error kind message line col start_byte end_byte start_line start_col end_line end_col token_kind context
+    err rakho map "kind" kind "message" message "line" line "col" col "start_byte" start_byte "end_byte" end_byte "start_line" start_line "start_col" start_col "end_line" end_line "end_col" end_col "token_kind" token_kind "context" context "recovered" galat
+    wapas do err
+khatam
+
+kaam parser_error_from_token kind message token context
+    err rakho parser_make_error kind message token hissa "line" token hissa "col" token hissa "start_byte" token hissa "end_byte" token hissa "start_line" token hissa "start_col" token hissa "end_line" token hissa "end_col" token hissa "kind" context
+    wapas do err
+khatam
+
+kaam parser_ok ast state
+    res rakho map "ok" sahi "ast" ast "error" khaali "state" state
+    wapas do res
+khatam
+
+kaam parser_fail error state
+    res rakho map "ok" galat "ast" khaali "error" error "state" state
+    wapas do res
+khatam
+
+kaam parser_error_text err
+    out rakho err hissa "kind"
+    jodo out out aur "|"
+    jodo out out aur err hissa "message"
+    jodo out out aur "|"
+    jodo out out aur text err hissa "line"
+    jodo out out aur "|"
+    jodo out out aur text err hissa "col"
+    jodo out out aur "|"
+    jodo out out aur text err hissa "start_byte"
+    jodo out out aur "|"
+    jodo out out aur text err hissa "end_byte"
+    jodo out out aur "|"
+    jodo out out aur text err hissa "start_line"
+    jodo out out aur "|"
+    jodo out out aur text err hissa "start_col"
+    jodo out out aur "|"
+    jodo out out aur text err hissa "end_line"
+    jodo out out aur "|"
+    jodo out out aur text err hissa "end_col"
+    wapas do out
+khatam

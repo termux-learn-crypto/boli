@@ -9,6 +9,8 @@
 
 > **Phase 4A update:** parser design is now documented in `docs/PARSER_GRAMMAR.md`, `docs/PARSER_AST_SPEC.md`, `docs/PARSER_ARCHITECTURE.md`, `docs/PARSER_ERROR_RECOVERY.md`, and `docs/PHASE4A_REPORT.md`. This phase was design-only: no BOLI parser, AST, lexer, VM, CLI, or Rust parser implementation was added. The design keeps the current recursive-descent grammar, flat call arguments, contextual `kaam`/`hissa`, fail-fast errors, and line-only Rust AST compatibility. Phase 4B implementation readiness is **READY WITH BLOCKERS**; the roadmap below remains the implementation order.
 
+> **Phase 4B.1 update:** the parser foundation is now implemented in `selfhost/parser/` with a tagged-map AST, canonical AST dumps, structured parser results/errors, a 1-based token cursor over the frozen token contract, and an honest skeleton that parses only an empty program. `tests/phase4b1_parser.rs` executes these BOLI modules and passes. Grammar implementation / Phase 4B.2 was not started; see `docs/PHASE4B_1_REPORT.md`.
+
 ---
 
 ## 0. Executive summary
@@ -447,7 +449,7 @@ Design decisions:
 - default errors stay fail-fast with one error; structured kinds and multi-error recovery are later opt-ins;
 - no parser, AST, lexer, VM, CLI, or syntax change was made.
 
-**Decision:** Phase 4B implementation is **READY WITH BLOCKERS**. Blockers are runtime/step/call/value-depth limits, absence of a BOLI AST representation, absence of a parser differential corpus, and the standing rule that VM stabilization precedes compiler migration.
+**Decision:** Phase 4B implementation is **READY WITH BLOCKERS**. Blockers are runtime/step/call/value-depth limits, the unimplemented grammar after the Phase 4B.1 AST/cursor foundation, absence of a parser differential corpus, and the standing rule that VM stabilization precedes compiler migration.
 
 ### Milestone 1 — VM stabilization
 
