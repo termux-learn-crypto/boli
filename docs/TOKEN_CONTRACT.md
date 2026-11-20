@@ -149,7 +149,8 @@ laao "lexer.boli"
 
 ## Compatibility and non-goals
 
-- Existing `line`, `col`, `kind`, `value`, and result fields are preserved.
-- Span fields are additive; consumers that ignore them keep working.
+- Existing `line`, `col`, `kind`, `value`, and BOLI result-map fields are preserved.
+- BOLI result maps are additive; consumers that ignore span fields keep working.
+- Rust `Token { span }` and `BoliError { kind, span }` are source-breaking struct-literal changes; use `Token::new`, `BoliError::line`, or `BoliError::line_col`. This ships as v0.7.0.
 - `SYNTHETIC_EOF` in the Rust parser uses a zero-span value; parser logic is unchanged.
 - No AST format, parser rules, bytecode format, VM opcode, or CLI behavior changed in Phase 3.2.

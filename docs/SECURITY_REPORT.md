@@ -74,7 +74,7 @@ Remaining `unwrap`s are internal invariants (scope stack never empty; last token
 
 ## Verification performed (not claims — actual commands)
 
-- `cargo test --all-targets --locked --quiet` — 215 passed / 0 failed / 2 ignored; historical v0.6.5 baseline was 191/191 pass (4 unit + 114 library + 34 CLI + 39 VM)
+- `cargo test --all-targets --locked --quiet` — 216 passed / 0 failed / 2 ignored; historical v0.6.5 baseline was 191/191 pass (4 unit + 114 library + 34 CLI + 39 VM)
 - `cargo clippy --all-targets -- -D warnings` — clean
 - `BOLI_IMPORT_ROOT` confinement verified for interpreter and `BOLI_VM=1` (`cli_import_root_confines_laao`)
 - Over-limit input drainage verified in `src/limits.rs` unit tests and CLI REPL regression

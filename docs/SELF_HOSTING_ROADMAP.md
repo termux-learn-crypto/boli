@@ -19,7 +19,7 @@
 
 | Area | Readiness | Basis |
 |---|---:|---|
-| Stage 0 Rust reference implementation | **5/5** | `src/` me complete lexer, parser, AST, interpreter, VM, limits, builtins, CLI, tests hain. 215 tests passed, 2 ignored in the current gate. |
+| Stage 0 Rust reference implementation | **5/5** | `src/` me complete lexer, parser, AST, interpreter, VM, limits, builtins, CLI, tests hain. 216 tests passed, 2 ignored in the current gate. |
 | Core language logic for a compiler | **3/5** | Recursion, `kaam`, lists, maps, `hissa`, comparisons, `wapas do` exist. Enums/pattern matching/closures nahi hain, par tagged maps + explicit state threading se prototype ban sakta hai. |
 | Systems capability for a compiler | **1/5** | No general file read/write, no bytes type, no binary output, no structured catchable errors, no source spans in AST, no BOLI-level bytecode API. |
 | VM as a stable compiler target | **3/5** | 39 VM tests + parity suite exist, but VM explicitly experimental (`src/vm.rs:1`), no bytecode serialization/loader, no fuzz corpus dedicated to VM, no benchmarks. |
@@ -45,7 +45,7 @@
 
 `VM stabilize` → `runtime primitives` → `sandboxed FS/bytes` → `bytecode format + Rust compiler emits bytecode` → `BOLI lexer` → `BOLI parser` → `BOLI AST helpers` → `BOLI bytecode compiler` → `self-host check` → `reproducibility` → `Rust-free release` → `native codegen`.
 
-Har step par existing gate (ab 215 passed, 2 ignored) plus naye tests green honi chahiye. Rust implementation ko delete nahi karna; use **bootstrap/reference implementation** ke roop me preserve karna hai.
+Har step par existing gate (ab 216 passed, 2 ignored) plus naye tests green honi chahiye. Rust implementation ko delete nahi karna; use **bootstrap/reference implementation** ke roop me preserve karna hai.
 
 ---
 
@@ -66,7 +66,7 @@ Har step par existing gate (ab 215 passed, 2 ignored) plus naye tests green honi
 | Builtins | `src/builtins.rs:8-191` | `lambayi`, `upar`, `neeche`, `text`, `sankhya`, `chaabiyan`. | Yes. | Compiler ke liye string/list/map basics hain, par file/bytes/binary nahi. |
 | CLI / REPL | `src/main.rs:23-461` | `run`, `.hl` shortcut, help/version, `--vm`, REPL with depth heuristic. | Yes. | REPL interpreter-only hai (`main.rs:306`) even with `--vm`. New build pipeline ko CLI flags reproduce karne honge. |
 | Imports | `interpreter/mod.rs:170-206`, `vm.rs:451-505,1066-1097`, `limits.rs:147-187` | `laao`, canonical path, root confinement, dedup, depth guard. | Yes. | Read-only imports exist; general file I/O nahi. Module namespace/export nahi. |
-| Tests | `tests/boli.rs`, `tests/cli.rs`, `tests/vm.rs`, `tests/phase3_lexer.rs`, embedded unit tests | Historical v0.6.5 baseline 191 tests; current gate 215 passed, 2 ignored. | Rust test harness. | Golden corpus preserve karna hai. BOLI-level test runner abhi nahi. |
+| Tests | `tests/boli.rs`, `tests/cli.rs`, `tests/vm.rs`, `tests/phase3_lexer.rs`, embedded unit tests | Historical v0.6.5 baseline 191 tests; current gate 216 passed, 2 ignored. | Rust test harness. | Golden corpus preserve karna hai. BOLI-level test runner abhi nahi. |
 | CI/CD | `.github/workflows/ci.yml`, `release.yml`, `dependabot.yml` | 3-OS CI, 4 release targets, checksums, pinned actions, Dependabot. | Cargo/Rust required. | Rust-free release ke liye replace hona hai. |
 | Installer | `install.sh:1-57` | Copies local `target/release/boli`. | Needs Cargo-built binary path. | Non-Cargo artifact path ya installer change chahiye. |
 
@@ -375,7 +375,7 @@ Notes:
 
 - Use current Rust `boli` binary and Rust VM (`src/vm.rs`) as oracle.
 - Add capability to emit/load `.bc` v1 (Milestone 4). This is a Rust-side extension, not a rewrite.
-- Existing gate (215 passed, 2 ignored) remains the compatibility baseline.
+- Existing gate (216 passed, 2 ignored) remains the compatibility baseline.
 
 Conceptual command:
 
@@ -637,7 +637,7 @@ Design decisions:
 
 ### 5.1 Preserve existing suite
 
-- Keep all existing tests; current gate is 215 passed, 2 ignored.
+- Keep all existing tests; current gate is 216 passed, 2 ignored.
   - `tests/boli.rs`, `tests/cli.rs`, `tests/vm.rs`, embedded unit tests
   - `tests/phase3_lexer.rs` (11 tests after Phase 3.2)
 - No test deletion. New behavior adds new tests; no test rewritten to hide regressions.

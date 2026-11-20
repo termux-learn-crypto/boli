@@ -1228,6 +1228,14 @@ fn public_parser_handles_empty_and_eofless_tokens() {
 }
 
 #[test]
+fn public_token_new_keeps_legacy_coordinates() {
+    let token = Token::new(Tok::Number(5.0), 2, 9);
+    assert_eq!(token.line, 2);
+    assert_eq!(token.col, 9);
+    assert_eq!(token.span, Span::default());
+}
+
+#[test]
 fn stuck_negative_number_is_error_but_spaced_one_is_a_list_item() {
     let err = parse_source("x rakho 5-3").unwrap_err();
     assert!(

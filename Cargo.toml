@@ -1,6 +1,6 @@
 [package]
 name = "boli"
-version = "0.6.5"
+version = "0.7.0"
 edition = "2024"
 rust-version = "1.100.0"
 description = "BOLI - Hinglish programming language (Rust interpreter, .hl files)"

@@ -130,7 +130,7 @@ Results:
 - `cargo fmt --all -- --check`: clean.
 - `cargo check --all-targets --locked`: passed.
 - `cargo clippy --all-targets --locked -- -D warnings`: passed with zero warnings.
-- `cargo test --all-targets --locked --quiet`: **215 passed, 0 failed, 2 ignored**.
+- `cargo test --all-targets --locked --quiet`: **216 passed, 0 failed, 2 ignored**.
 - `cargo build --release --locked`: passed.
 - Release binary: `BOLI version 0.6.5`.
 - Self-hosted lexer demo:

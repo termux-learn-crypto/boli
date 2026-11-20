@@ -192,7 +192,7 @@ git diff --check
 
 Results:
 
-- `cargo test --all-targets --locked --quiet`: **215 passed, 0 failed, 2 ignored**.
+- `cargo test --all-targets --locked --quiet`: **216 passed, 0 failed, 2 ignored**.
 - Release binary: `BOLI version 0.6.5`.
 - Demo output:
 

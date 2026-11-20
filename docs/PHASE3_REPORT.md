@@ -6,7 +6,7 @@ Phase 3 ka constrained, in-memory BOLI lexer complete hai. `selfhost/lexer/` me 
 
 Status: **Phase 3 experiment complete for the lexer boundary only.** Phase 3.1 audit/fix results `docs/PHASE3_1_AUDIT_REPORT.md` me hain. Iska matlab self-hosting complete nahi hua. Default pipeline abhi bhi Rust lexer/parser/interpreter use karta hai. BOLI lexer default build me wired **nahi** hai.
 
-> **Phase 3.2 addendum:** this report preserves the Phase 3/3.1 baseline. Phase 3.2 added `unicode.boli`, span fields, Rust `BoliError.kind`/span parity, canonical span dumps, and an 11th differential test. Later sections that say there are no spans, no Rust error kind, or a Unicode identifier gap are historical and superseded by `docs/TOKEN_CONTRACT.md` and `docs/PHASE3_2_REPORT.md`. The current full gate is 215 passed / 0 failed / 2 ignored.
+> **Phase 3.2 addendum:** this report preserves the Phase 3/3.1 baseline. Phase 3.2 added `unicode.boli`, span fields, Rust `BoliError.kind`/span parity, canonical span dumps, and an 11th differential test. Later sections that say there are no spans, no Rust error kind, or a Unicode identifier gap are historical and superseded by `docs/TOKEN_CONTRACT.md` and `docs/PHASE3_2_REPORT.md`. The current full gate is 216 passed / 0 failed / 2 ignored.
 
 ## Inspect kiya gaya
 

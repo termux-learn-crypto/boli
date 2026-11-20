@@ -88,6 +88,15 @@ impl LexErrorKind {
 }
 
 impl Token {
+    pub fn new(tok: Tok, line: usize, col: usize) -> Self {
+        Self {
+            tok,
+            line,
+            col,
+            span: Span::default(),
+        }
+    }
+
     // Galti message ke liye token ko dikhane layak banao
     pub fn describe(&self) -> String {
         match &self.tok {

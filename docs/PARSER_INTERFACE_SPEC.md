@@ -31,7 +31,7 @@ Parser-facing guarantees:
 
 ## Current Rust parser behavior
 
-`src/parser.rs` was not changed except for the minimal `SYNTHETIC_EOF` token literal needed to satisfy the additive `span` field.
+`src/parser.rs` was not changed except for the minimal `SYNTHETIC_EOF` token literal needed by the new `span` field; that field is a source-breaking Rust API change.
 
 Existing parser behavior remains authoritative:
 
@@ -58,7 +58,7 @@ pub struct BoliError {
 }
 ```
 
-A future parser may use `kind` and `span` for structured diagnostics without changing the lexer. The span is boxed to keep `BoliError` below the `clippy::result_large_err` threshold; read it with `error.span.as_deref()`. Existing error constructors set both fields to `None`, so current output and tests remain compatible.
+A future parser may use `kind` and `span` for structured diagnostics without changing the lexer. The span is boxed to keep `BoliError` below the `clippy::result_large_err` threshold; read it with `error.span.as_deref()`. Existing error constructors set both fields to `None`, so runtime output remains compatible, but existing struct literals must migrate to those constructors.
 
 ## BOLI-side token map
 
